@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-06
+
+### Changed
+
+- Standardize jobs dashboard priority and status badges to fixed-size rounded rectangles for consistent sizing across labels
+
 ## [0.5.0] - 2026-05-06
 
 ### Added
