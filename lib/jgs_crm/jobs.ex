@@ -14,10 +14,11 @@ defmodule JgsCrm.Jobs do
       from j in Job,
         order_by: [
           asc: fragment("CASE ? WHEN 'high' THEN 0 ELSE 1 END", j.priority),
-          asc: fragment(
-            "CASE ? WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 WHEN 'lead' THEN 2 ELSE 3 END",
-            j.status
-          ),
+          asc:
+            fragment(
+              "CASE ? WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 WHEN 'lead' THEN 2 ELSE 3 END",
+              j.status
+            ),
           asc: j.client_name
         ]
     )

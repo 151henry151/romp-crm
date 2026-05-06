@@ -25,8 +25,15 @@ defmodule JgsCrm.Jobs.Job do
   def changeset(job, attrs) do
     job
     |> cast(attrs, [
-      :client_name, :address, :phone, :work_description,
-      :priority, :status, :referred_by, :notes, :next_action
+      :client_name,
+      :address,
+      :phone,
+      :work_description,
+      :priority,
+      :status,
+      :referred_by,
+      :notes,
+      :next_action
     ])
     |> validate_required([:client_name, :priority, :status])
   end

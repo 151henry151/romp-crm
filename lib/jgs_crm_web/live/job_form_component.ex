@@ -52,7 +52,7 @@ defmodule JgsCrmWeb.JobFormComponent do
   def render(assigns) do
     ~H"""
     <div>
-      <.header><%= @title %></.header>
+      <.header>{@title}</.header>
 
       <.form
         for={@form}
