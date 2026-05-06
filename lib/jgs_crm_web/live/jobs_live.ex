@@ -51,7 +51,10 @@ defmodule JgsCrmWeb.JobsLive do
 
   @impl true
   def handle_event("filter", %{"status" => status}, socket) do
-    {:noreply, assign(socket, :filter, String.to_existing_atom(status))}
+    {:noreply,
+     socket
+     |> assign(:filter, String.to_existing_atom(status))
+     |> assign(:jobs, Jobs.list_jobs())}
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
@@ -70,7 +73,10 @@ defmodule JgsCrmWeb.JobsLive do
         id
       end
 
-    {:noreply, assign(socket, :expanded_job_id, expanded)}
+    {:noreply,
+     socket
+     |> assign(:expanded_job_id, expanded)
+     |> assign(:jobs, Jobs.list_jobs())}
   end
 
   defp visible_jobs(jobs, :all), do: jobs
