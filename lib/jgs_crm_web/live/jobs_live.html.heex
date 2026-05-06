@@ -1,7 +1,7 @@
 <div class="min-h-screen bg-gray-50">
   <%!-- Header --%>
-  <header class="bg-white border-b border-gray-200 px-6 py-4">
-    <div class="flex items-center justify-between max-w-screen-xl mx-auto">
+  <header class="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between max-w-screen-xl mx-auto">
       <div class="flex items-center gap-3 min-w-0">
         <img
           src={~p"/images/jgs_logo.png"}
@@ -9,12 +9,14 @@
           class="h-10 w-auto shrink-0 object-contain"
         />
         <div class="min-w-0">
-          <h1 class="text-xl font-bold text-gray-900">JGS Mechanical</h1>
+          <h1 class="text-lg sm:text-xl font-bold text-gray-900">JGS Mechanical</h1>
           <p class="text-sm text-gray-500">Customer & Job Tracker</p>
         </div>
       </div>
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-500">{@current_scope.user.email}</span>
+      <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 min-w-0">
+        <span class="hidden lg:block text-sm text-gray-500 truncate max-w-[220px]">
+          {@current_scope.user.email}
+        </span>
         <.link
           href={~p"/users/log-out"}
           method="delete"
@@ -24,7 +26,7 @@
         </.link>
         <.link
           patch={~p"/jobs/new"}
-          class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+          class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 sm:px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
         >
           + New Job
         </.link>
@@ -32,15 +34,15 @@
     </div>
   </header>
 
-  <main class="max-w-screen-xl mx-auto px-6 py-6">
+  <main class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
     <%!-- Status filter tabs --%>
-    <div class="flex gap-1 mb-6 border-b border-gray-200">
+    <div class="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
       <%= for {label, status} <- [{"All", :all} | Enum.map([:lead, :pending, :in_progress, :done], &{status_label(&1), &1})] do %>
         <button
           phx-click="filter"
           phx-value-status={status}
           class={[
-            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+            "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors",
             if(@filter == status,
               do: "border-blue-600 text-blue-600",
               else: "border-transparent text-gray-500 hover:text-gray-700"
@@ -61,8 +63,61 @@
       <% end %>
     </div>
 
+    <div class="md:hidden space-y-3">
+      <%= for job <- visible_jobs(@jobs, @filter) do %>
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            phx-click="toggle_row"
+            phx-value-id={job.id}
+            class="w-full text-left px-4 py-3"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-semibold text-gray-900 break-words">{job.client_name}</p>
+                <p class="text-sm text-gray-600 mt-1 break-words">{display(job.work_description)}</p>
+              </div>
+              <span class={"rounded-full px-2.5 py-0.5 text-xs font-medium #{status_class(job.status)}"}>
+                {status_label(job.status)}
+              </span>
+            </div>
+          </button>
+
+          <%= if expanded?(@expanded_job_id, job.id) do %>
+            <div class="border-t border-gray-100 px-4 py-3 text-sm space-y-2">
+              <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words">{display(job.address)}</span></p>
+              <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
+              <p><span class="font-medium text-gray-700">Priority:</span> {if job.priority == :high, do: "High", else: "Normal"}</p>
+              <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words">{display(job.referred_by)}</span></p>
+              <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words">{display(job.next_action)}</span></p>
+              <p><span class="font-medium text-gray-700">Notes:</span> <span class="break-words">{display(job.notes)}</span></p>
+              <div class="pt-2 flex items-center gap-4">
+                <.link patch={~p"/jobs/#{job.id}/edit"} class="text-blue-600 hover:text-blue-800 font-medium">
+                  Edit
+                </.link>
+                <button
+                  phx-click="delete"
+                  phx-value-id={job.id}
+                  data-confirm="Delete this job?"
+                  class="text-red-500 hover:text-red-700 font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%= if visible_jobs(@jobs, @filter) == [] do %>
+        <div class="bg-white rounded-lg border border-gray-200 px-4 py-12 text-center text-gray-400">
+          No jobs found.
+        </div>
+      <% end %>
+    </div>
+
     <%!-- Job table --%>
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-100 bg-gray-50">
@@ -79,7 +134,12 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
           <%= for job <- visible_jobs(@jobs, @filter) do %>
-            <tr class="hover:bg-gray-50 group">
+            <tr
+              id={"job-row-#{job.id}"}
+              phx-click="toggle_row"
+              phx-value-id={job.id}
+              class="hover:bg-gray-50 group cursor-pointer"
+            >
               <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                 {job.client_name}
               </td>
@@ -121,6 +181,23 @@
                 </div>
               </td>
             </tr>
+            <%= if expanded?(@expanded_job_id, job.id) do %>
+              <tr class="bg-gray-50">
+                <td colspan="9" class="px-4 py-3 text-sm text-gray-700">
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
+                    <p><span class="font-medium text-gray-700">Client:</span> {display(job.client_name)}</p>
+                    <p><span class="font-medium text-gray-700">Address:</span> {display(job.address)}</p>
+                    <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
+                    <p><span class="font-medium text-gray-700">Work:</span> {display(job.work_description)}</p>
+                    <p><span class="font-medium text-gray-700">Priority:</span> {if job.priority == :high, do: "High", else: "Normal"}</p>
+                    <p><span class="font-medium text-gray-700">Status:</span> {status_label(job.status)}</p>
+                    <p><span class="font-medium text-gray-700">Referred By:</span> {display(job.referred_by)}</p>
+                    <p><span class="font-medium text-gray-700">Next Action:</span> {display(job.next_action)}</p>
+                    <p class="lg:col-span-2"><span class="font-medium text-gray-700">Notes:</span> {display(job.notes)}</p>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
           <% end %>
           <%= if visible_jobs(@jobs, @filter) == [] do %>
             <tr>

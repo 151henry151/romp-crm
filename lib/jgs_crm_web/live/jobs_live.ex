@@ -11,6 +11,7 @@ defmodule JgsCrmWeb.JobsLive do
     {:ok,
      socket
      |> assign(:filter, :all)
+     |> assign(:expanded_job_id, nil)
      |> assign(:jobs, Jobs.list_jobs())}
   end
 
@@ -59,6 +60,19 @@ defmodule JgsCrmWeb.JobsLive do
     {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
   end
 
+  def handle_event("toggle_row", %{"id" => id}, socket) do
+    id = String.to_integer(id)
+
+    expanded =
+      if socket.assigns.expanded_job_id == id do
+        nil
+      else
+        id
+      end
+
+    {:noreply, assign(socket, :expanded_job_id, expanded)}
+  end
+
   defp visible_jobs(jobs, :all), do: jobs
   defp visible_jobs(jobs, status), do: Enum.filter(jobs, &(&1.status == status))
 
@@ -77,4 +91,10 @@ defmodule JgsCrmWeb.JobsLive do
 
   defp count_for(jobs, :all), do: length(jobs)
   defp count_for(jobs, status), do: Enum.count(jobs, &(&1.status == status))
+
+  defp expanded?(expanded_job_id, job_id), do: expanded_job_id == job_id
+
+  defp display(nil), do: "—"
+  defp display(""), do: "—"
+  defp display(value), do: value
 end
