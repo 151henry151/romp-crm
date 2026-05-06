@@ -20,19 +20,23 @@ defmodule JgsCrmWeb.JobsLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/")
 
-    refute render(view) =~ "Detailed Notes 123"
+    refute has_element?(view, "#job-expand-md-#{job.id}")
+    refute has_element?(view, "#job-expand-sm-#{job.id}")
 
     view
     |> element("#job-row-#{job.id}")
     |> render_click()
 
-    assert render(view) =~ "Detailed Notes 123"
-    assert render(view) =~ "42 Maple St"
+    assert has_element?(view, "#job-expand-md-#{job.id}")
+    assert has_element?(view, "#job-expand-sm-#{job.id}")
+    expanded = render(view)
+    assert expanded =~ "Detailed Notes 123"
 
     view
     |> element("#job-row-#{job.id}")
     |> render_click()
 
-    refute render(view) =~ "Detailed Notes 123"
+    refute has_element?(view, "#job-expand-md-#{job.id}")
+    refute has_element?(view, "#job-expand-sm-#{job.id}")
   end
 end

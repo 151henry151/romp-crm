@@ -73,9 +73,18 @@
             class="w-full text-left px-4 py-3"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
+              <div class="min-w-0 space-y-1">
                 <p class="font-semibold text-gray-900 break-words">{job.client_name}</p>
-                <p class="text-sm text-gray-600 mt-1 break-words">{display(job.work_description)}</p>
+                <p class="text-sm text-gray-600 break-words">
+                  <span class="font-medium text-gray-700">Work:</span>
+                  {display(job.work_description)}
+                </p>
+                <%= if is_binary(job.notes) && String.trim(job.notes) != "" do %>
+                  <p class="text-sm text-gray-600 break-words">
+                    <span class="font-medium text-gray-700">Notes:</span>
+                    {job.notes}
+                  </p>
+                <% end %>
               </div>
               <span class={"rounded-full px-2.5 py-0.5 text-xs font-medium #{status_class(job.status)}"}>
                 {status_label(job.status)}
@@ -84,10 +93,18 @@
           </button>
 
           <%= if expanded?(@expanded_job_id, job.id) do %>
-            <div class="border-t border-gray-100 px-4 py-3 text-sm space-y-2">
+            <div id={"job-expand-sm-#{job.id}"} class="border-t border-gray-100 px-4 py-3 text-sm space-y-2">
               <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words">{display(job.address)}</span></p>
               <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
-              <p><span class="font-medium text-gray-700">Priority:</span> {if job.priority == :high, do: "High", else: "Normal"}</p>
+              <p>
+                <span class="font-medium text-gray-700">Work:</span>
+                <span class="break-words">{display(job.work_description)}</span>
+              </p>
+              <p>
+                <span class="font-medium text-gray-700">Priority:</span>
+                <%= if job.priority == :high do %>High<% else %>Normal<% end %>
+              </p>
+              <p><span class="font-medium text-gray-700">Status:</span> {status_label(job.status)}</p>
               <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words">{display(job.referred_by)}</span></p>
               <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words">{display(job.next_action)}</span></p>
               <p><span class="font-medium text-gray-700">Notes:</span> <span class="break-words">{display(job.notes)}</span></p>
@@ -182,7 +199,7 @@
               </td>
             </tr>
             <%= if expanded?(@expanded_job_id, job.id) do %>
-              <tr class="bg-gray-50">
+              <tr id={"job-expand-md-#{job.id}"} class="bg-gray-50">
                 <td colspan="9" class="px-4 py-3 text-sm text-gray-700">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
                     <p><span class="font-medium text-gray-700">Client:</span> {display(job.client_name)}</p>

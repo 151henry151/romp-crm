@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-05-06
+### Fixed
+- Refresh job list from DB when toggling row expand or filters so SMS and other server-side updates show immediately in the dashboard
+
+### Changed
+- Label mobile summary line as Work; show optional Notes under the name only when the notes field has content
+- Add Work and Status rows to the mobile expanded panel; render priority with standard HEEx control flow
+
+### Added
+- Add stable ids for mobile and desktop expanded-detail blocks for LiveView tests
+
 ## [0.2.5] - 2026-05-06
 ### Added
 - Log full Twilio inbound SMS body, `MessageSid`, `From`, and create/update parse and database outcomes in `TwilioWebhookController` for production debugging
