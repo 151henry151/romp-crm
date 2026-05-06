@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-06
+
+### Changed
+
+- Add dashboard header hint linking SMS intake number `(802) 278-0970` and clarify it accepts both new jobs and updates
+
 ## [0.5.1] - 2026-05-06
 
 ### Changed
