@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-06
+
+### Changed
+
+- Pass live `Jobs.snapshot_for_sms_ai/0` JSON into Anthropic SMS extraction so updates select `job_id` by semantic match against CRM rows (typos, informal references)
+- Validate `job_id` against the snapshot before applying Twilio SMS patches; keep heuristic `match` map path as fallback
+- Extend deterministic SMS stub with `STUB_JSON` test prefix and `STUB_UPDATE` job_id shape
+
+## [0.2.9] - 2026-05-06
+
+### Changed
+
+- Normalize `work_description_snippet` matching so phrases like "water shut off" or "water shut-off" align with CRM text stored as "water shutoff"
+- Document work-snippet normalization in the Anthropic SMS system prompt
+
+## [0.2.8] - 2026-05-06
+
+### Changed
+
+- Raise `work_description_snippet` SMS match weight so task-only references can reach the match threshold
+- Treat a single above-threshold job as the SMS update target even when its score is below 52 (keeps requiring a clear margin when multiple jobs score)
+- Extend Anthropic SMS prompt with indirect job references and a water-shutoff address-correction example
+
+## [0.2.7] - 2026-05-05
+
+### Fixed
+
+- Scope expanded job detail rows with explicit Tailwind text color and `data-theme="light"` so Address, Work, Priority, Status, and other values stay visible on white cards when the root uses DaisyUI dark theme
+
 ## [0.2.6] - 2026-05-06
 ### Fixed
 - Refresh job list from DB when toggling row expand or filters so SMS and other server-side updates show immediately in the dashboard

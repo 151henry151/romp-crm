@@ -13,10 +13,12 @@ defmodule JgsCrm.Jobs.SmsMatch do
   def score(%Job{} = job, spec) when is_map(spec) do
     spec = stringify(spec)
 
+    # Work descriptions must score high enough alone to pass `sms_match_min_score/0` when the SMS
+    # references the job only by task ("the water shutoff guy…") with no name or address snippet.
     0
     |> add_client_name(job.client_name, Map.get(spec, "client_name"))
     |> add_substring_field(job.address, Map.get(spec, "address_snippet"), 38)
-    |> add_substring_field(job.work_description, Map.get(spec, "work_description_snippet"), 28)
+    |> add_work_description_substring_field(job.work_description, Map.get(spec, "work_description_snippet"), 48)
     |> add_substring_field(job.notes, Map.get(spec, "notes_snippet"), 18)
     |> add_phone_fragment(job.phone, Map.get(spec, "phone_fragment"))
   end
@@ -73,6 +75,57 @@ defmodule JgsCrm.Jobs.SmsMatch do
     case blank_to_nil(spec_needle) do
       nil -> acc
       needle -> acc + substring_points(blank_to_nil(job_val), needle, weight)
+    end
+  end
+
+  # Claude often emits "water shut off" while techs type "water shutoff". Normalize trivial splits
+  # so substring matching still lines up with stored CRM text.
+  defp add_work_description_substring_field(acc, _job_val, nil, _weight), do: acc
+
+  defp add_work_description_substring_field(acc, job_val, spec_needle, weight) do
+    case blank_to_nil(spec_needle) do
+      nil ->
+        acc
+
+      needle ->
+        acc +
+          substring_points_normalized(
+            normalize_work_match_text(blank_to_nil(job_val)),
+            normalize_work_match_text(needle),
+            weight
+          )
+    end
+  end
+
+  defp normalize_work_match_text(nil), do: nil
+
+  defp normalize_work_match_text(s) when is_binary(s) do
+    s
+    |> String.downcase()
+    |> String.trim()
+    |> String.replace(~r/[\-_]+/, " ")
+    |> String.replace(~r/\s+/, " ")
+    |> String.replace("shut off", "shutoff")
+  end
+
+  defp substring_points_normalized(nil, _, _), do: 0
+  defp substring_points_normalized(_, nil, _), do: 0
+
+  defp substring_points_normalized(h, n, weight) when is_binary(h) and is_binary(n) do
+    n = String.trim(n)
+
+    cond do
+      n == "" ->
+        0
+
+      String.contains?(h, n) and String.length(n) >= 6 ->
+        weight
+
+      String.contains?(h, n) and String.length(n) >= 3 ->
+        trunc(weight * 0.65)
+
+      true ->
+        0
     end
   end
 

@@ -41,7 +41,10 @@ defmodule JgsCrmWeb.TwilioWebhookController do
       "Twilio SMS inbound: sid=#{message_sid} from=#{from} body=#{inspect(body_text)}"
     )
 
-    case SmsJobExtractor.extract(body_text) do
+    jobs_snapshot = Jobs.snapshot_for_sms_ai()
+    allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
+
+    case SmsJobExtractor.extract(body_text, jobs_snapshot) do
       {:ok, {:create, attrs}} ->
         Logger.info(
           "Twilio SMS parsed create: sid=#{message_sid} from=#{from} attrs=#{inspect(attrs)}"
@@ -61,6 +64,47 @@ defmodule JgsCrmWeb.TwilioWebhookController do
             )
 
             twiml_ok(conn)
+        end
+
+      {:ok, {:update_by_id, job_id, patch}} ->
+        Logger.info(
+          "Twilio SMS parsed update: sid=#{message_sid} from=#{from} job_id=#{job_id} patch=#{inspect(patch)}"
+        )
+
+        cond do
+          not MapSet.member?(allowed_job_ids, job_id) ->
+            Logger.info(
+              "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=:invalid_job_id job_id=#{job_id} patch=#{inspect(patch)}"
+            )
+
+            twiml_ok(conn)
+
+          true ->
+            case Jobs.get_job(job_id) do
+              nil ->
+                Logger.info(
+                  "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=:job_not_found job_id=#{job_id}"
+                )
+
+                twiml_ok(conn)
+
+              job ->
+                case Jobs.update_job(job, patch) do
+                  {:ok, updated_job} ->
+                    Logger.info(
+                      "Twilio SMS update applied: sid=#{message_sid} from=#{from} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
+                    )
+
+                    twiml_ok(conn)
+
+                  {:error, changeset} ->
+                    Logger.warning(
+                      "Twilio SMS update failed: sid=#{message_sid} from=#{from} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
+                    )
+
+                    twiml_ok(conn)
+                end
+            end
         end
 
       {:ok, {:update, match, patch}} ->
