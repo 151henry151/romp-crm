@@ -2,16 +2,30 @@
   <%!-- Header --%>
   <header class="bg-white border-b border-gray-200 px-6 py-4">
     <div class="flex items-center justify-between max-w-screen-xl mx-auto">
-      <div>
-        <h1 class="text-xl font-bold text-gray-900">JGS Mechanical</h1>
-        <p class="text-sm text-gray-500">Customer & Job Tracker</p>
+      <div class="flex items-center gap-3 min-w-0">
+        <img
+          src={~p"/images/jgs_logo.png"}
+          alt=""
+          class="h-10 w-auto shrink-0 object-contain"
+        />
+        <div class="min-w-0">
+          <h1 class="text-xl font-bold text-gray-900">JGS Mechanical</h1>
+          <p class="text-sm text-gray-500">Customer & Job Tracker</p>
+        </div>
       </div>
       <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-500"><%= @current_scope.user.email %></span>
-        <.link href={~p"/users/log-out"} method="delete" class="text-sm text-gray-500 hover:text-gray-900">
+        <span class="text-sm text-gray-500">{@current_scope.user.email}</span>
+        <.link
+          href={~p"/users/log-out"}
+          method="delete"
+          class="text-sm text-gray-500 hover:text-gray-900"
+        >
           Log out
         </.link>
-        <.link patch={~p"/jobs/new"} class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+        <.link
+          patch={~p"/jobs/new"}
+          class="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+        >
           + New Job
         </.link>
       </div>
@@ -33,12 +47,15 @@
             )
           ]}
         >
-          <%= label %>
+          {label}
           <span class={[
             "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
-            if(@filter == status, do: "bg-blue-100 text-blue-700", else: "bg-gray-100 text-gray-600")
+            if(@filter == status,
+              do: "bg-blue-100 text-blue-700",
+              else: "bg-gray-100 text-gray-600"
+            )
           ]}>
-            <%= count_for(@jobs, status) %>
+            {count_for(@jobs, status)}
           </span>
         </button>
       <% end %>
@@ -64,12 +81,12 @@
           <%= for job <- visible_jobs(@jobs, @filter) do %>
             <tr class="hover:bg-gray-50 group">
               <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                <%= job.client_name %>
+                {job.client_name}
               </td>
-              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate"><%= job.address %></td>
-              <td class="px-4 py-3 text-gray-600 whitespace-nowrap"><%= job.phone %></td>
+              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate">{job.address}</td>
+              <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{job.phone}</td>
               <td class="px-4 py-3 text-gray-700 max-w-[220px]">
-                <span class="line-clamp-2"><%= job.work_description %></span>
+                <span class="line-clamp-2">{job.work_description}</span>
               </td>
               <td class="px-4 py-3">
                 <%= if job.priority == :high do %>
@@ -80,14 +97,17 @@
               </td>
               <td class="px-4 py-3">
                 <span class={"rounded-full px-2.5 py-0.5 text-xs font-medium #{status_class(job.status)}"}>
-                  <%= status_label(job.status) %>
+                  {status_label(job.status)}
                 </span>
               </td>
-              <td class="px-4 py-3 text-gray-600"><%= job.referred_by %></td>
-              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate"><%= job.next_action %></td>
+              <td class="px-4 py-3 text-gray-600">{job.referred_by}</td>
+              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate">{job.next_action}</td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <.link patch={~p"/jobs/#{job.id}/edit"} class="text-blue-600 hover:text-blue-800 font-medium">
+                  <.link
+                    patch={~p"/jobs/#{job.id}/edit"}
+                    class="text-blue-600 hover:text-blue-800 font-medium"
+                  >
                     Edit
                   </.link>
                   <button
