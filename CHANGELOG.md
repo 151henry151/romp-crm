@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-05-06
+
+### Changed
+
+- Use DaisyUI semantic colors on `/businesses` so headings, cards, and secondary text stay readable in dark mode
+- Set explicit `text-base-content` on shared `<.header>` titles for consistent contrast in dark mode
+
 ## [0.7.0] - 2026-05-06
 
 ### Added
