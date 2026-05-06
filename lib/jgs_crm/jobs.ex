@@ -51,6 +51,39 @@ defmodule JgsCrm.Jobs do
     Job.changeset(job, attrs)
   end
 
+  @doc """
+  Picks at most one existing job that best matches SMS `match` clues (from Claude).
+
+  Returns `{:ok, job}`, `{:error, :no_match}`, or `{:error, :ambiguous}` when two jobs score too close.
+  """
+  def find_job_for_sms_update(match_spec) when is_map(match_spec) do
+    scored =
+      list_jobs()
+      |> Enum.map(fn job -> {job, JgsCrm.Jobs.SmsMatch.score(job, match_spec)} end)
+      |> Enum.filter(fn {_, sc} -> sc >= sms_match_min_score() end)
+      |> Enum.sort_by(fn {_, sc} -> -sc end)
+
+    case scored do
+      [] ->
+        {:error, :no_match}
+
+      [{job, top} | rest] ->
+        second =
+          case rest do
+            [{_, s} | _] -> s
+            [] -> 0
+          end
+
+        if sms_unique_winner?(top, second), do: {:ok, job}, else: {:error, :ambiguous}
+    end
+  end
+
+  defp sms_match_min_score, do: 38
+
+  defp sms_unique_winner?(top, second) do
+    top >= 52 and (second == 0 or top >= second + 20)
+  end
+
   defp broadcast(message) do
     Phoenix.PubSub.broadcast(JgsCrm.PubSub, @topic, message)
   end

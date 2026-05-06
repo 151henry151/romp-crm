@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-05
+### Added
+- Resolve inbound SMS updates against existing jobs via Claude `match` hints and `SmsMatch` scoring; apply patches with `find_job_for_sms_update/1`
+- Extend Anthropic SMS extractor prompt for `intent` create vs update and add `STUB_UPDATE` JSON prefix on deterministic stub for update-path tests
+- Add SMS-match scoring tests and Twilio webhook update-flow tests
+
+### Fixed
+- Stop applying shell `PORT` to the endpoint in `:test` so test runs do not collide with a running release on the same host
+
+### Changed
+- Normalize SMS extractor output to explicit create/update intents before controller handling
+- Route Twilio webhook create and update intents to `create_job/1` or `update_job/2` with no-match/ambiguous logging
+- Relax `SmsMatchTest` combined-hint assertion to match actual scoring weights
+
 ## [0.2.2] - 2026-05-06
 ### Added
 - Add `deploy/` with nginx location snippet, `jgs-crm.env.example`, systemd unit, and server runbook
