@@ -36,13 +36,30 @@ defmodule JgsCrmWeb.TwilioWebhookController do
     body_text = (conn.body_params["Body"] || "") |> to_string()
 
     case SmsJobExtractor.extract(body_text) do
-      {:ok, attrs} ->
+      {:ok, {:create, attrs}} ->
         case Jobs.create_job(attrs) do
           {:ok, _job} ->
             twiml_ok(conn)
 
           {:error, changeset} ->
             Logger.warning("Twilio SMS job insert failed: #{inspect(changeset.errors)}")
+            twiml_ok(conn)
+        end
+
+      {:ok, {:update, match, patch}} ->
+        case Jobs.find_job_for_sms_update(match) do
+          {:ok, job} ->
+            case Jobs.update_job(job, patch) do
+              {:ok, _job} ->
+                twiml_ok(conn)
+
+              {:error, changeset} ->
+                Logger.warning("Twilio SMS job update failed: #{inspect(changeset.errors)}")
+                twiml_ok(conn)
+            end
+
+          {:error, reason} ->
+            Logger.info("Twilio SMS update skipped (match): #{inspect(reason)}, match=#{inspect(match)}")
             twiml_ok(conn)
         end
 

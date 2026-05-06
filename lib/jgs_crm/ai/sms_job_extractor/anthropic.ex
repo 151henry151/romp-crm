@@ -90,20 +90,44 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
 
   defp system_prompt do
     """
-    You extract structured job leads for a plumbing/mechanical contractor CRM.
+    You extract structured CRM updates for a plumbing/mechanical contractor from inbound SMS.
 
-    Respond with a single JSON object only (no markdown fences, no commentary). Use these string keys:
-    - "client_name" (required): person or business name for the customer.
-    - "address": street address if present, else null.
-    - "phone": phone number if present, else null.
-    - "work_description": what work is needed in concise plain language, else null.
-    - "priority": either "normal" or "high" based on urgency implied in the message; default "normal".
-    - "status": one of "lead", "pending", "in_progress", "done". New inbound texts are usually "lead" unless clearly otherwise.
-    - "referred_by": referral source if mentioned, else null.
-    - "next_action": suggested next step with rough timing if mentioned (e.g. "Visit Thu May 7", "Call to schedule"), else null.
-    - "notes": timing of call, pronunciation hints, availability, "works from home", or other meta detail that does not fit other fields; else null.
+    Respond with a single JSON object only (no markdown fences, no commentary).
 
-    Infer reasonably from context. Prefer null over guessing obscure fields. Normalize phone to digits with optional punctuation as given.
+    ## intent
+    - "create": brand-new lead / new job mention with no clear reference to an existing customer row.
+    - "update": the message corrects or adds detail for someone already in the CRM (possessive like "Angela Brande's address is …", "the customer at 123 Oak …", "the bathroom remodel job — their name is …", nicknames, "that Castleton job", partial addresses, etc.).
+
+    When unsure, prefer "create" only if there is truly no identifiable existing entity; otherwise "update" with strong match hints.
+
+    ## Shape A — create
+    Use keys:
+    - "intent": "create"
+    - "job": object with:
+      - "client_name" (required): person or business name for the customer (never null for creates).
+      - "address", "phone", "work_description", "referred_by", "notes", "next_action": strings or null.
+      - "priority": "normal" | "high"
+      - "status": "lead" | "pending" | "in_progress" | "done"
+
+    ## Shape B — update
+    Use keys:
+    - "intent": "update"
+    - "match": clues to find ONE existing job (include every clue the SMS gives; omit unknowns):
+      - "client_name": full or partial customer name as stated.
+      - "address_snippet": distinctive fragment of their property address (street number, road name, town).
+      - "work_description_snippet": distinctive fragment of work mentioned (e.g. "basement", "bathroom remodel", "sump pump").
+      - "notes_snippet": fragment matching internal notes if helpful.
+      - "phone_fragment": last 4 digits or full normalized phone fragment if given.
+    - "updates": only fields that change — each key optional; omit or null means leave unchanged:
+      same names as job fields: "client_name", "address", "phone", "work_description", "priority", "status",
+      "referred_by", "notes", "next_action".
+
+    Examples:
+    - "Angela Brande's address is 42 Maple St Burlington" → intent update; match client_name "Angela Brande"; updates address "42 Maple St Burlington".
+    - "The customer at 32 Seminary St is Bob Sinclair now" → intent update; match address_snippet "32 Seminary"; updates client_name "Bob Sinclair".
+    - "New caller Jane 802-555-0101 needs water heater" → intent create with job object.
+
+    Normalize phones naturally; prefer null over guessing.
     """
   end
 end

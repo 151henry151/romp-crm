@@ -4,7 +4,7 @@ defmodule JgsCrm.MixProject do
   def project do
     [
       app: :jgs_crm,
-      version: "0.2.2",
+      version: "0.2.3",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -27,7 +27,11 @@ defmodule JgsCrm.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      # Used by Mix when loading mix.exs (only effective if `MIX_ENV` is unset).
+      preferred_envs: [
+        test: :test,
+        precommit: :test
+      ]
     ]
   end
 
@@ -66,6 +70,7 @@ defmodule JgsCrm.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:swoosh, "~> 1.5"},
+      {:gen_smtp, "~> 1.2"},
       {:finch, "~> 0.13"},
       {:req, "~> 0.5"}
     ]
@@ -86,6 +91,7 @@ defmodule JgsCrm.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind jgs_crm", "esbuild jgs_crm"],
       "assets.deploy": [
+        "compile",
         "tailwind jgs_crm --minify",
         "esbuild jgs_crm --minify",
         "phx.digest"

@@ -105,5 +105,47 @@ defmodule JgsCrm.JobsTest do
       job = job_fixture()
       assert %Ecto.Changeset{} = Jobs.change_job(job)
     end
+
+    test "find_job_for_sms_update/1 returns job when match hints uniquely" do
+      j =
+        job_fixture(%{
+          client_name: "Angela Brande",
+          address: "old",
+          work_description: "line repair"
+        })
+
+      assert {:ok, got} =
+               Jobs.find_job_for_sms_update(%{"client_name" => "Angela Brande"})
+
+      assert got.id == j.id
+    end
+
+    test "find_job_for_sms_update/1 returns :ambiguous when two jobs tie closely" do
+      job_fixture(%{client_name: "Same Client Dup", address: "1 A St"})
+      job_fixture(%{client_name: "Same Client Dup", address: "2 B St"})
+
+      assert {:error, :ambiguous} =
+               Jobs.find_job_for_sms_update(%{"client_name" => "Same Client Dup"})
+    end
+
+    test "find_job_for_sms_update/1 disambiguates duplicate names with address_snippet" do
+      job_fixture(%{client_name: "Dup Name", address: "100 Oak Ave"})
+      target = job_fixture(%{client_name: "Dup Name", address: "200 Pine Rd"})
+
+      assert {:ok, got} =
+               Jobs.find_job_for_sms_update(%{
+                 "client_name" => "Dup Name",
+                 "address_snippet" => "200 Pine"
+               })
+
+      assert got.id == target.id
+    end
+
+    test "find_job_for_sms_update/1 returns :no_match when nothing scores enough" do
+      job_fixture(%{client_name: "Someone Else"})
+
+      assert {:error, :no_match} =
+               Jobs.find_job_for_sms_update(%{"client_name" => "ZZZ Nonexistent Person"})
+    end
   end
 end
