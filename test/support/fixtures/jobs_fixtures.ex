@@ -1,13 +1,12 @@
 defmodule JgsCrm.JobsFixtures do
   @moduledoc """
-  This module defines test helpers for creating
-  entities via the `JgsCrm.Jobs` context.
+  Test helpers for creating jobs via `JgsCrm.Jobs`.
   """
 
   @doc """
-  Generate a job.
+  Creates a job with default attributes; merges `attrs` when given.
   """
-  def job_fixture(scope, attrs \\ %{}) do
+  def job_fixture(attrs \\ %{}) do
     attrs =
       Enum.into(attrs, %{
         address: "some address",
@@ -15,13 +14,13 @@ defmodule JgsCrm.JobsFixtures do
         next_action: "some next_action",
         notes: "some notes",
         phone: "some phone",
-        priority: "some priority",
+        priority: :normal,
         referred_by: "some referred_by",
-        status: "some status",
+        status: :lead,
         work_description: "some work_description"
       })
 
-    {:ok, job} = JgsCrm.Jobs.create_job(scope, attrs)
+    {:ok, job} = JgsCrm.Jobs.create_job(attrs)
     job
   end
 end
