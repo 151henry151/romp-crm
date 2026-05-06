@@ -1,7 +1,7 @@
 <div class="min-h-screen bg-gray-50">
   <%!-- Header --%>
   <header class="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between max-w-screen-xl mx-auto">
+    <div class="max-w-screen-xl mx-auto">
       <div class="min-w-0">
         <h1 class="text-lg sm:text-xl font-bold text-gray-900">JGS Mechanical</h1>
         <p class="text-sm text-gray-500">Customer & Job Tracker</p>
@@ -12,49 +12,46 @@
           </a>
         </p>
       </div>
-      <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 min-w-0">
-        <span class="hidden lg:block text-sm text-gray-500 truncate max-w-[220px]">
-          {@current_scope.user.email}
-        </span>
-        <.link
-          patch={~p"/jobs/new"}
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 p-0 text-xl font-semibold leading-none text-white shadow-sm hover:bg-blue-500"
-          title="New Job"
-          aria-label="New Job"
-        >
-          +
-        </.link>
-      </div>
     </div>
   </header>
 
   <main class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
-    <%!-- Status filter tabs --%>
-    <div class="flex flex-wrap gap-1 mb-6 border-b border-gray-200">
-      <%= for {label, status} <- [{"All", :all} | Enum.map([:lead, :pending, :in_progress, :done], &{status_label(&1), &1})] do %>
-        <button
-          phx-click="filter"
-          phx-value-status={status}
-          class={[
-            "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors",
-            if(@filter == status,
-              do: "border-blue-600 text-blue-600",
-              else: "border-transparent text-gray-500 hover:text-gray-700"
-            )
-          ]}
-        >
-          {label}
-          <span class={[
-            "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
-            if(@filter == status,
-              do: "bg-blue-100 text-blue-700",
-              else: "bg-gray-100 text-gray-600"
-            )
-          ]}>
-            {count_for(@jobs, status)}
-          </span>
-        </button>
-      <% end %>
+    <%!-- Status filter tabs + new job --%>
+    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-gray-200">
+      <div class="flex min-w-0 flex-1 flex-wrap gap-1">
+        <%= for {label, status} <- [{"All", :all} | Enum.map([:lead, :pending, :in_progress, :done], &{status_label(&1), &1})] do %>
+          <button
+            phx-click="filter"
+            phx-value-status={status}
+            class={[
+              "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors",
+              if(@filter == status,
+                do: "border-blue-600 text-blue-600",
+                else: "border-transparent text-gray-500 hover:text-gray-700"
+              )
+            ]}
+          >
+            {label}
+            <span class={[
+              "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
+              if(@filter == status,
+                do: "bg-blue-100 text-blue-700",
+                else: "bg-gray-100 text-gray-600"
+              )
+            ]}>
+              {count_for(@jobs, status)}
+            </span>
+          </button>
+        <% end %>
+      </div>
+      <.link
+        patch={~p"/jobs/new"}
+        class="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-lg bg-blue-600 p-0 text-xl font-semibold leading-none text-white shadow-sm hover:bg-blue-500 sm:mb-px"
+        title="New Job"
+        aria-label="New Job"
+      >
+        +
+      </.link>
     </div>
 
     <div class="md:hidden space-y-3">
