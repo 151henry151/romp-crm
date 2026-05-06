@@ -1,0 +1,32 @@
+# Step 2 — systemd unit (adjust paths to match where you install the release).
+#
+#   sudo install -m 644 deploy/jgs-crm.service /etc/systemd/system/jgs-crm.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jgs-crm
+#
+# Expects:
+#   • Release at /opt/jgs-crm (contains bin/jgs_crm)
+#   • Environment file at /etc/jgs-crm/jgs-crm.env (see deploy/jgs-crm.env.example)
+
+[Unit]
+Description=JGS CRM Phoenix application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/jgs-crm
+EnvironmentFile=/etc/jgs-crm/jgs-crm.env
+ExecStart=/opt/jgs-crm/bin/jgs_crm start
+ExecStop=/opt/jgs-crm/bin/jgs_crm stop
+Restart=on-failure
+RestartSec=5
+
+# Hardening (optional; relax if you hit permission issues)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

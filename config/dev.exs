@@ -84,3 +84,11 @@ config :phoenix_live_view,
   debug_attributes: true,
   # Enable helpful, but potentially expensive runtime checks
   enable_expensive_runtime_checks: true
+
+# Twilio inbound SMS + Anthropic parsing (export env vars before `mix phx.server`)
+config :jgs_crm,
+  twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
+  twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
+  skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true"

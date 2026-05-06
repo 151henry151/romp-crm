@@ -17,6 +17,17 @@ defmodule JgsCrmWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Twilio sends POST form bodies; minimal pipeline without CSRF or session.
+  pipeline :webhooks do
+    plug :accepts, ["html"]
+  end
+
+  scope "/webhooks/twilio", JgsCrmWeb do
+    pipe_through :webhooks
+
+    post "/sms", TwilioWebhookController, :sms
+  end
+
   if Application.compile_env(:jgs_crm, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 
