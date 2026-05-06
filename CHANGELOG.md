@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-05-06
+
+### Changed
+
+- Omit Work and Notes from expanded job panels where those fields already appear in the collapsed row (mobile removes both from the slide-down panel; desktop table removes duplicate Work from the colspan detail grid while keeping Notes there only)
+
 ## [0.5.7] - 2026-05-06
 
 ### Changed

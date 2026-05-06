@@ -93,17 +93,12 @@
               <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words text-gray-900">{display(job.address)}</span></p>
               <p><span class="font-medium text-gray-700">Phone:</span> <span class="text-gray-900">{display(job.phone)}</span></p>
               <p>
-                <span class="font-medium text-gray-700">Work:</span>
-                <span class="break-words text-gray-900">{display(job.work_description)}</span>
-              </p>
-              <p>
                 <span class="font-medium text-gray-700">Priority:</span>
                 <span class="text-gray-900"><%= if job.priority == :high do %>High<% else %>Normal<% end %></span>
               </p>
               <p><span class="font-medium text-gray-700">Status:</span> <span class="text-gray-900">{status_label(job.status)}</span></p>
               <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words text-gray-900">{display(job.referred_by)}</span></p>
               <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words text-gray-900">{display(job.next_action)}</span></p>
-              <p><span class="font-medium text-gray-700">Notes:</span> <span class="break-words text-gray-900">{display(job.notes)}</span></p>
               <div class="pt-2 flex items-center gap-4">
                 <.link patch={~p"/jobs/#{job.id}/edit"} class="text-blue-600 hover:text-blue-800 font-medium">
                   Edit
@@ -201,7 +196,6 @@
                     <p><span class="font-medium text-gray-700">Client:</span> {display(job.client_name)}</p>
                     <p><span class="font-medium text-gray-700">Address:</span> {display(job.address)}</p>
                     <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
-                    <p><span class="font-medium text-gray-700">Work:</span> {display(job.work_description)}</p>
                     <p><span class="font-medium text-gray-700">Priority:</span> {if job.priority == :high, do: "High", else: "Normal"}</p>
                     <p><span class="font-medium text-gray-700">Status:</span> {status_label(job.status)}</p>
                     <p><span class="font-medium text-gray-700">Referred By:</span> {display(job.referred_by)}</p>
