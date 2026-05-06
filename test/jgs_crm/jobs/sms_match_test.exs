@@ -40,7 +40,19 @@ defmodule JgsCrm.Jobs.SmsMatchTest do
   test "score/2 adds work_description_snippet" do
     j = job(%{work_description: "Full bathroom remodel, second floor"})
     sc = SmsMatch.score(j, %{"work_description_snippet" => "bathroom remodel"})
-    assert sc >= 18
+    assert sc >= 48
+  end
+
+  test "score/2 matches work_description when model uses shut off vs CRM shutoff" do
+    j = job(%{work_description: "Water shutoff"})
+    sc = SmsMatch.score(j, %{"work_description_snippet" => "water shut off"})
+    assert sc >= 48
+  end
+
+  test "score/2 matches work_description hyphen shut-off variant" do
+    j = job(%{work_description: "Water shutoff"})
+    sc = SmsMatch.score(j, %{"work_description_snippet" => "water shut-off"})
+    assert sc >= 48
   end
 
   test "score/2 adds phone_fragment when digits match" do
@@ -64,6 +76,6 @@ defmodule JgsCrm.Jobs.SmsMatchTest do
 
     base = SmsMatch.score(j, %{"client_name" => "Bob"})
     assert multi > base
-    assert multi >= 52 + 24 + 28
+    assert multi >= 52 + 24 + 48
   end
 end

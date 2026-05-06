@@ -3,9 +3,12 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
   Turns free-form SMS text into a **create** or **update** instruction via the configured
   adapter (Anthropic Claude in production, deterministic stub in tests).
 
+  Production adapters receive `jobs_snapshot` (`Jobs.snapshot_for_sms_ai/0`) so the model can
+  compare the SMS against live CRM rows (names, addresses, work text, typos, informal references).
+
   - `{:ok, {:create, attrs}}` — attrs match `JgsCrm.Jobs.create_job/1`.
-  - `{:ok, {:update, match, patch}}` — resolve job via `JgsCrm.Jobs.find_job_for_sms_update/1`,
-    then `JgsCrm.Jobs.update_job/2` with `patch`.
+  - `{:ok, {:update_by_id, job_id, patch}}` — `JgsCrm.Jobs.update_job/2` after validating `job_id`.
+  - `{:ok, {:update, match, patch}}` — fallback: resolve via `JgsCrm.Jobs.find_job_for_sms_update/1`.
   """
 
   alias JgsCrm.Jobs.Job
@@ -14,13 +17,16 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
   Returns:
 
     - `{:ok, {:create, attrs}}` with atom keys for `JgsCrm.Jobs.create_job/1`
-    - `{:ok, {:update, match, patch}}` — atom-key patch map for `update_job/2`; match uses string keys
+    - `{:ok, {:update_by_id, job_id, patch}}` — integer id + atom-key patch
+    - `{:ok, {:update, match, patch}}` — atom-key patch; match uses string keys (legacy heuristic matching)
     - `{:error, reason}` otherwise.
+
+  `jobs_snapshot` must be the same list passed to the adapter (for validation after extraction).
   """
-  def extract(raw_message) when is_binary(raw_message) do
+  def extract(raw_message, jobs_snapshot \\ []) when is_binary(raw_message) and is_list(jobs_snapshot) do
     mod = Application.get_env(:jgs_crm, :sms_job_extractor_adapter, __MODULE__.Anthropic)
 
-    case mod.extract(raw_message) do
+    case mod.extract(raw_message, jobs_snapshot) do
       {:ok, attrs} when is_map(attrs) -> parse_extracted_map(attrs)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}
@@ -49,39 +55,78 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
   defp infer_intent(map) do
     match = Map.get(map, "match")
     updates = Map.get(map, "updates")
+    job_id_present? = job_id_present_in_map?(map)
 
-    if is_map(match) and is_map(updates) and map_size(updates) > 0 do
-      "update"
-    else
-      "create"
+    cond do
+      job_id_present? and is_map(updates) and map_size(updates) > 0 ->
+        "update"
+
+      is_map(match) and is_map(updates) and map_size(updates) > 0 ->
+        "update"
+
+      true ->
+        "create"
     end
   end
 
   defp parse_update_intent(map) do
-    match = Map.get(map, "match")
     updates = Map.get(map, "updates")
 
     cond do
-      not is_map(match) ->
-        {:error, :update_missing_match}
-
       not is_map(updates) or map_size(updates) == 0 ->
         {:error, :update_missing_updates}
 
       true ->
-        n_match = normalize_match_map(match)
+        patch = normalize_update_patch(updates)
 
-        if map_size(n_match) == 0 do
-          {:error, :update_empty_match}
-        else
-          patch = normalize_update_patch(updates)
-
-          if map_size(patch) == 0 do
+        cond do
+          map_size(patch) == 0 ->
             {:error, :update_empty_patch}
-          else
-            {:ok, {:update, n_match, patch}}
-          end
+
+          true ->
+            case coerce_job_id(Map.get(map, "job_id")) do
+              {:ok, job_id} ->
+                {:ok, {:update_by_id, job_id, patch}}
+
+              :missing ->
+                resolve_update_via_match(Map.get(map, "match"), patch)
+
+              {:error, _} ->
+                {:error, :invalid_job_id}
+            end
         end
+    end
+  end
+
+  defp job_id_present_in_map?(map) do
+    case Map.get(map, "job_id") do
+      nil -> false
+      v when v == "" -> false
+      _ -> true
+    end
+  end
+
+  defp coerce_job_id(nil), do: :missing
+  defp coerce_job_id(v) when v == "", do: :missing
+
+  defp coerce_job_id(v) when is_integer(v) and v > 0, do: {:ok, v}
+
+  defp coerce_job_id(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {i, _} when i > 0 -> {:ok, i}
+      _ -> {:error, :invalid_job_id}
+    end
+  end
+
+  defp coerce_job_id(_), do: {:error, :invalid_job_id}
+
+  defp resolve_update_via_match(match, patch) do
+    n_match = normalize_match_map(match)
+
+    if map_size(n_match) == 0 do
+      {:error, :update_missing_job_id_or_match}
+    else
+      {:ok, {:update, n_match, patch}}
     end
   end
 
@@ -89,7 +134,7 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
     payload =
       case Map.get(map, "job") do
         %{} = job_map -> job_map
-        _ -> Map.drop(map, ["intent", "match", "updates"])
+        _ -> Map.drop(map, ["intent", "match", "updates", "job_id"])
       end
 
     {:ok, {:create, normalize_create(payload)}}

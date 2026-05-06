@@ -3,23 +3,23 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
 
   @api "https://api.anthropic.com/v1/messages"
 
-  def extract(raw_message) when is_binary(raw_message) do
+  def extract(raw_message, jobs_snapshot \\ []) when is_binary(raw_message) and is_list(jobs_snapshot) do
     api_key = Application.get_env(:jgs_crm, :anthropic_api_key)
     model = Application.get_env(:jgs_crm, :anthropic_model, "claude-sonnet-4-20250514")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}
     else
-      call_claude(api_key, model, raw_message)
+      call_claude(api_key, model, raw_message, jobs_snapshot)
     end
   end
 
-  defp call_claude(api_key, model, raw_message) do
+  defp call_claude(api_key, model, raw_message, jobs_snapshot) do
     body = %{
       model: model,
       max_tokens: 4096,
       system: system_prompt(),
-      messages: [%{role: "user", content: user_content(raw_message)}]
+      messages: [%{role: "user", content: user_content(raw_message, jobs_snapshot)}]
     }
 
     case Req.post(@api,
@@ -77,13 +77,28 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
     end
   end
 
-  defp user_content(raw_message) do
+  defp user_content(raw_message, jobs_snapshot) do
+    jobs_json =
+      case Jason.encode(jobs_snapshot) do
+        {:ok, bin} -> bin
+        {:error, _} -> "[]"
+      end
+
     """
-    Parse the following SMS or MMS text message into CRM fields. The message may be messy, abbreviated, or in any style.
+    Parse the following SMS or MMS text message into CRM fields. The message may be messy, abbreviated, misspelled, or informal.
 
     SMS text:
     ---
     #{raw_message}
+    ---
+
+    Existing CRM jobs (JSON array). Each object includes integer `"id"` — this is the database primary key and is authoritative.
+
+    Compare the SMS to these rows. Use fuzzy judgment: typos, nicknames, "the guy", "that water shutoff job", partial addresses, etc.
+
+    Jobs snapshot:
+    ---
+    #{jobs_json}
     ---
     """
   end
@@ -92,13 +107,13 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
     """
     You extract structured CRM updates for a plumbing/mechanical contractor from inbound SMS.
 
-    Respond with a single JSON object only (no markdown fences, no commentary).
+    The user message includes the live CRM snapshot JSON plus the SMS. Respond with a single JSON object only (no markdown fences, no commentary).
 
     ## intent
-    - "create": brand-new lead / new job mention with no clear reference to an existing customer row.
-    - "update": the message corrects or adds detail for someone already in the CRM (possessive like "Angela Brande's address is …", "the customer at 123 Oak …", "the bathroom remodel job — their name is …", nicknames, "that Castleton job", partial addresses, etc.).
+    - "create": brand-new lead only when no snapshot row plausibly matches the SMS (or the snapshot array is empty).
+    - "update": any correction / fill-in that refers to an existing snapshot row — including informal references ("that sump pump guy"), typos vs stored names or streets, or task wording that differs slightly from `work_description`.
 
-    When unsure, prefer "create" only if there is truly no identifiable existing entity; otherwise "update" with strong match hints.
+    Prefer **update** whenever one snapshot row is the clear best semantic fit.
 
     ## Shape A — create
     Use keys:
@@ -109,23 +124,22 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
       - "priority": "normal" | "high"
       - "status": "lead" | "pending" | "in_progress" | "done"
 
-    ## Shape B — update
+    ## Shape B — update (primary)
     Use keys:
     - "intent": "update"
-    - "match": clues to find ONE existing job (include every clue the SMS gives; omit unknowns):
-      - "client_name": full or partial customer name as stated.
-      - "address_snippet": distinctive fragment of their property address (street number, road name, town).
-      - "work_description_snippet": distinctive fragment of work mentioned (e.g. "basement", "bathroom remodel", "sump pump").
-      - "notes_snippet": fragment matching internal notes if helpful.
-      - "phone_fragment": last 4 digits or full normalized phone fragment if given.
-    - "updates": only fields that change — each key optional; omit or null means leave unchanged:
-      same names as job fields: "client_name", "address", "phone", "work_description", "priority", "status",
-      "referred_by", "notes", "next_action".
+    - "job_id": integer — MUST be exactly one `"id"` from the snapshot JSON that matches the SMS (your semantic judgment).
+    - "updates": only fields that change — omit or null unchanged keys — same field names as in Shape A job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`).
+
+    Never invent `job_id` values not present in the snapshot.
+
+    ## Shape C — update (fallback, rarely)
+    Only if you cannot choose any snapshot id with reasonable confidence:
+    - Same as Shape B but replace `"job_id"` with `"match"` using snippets (`client_name`, `address_snippet`, `work_description_snippet`, `notes_snippet`, `phone_fragment`) — omit unknowns.
 
     Examples:
-    - "Angela Brande's address is 42 Maple St Burlington" → intent update; match client_name "Angela Brande"; updates address "42 Maple St Burlington".
-    - "The customer at 32 Seminary St is Bob Sinclair now" → intent update; match address_snippet "32 Seminary"; updates client_name "Bob Sinclair".
-    - "New caller Jane 802-555-0101 needs water heater" → intent create with job object.
+    - Snapshot lists ids `…`; SMS "Angela Brande's address is 42 Maple St Burlington" → `{"intent":"update","job_id":<Angela's id>,"updates":{"address":"42 Maple St Burlington"}}`
+    - SMS "the guy we're doing the water shutoff for — correct address Waterfall Lane" → pick the snapshot row whose work/name context fits; `job_id` that row; `updates.address`
+    - No plausible snapshot match → `intent` create with `job`.
 
     Normalize phones naturally; prefer null over guessing.
     """

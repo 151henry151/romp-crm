@@ -26,6 +26,30 @@ defmodule JgsCrm.Jobs do
 
   def get_job!(id), do: Repo.get!(Job, id)
 
+  def get_job(id), do: Repo.get(Job, id)
+
+  @doc """
+  Returns jobs as plain maps suitable for embedding in an SMS-extraction LLM prompt.
+
+  Each row includes integer `"id"` (database primary key). Fields may be `null` when empty.
+  """
+  def snapshot_for_sms_ai do
+    Enum.map(list_jobs(), fn j ->
+      %{
+        "id" => j.id,
+        "client_name" => j.client_name,
+        "address" => j.address,
+        "phone" => j.phone,
+        "work_description" => j.work_description,
+        "notes" => j.notes,
+        "next_action" => j.next_action,
+        "referred_by" => j.referred_by,
+        "status" => Atom.to_string(j.status),
+        "priority" => Atom.to_string(j.priority)
+      }
+    end)
+  end
+
   def create_job(attrs) do
     with {:ok, job} <- %Job{} |> Job.changeset(attrs) |> Repo.insert() do
       broadcast({:created, job})
@@ -80,8 +104,19 @@ defmodule JgsCrm.Jobs do
 
   defp sms_match_min_score, do: 38
 
+  # When only one job clears the min score, accept it at that score so address-only snippets (38)
+  # and distinctive work-only snippets (see `SmsMatch` weights) can resolve updates.
+  # When several jobs score, require a stronger top score and a clear gap vs the runner-up.
   defp sms_unique_winner?(top, second) do
-    top >= 52 and (second == 0 or top >= second + 20)
+    min = sms_match_min_score()
+
+    cond do
+      second == 0 ->
+        top >= min
+
+      true ->
+        top >= 52 and top >= second + 20
+    end
   end
 
   defp broadcast(message) do

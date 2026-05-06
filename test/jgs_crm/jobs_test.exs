@@ -147,5 +147,40 @@ defmodule JgsCrm.JobsTest do
       assert {:error, :no_match} =
                Jobs.find_job_for_sms_update(%{"client_name" => "ZZZ Nonexistent Person"})
     end
+
+    test "find_job_for_sms_update/1 matches by work_description_snippet when it is the only strong hint" do
+      j =
+        job_fixture(%{
+          client_name: "Bud Reed",
+          address: "Evergreen Lane",
+          work_description: "Water shutoff"
+        })
+
+      assert {:ok, got} =
+               Jobs.find_job_for_sms_update(%{"work_description_snippet" => "water shutoff"})
+
+      assert got.id == j.id
+    end
+
+    test "find_job_for_sms_update/1 returns :ambiguous when two jobs share the same work phrase" do
+      job_fixture(%{client_name: "Ann", work_description: "Water shutoff"})
+      job_fixture(%{client_name: "Bob", work_description: "Water shutoff"})
+
+      assert {:error, :ambiguous} =
+               Jobs.find_job_for_sms_update(%{"work_description_snippet" => "water shutoff"})
+    end
+
+    test "find_job_for_sms_update/1 accepts address_snippet alone when exactly one job matches" do
+      j =
+        job_fixture(%{
+          client_name: "Corner Case",
+          address: "999 Zephyr Road"
+        })
+
+      assert {:ok, got} =
+               Jobs.find_job_for_sms_update(%{"address_snippet" => "Zephyr"})
+
+      assert got.id == j.id
+    end
   end
 end

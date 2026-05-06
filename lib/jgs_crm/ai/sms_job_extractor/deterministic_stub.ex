@@ -4,20 +4,36 @@ defmodule JgsCrm.Ai.SmsJobExtractor.DeterministicStub do
   @doc """
   Test double: returns predictable JSON-shaped maps without calling Anthropic.
 
-  Prefix the SMS body with `STUB_UPDATE ` followed by JSON:
-  `{"match":{...},"updates":{...}}` to exercise the update path.
+  - `STUB_JSON ` + JSON — raw map passthrough (tests).
+  - `STUB_UPDATE ` + JSON — production-shaped stubs:
+    - `{"job_id": <int>, "updates": {...}}` — preferred (matches Claude after snapshot rollout).
+    - `{"match": {...}, "updates": {...}}` — fallback heuristic matching tests.
+
+  Second argument (`jobs_snapshot`) is ignored.
   """
-  def extract(raw_message) when is_binary(raw_message) do
+  def extract(raw_message, _jobs_snapshot \\ []) when is_binary(raw_message) do
     trimmed = String.trim(raw_message)
 
     case trimmed do
+      <<"STUB_JSON ", json::binary>> ->
+        case Jason.decode(json) do
+          {:ok, %{} = map} ->
+            {:ok, map}
+
+          {:error, _} ->
+            {:error, :stub_bad_json}
+        end
+
       <<"STUB_UPDATE ", json::binary>> ->
         case Jason.decode(json) do
+          {:ok, %{"job_id" => job_id, "updates" => %{} = updates}} ->
+            {:ok, %{"intent" => "update", "job_id" => job_id, "updates" => updates}}
+
           {:ok, %{"match" => %{} = match, "updates" => %{} = updates}} ->
             {:ok, %{"intent" => "update", "match" => match, "updates" => updates}}
 
           {:ok, _} ->
-            {:error, :stub_missing_match_updates}
+            {:error, :stub_missing_job_id_or_match_updates}
 
           {:error, _} ->
             {:error, :stub_bad_json}

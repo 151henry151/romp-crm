@@ -93,21 +93,26 @@
           </button>
 
           <%= if expanded?(@expanded_job_id, job.id) do %>
-            <div id={"job-expand-sm-#{job.id}"} class="border-t border-gray-100 px-4 py-3 text-sm space-y-2">
-              <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words">{display(job.address)}</span></p>
-              <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
+            <%!-- Explicit text color: dark DaisyUI theme sets a light base `color` on the root; without Tailwind text-* here, values inherit near-white and disappear on white cards. --%>
+            <div
+              id={"job-expand-sm-#{job.id}"}
+              class="border-t border-gray-100 px-4 py-3 text-sm text-gray-900 space-y-2"
+              data-theme="light"
+            >
+              <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words text-gray-900">{display(job.address)}</span></p>
+              <p><span class="font-medium text-gray-700">Phone:</span> <span class="text-gray-900">{display(job.phone)}</span></p>
               <p>
                 <span class="font-medium text-gray-700">Work:</span>
-                <span class="break-words">{display(job.work_description)}</span>
+                <span class="break-words text-gray-900">{display(job.work_description)}</span>
               </p>
               <p>
                 <span class="font-medium text-gray-700">Priority:</span>
-                <%= if job.priority == :high do %>High<% else %>Normal<% end %>
+                <span class="text-gray-900"><%= if job.priority == :high do %>High<% else %>Normal<% end %></span>
               </p>
-              <p><span class="font-medium text-gray-700">Status:</span> {status_label(job.status)}</p>
-              <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words">{display(job.referred_by)}</span></p>
-              <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words">{display(job.next_action)}</span></p>
-              <p><span class="font-medium text-gray-700">Notes:</span> <span class="break-words">{display(job.notes)}</span></p>
+              <p><span class="font-medium text-gray-700">Status:</span> <span class="text-gray-900">{status_label(job.status)}</span></p>
+              <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words text-gray-900">{display(job.referred_by)}</span></p>
+              <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words text-gray-900">{display(job.next_action)}</span></p>
+              <p><span class="font-medium text-gray-700">Notes:</span> <span class="break-words text-gray-900">{display(job.notes)}</span></p>
               <div class="pt-2 flex items-center gap-4">
                 <.link patch={~p"/jobs/#{job.id}/edit"} class="text-blue-600 hover:text-blue-800 font-medium">
                   Edit
@@ -200,7 +205,7 @@
             </tr>
             <%= if expanded?(@expanded_job_id, job.id) do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-gray-50">
-                <td colspan="9" class="px-4 py-3 text-sm text-gray-700">
+                <td colspan="9" class="px-4 py-3 text-sm text-gray-900" data-theme="light">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
                     <p><span class="font-medium text-gray-700">Client:</span> {display(job.client_name)}</p>
                     <p><span class="font-medium text-gray-700">Address:</span> {display(job.address)}</p>
