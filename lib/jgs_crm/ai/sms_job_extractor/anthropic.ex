@@ -109,14 +109,17 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
 
     The user message includes the live CRM snapshot JSON plus the SMS. Respond with a single JSON object only (no markdown fences, no commentary).
 
-    ## intent
-    - "create": brand-new lead only when no snapshot row plausibly matches the SMS (or the snapshot array is empty).
-    - "update": any correction / fill-in that refers to an existing snapshot row — including informal references ("that sump pump guy"), typos vs stored names or streets, or task wording that differs slightly from `work_description`.
+    ## Output shape
+    Always return:
+    - `"actions"`: non-empty array of action objects in message order.
 
-    Prefer **update** whenever one snapshot row is the clear best semantic fit.
+    If there is exactly one action you may either return:
+    - top-level single action object (legacy shape), OR
+    - `"actions": [ ... ]`.
+    Prefer `"actions"` for consistency.
 
-    ## Shape A — create
-    Use keys:
+    ## Action type: create
+    Use keys on an action object:
     - "intent": "create"
     - "job": object with:
       - "client_name" (required): person or business name for the customer (never null for creates).
@@ -124,22 +127,28 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
       - "priority": "normal" | "high"
       - "status": "lead" | "pending" | "in_progress" | "done"
 
-    ## Shape B — update (primary)
-    Use keys:
+    ## Action type: update (primary)
+    Use keys on an action object:
     - "intent": "update"
     - "job_id": integer — MUST be exactly one `"id"` from the snapshot JSON that matches the SMS (your semantic judgment).
-    - "updates": only fields that change — omit or null unchanged keys — same field names as in Shape A job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`).
+    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`).
 
     Never invent `job_id` values not present in the snapshot.
 
-    ## Shape C — update (fallback, rarely)
+    ## Action type: update (fallback, rarely)
     Only if you cannot choose any snapshot id with reasonable confidence:
-    - Same as Shape B but replace `"job_id"` with `"match"` using snippets (`client_name`, `address_snippet`, `work_description_snippet`, `notes_snippet`, `phone_fragment`) — omit unknowns.
+    - Same as update primary but replace `"job_id"` with `"match"` using snippets (`client_name`, `address_snippet`, `work_description_snippet`, `notes_snippet`, `phone_fragment`) — omit unknowns.
+
+    ## Intent guidance
+    - "create": brand-new lead only when no snapshot row plausibly matches the specific person/job mention.
+    - "update": any correction / fill-in that refers to an existing snapshot row — including informal references ("that sump pump guy"), typos vs stored names or streets, or task wording that differs slightly from `work_description`.
+    Prefer **update** whenever one snapshot row is the clear best semantic fit.
 
     Examples:
-    - Snapshot lists ids `…`; SMS "Angela Brande's address is 42 Maple St Burlington" → `{"intent":"update","job_id":<Angela's id>,"updates":{"address":"42 Maple St Burlington"}}`
-    - SMS "the guy we're doing the water shutoff for — correct address Waterfall Lane" → pick the snapshot row whose work/name context fits; `job_id` that row; `updates.address`
-    - No plausible snapshot match → `intent` create with `job`.
+    - Snapshot lists ids `…`; SMS "Angela Brande's address is 42 Maple St Burlington" → `{"actions":[{"intent":"update","job_id":<Angela's id>,"updates":{"address":"42 Maple St Burlington"}}]}`
+    - SMS "the guy we're doing the water shutoff for — correct address Waterfall Lane" → pick the snapshot row whose work/name context fits; `job_id` that row; `updates.address`.
+    - SMS "Mark Sino replace refrigerator, Dave Woll clogged drain, and toilet replacement guy phone 8029897658" → three actions in order: create Mark job, create Dave job, update existing toilet-replacement row with phone.
+    - No plausible snapshot match for a mention → create action for that mention.
 
     Normalize phones naturally; prefer null over guessing.
     """

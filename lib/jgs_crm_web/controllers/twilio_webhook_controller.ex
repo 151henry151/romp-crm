@@ -62,98 +62,17 @@ defmodule JgsCrmWeb.TwilioWebhookController do
     allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
 
     case SmsJobExtractor.extract(body_text, jobs_snapshot) do
-      {:ok, {:create, attrs}} ->
+      {:ok, operations} when is_list(operations) ->
         Logger.info(
-          "Twilio SMS parsed create: sid=#{message_sid} from=#{from} attrs=#{inspect(attrs)}"
+          "Twilio SMS parsed operations: sid=#{message_sid} from=#{from} count=#{length(operations)}"
         )
 
-        case Jobs.create_job(attrs) do
-          {:ok, job} ->
-            Logger.info(
-              "Twilio SMS create applied: sid=#{message_sid} from=#{from} job_id=#{job.id}"
-            )
+        Enum.with_index(operations, 1)
+        |> Enum.each(fn {op, idx} ->
+          apply_sms_operation(op, idx, message_sid, from, allowed_job_ids)
+        end)
 
-            twiml_ok(conn)
-
-          {:error, changeset} ->
-            Logger.warning(
-              "Twilio SMS create failed: sid=#{message_sid} from=#{from} errors=#{inspect(changeset.errors)}"
-            )
-
-            twiml_ok(conn)
-        end
-
-      {:ok, {:update_by_id, job_id, patch}} ->
-        Logger.info(
-          "Twilio SMS parsed update: sid=#{message_sid} from=#{from} job_id=#{job_id} patch=#{inspect(patch)}"
-        )
-
-        cond do
-          not MapSet.member?(allowed_job_ids, job_id) ->
-            Logger.info(
-              "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=:invalid_job_id job_id=#{job_id} patch=#{inspect(patch)}"
-            )
-
-            twiml_ok(conn)
-
-          true ->
-            case Jobs.get_job(job_id) do
-              nil ->
-                Logger.info(
-                  "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=:job_not_found job_id=#{job_id}"
-                )
-
-                twiml_ok(conn)
-
-              job ->
-                case Jobs.update_job(job, patch) do
-                  {:ok, updated_job} ->
-                    Logger.info(
-                      "Twilio SMS update applied: sid=#{message_sid} from=#{from} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
-                    )
-
-                    twiml_ok(conn)
-
-                  {:error, changeset} ->
-                    Logger.warning(
-                      "Twilio SMS update failed: sid=#{message_sid} from=#{from} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
-                    )
-
-                    twiml_ok(conn)
-                end
-            end
-        end
-
-      {:ok, {:update, match, patch}} ->
-        Logger.info(
-          "Twilio SMS parsed update: sid=#{message_sid} from=#{from} match=#{inspect(match)} patch=#{inspect(patch)}"
-        )
-
-        case Jobs.find_job_for_sms_update(match) do
-          {:ok, job} ->
-            case Jobs.update_job(job, patch) do
-              {:ok, updated_job} ->
-                Logger.info(
-                  "Twilio SMS update applied: sid=#{message_sid} from=#{from} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
-                )
-
-                twiml_ok(conn)
-
-              {:error, changeset} ->
-                Logger.warning(
-                  "Twilio SMS update failed: sid=#{message_sid} from=#{from} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
-                )
-
-                twiml_ok(conn)
-            end
-
-          {:error, reason} ->
-            Logger.info(
-              "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=#{inspect(reason)} match=#{inspect(match)} patch=#{inspect(patch)}"
-            )
-
-            twiml_ok(conn)
-        end
+        twiml_ok(conn)
 
       {:error, :missing_api_key} ->
         Logger.error(
@@ -168,6 +87,84 @@ defmodule JgsCrmWeb.TwilioWebhookController do
         )
 
         twiml_ok(conn)
+    end
+  end
+
+  defp apply_sms_operation({:create, attrs}, idx, message_sid, from, _allowed_job_ids) do
+    Logger.info(
+      "Twilio SMS parsed create: sid=#{message_sid} from=#{from} op_index=#{idx} attrs=#{inspect(attrs)}"
+    )
+
+    case Jobs.create_job(attrs) do
+      {:ok, job} ->
+        Logger.info(
+          "Twilio SMS create applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id}"
+        )
+
+      {:error, changeset} ->
+        Logger.warning(
+          "Twilio SMS create failed: sid=#{message_sid} from=#{from} op_index=#{idx} errors=#{inspect(changeset.errors)}"
+        )
+    end
+  end
+
+  defp apply_sms_operation({:update_by_id, job_id, patch}, idx, message_sid, from, allowed_job_ids) do
+    Logger.info(
+      "Twilio SMS parsed update: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job_id} patch=#{inspect(patch)}"
+    )
+
+    cond do
+      not MapSet.member?(allowed_job_ids, job_id) ->
+        Logger.info(
+          "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=:invalid_job_id job_id=#{job_id} patch=#{inspect(patch)}"
+        )
+
+      true ->
+        case Jobs.get_job(job_id) do
+          nil ->
+            Logger.info(
+              "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=:job_not_found job_id=#{job_id}"
+            )
+
+          job ->
+            case Jobs.update_job(job, patch) do
+              {:ok, updated_job} ->
+                Logger.info(
+                  "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
+                )
+
+              {:error, changeset} ->
+                Logger.warning(
+                  "Twilio SMS update failed: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
+                )
+            end
+        end
+    end
+  end
+
+  defp apply_sms_operation({:update, match, patch}, idx, message_sid, from, _allowed_job_ids) do
+    Logger.info(
+      "Twilio SMS parsed update: sid=#{message_sid} from=#{from} op_index=#{idx} match=#{inspect(match)} patch=#{inspect(patch)}"
+    )
+
+    case Jobs.find_job_for_sms_update(match) do
+      {:ok, job} ->
+        case Jobs.update_job(job, patch) do
+          {:ok, updated_job} ->
+            Logger.info(
+              "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
+            )
+
+          {:error, changeset} ->
+            Logger.warning(
+              "Twilio SMS update failed: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
+            )
+        end
+
+      {:error, reason} ->
+        Logger.info(
+          "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=#{inspect(reason)} match=#{inspect(match)} patch=#{inspect(patch)}"
+        )
     end
   end
 

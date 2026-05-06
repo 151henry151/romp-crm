@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-06
+
+### Added
+
+- Parse multi-operation SMS payloads into an ordered `actions` list so one inbound text can create and update multiple jobs
+- Apply each parsed SMS operation independently in the Twilio webhook with per-operation logging
+
+### Changed
+
+- Update Anthropic extraction prompt to emit `actions` arrays for multi-job messages while preserving single-action compatibility
+
 ## [0.4.0] - 2026-05-06
 
 ### Added
