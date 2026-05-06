@@ -181,4 +181,73 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     refute log =~ "Twilio SMS inbound:"
     assert Jobs.list_jobs() |> length() == before
   end
+
+  test "POST /webhooks/twilio/sms applies multiple create/update operations from one message", %{
+    conn: conn
+  } do
+    existing =
+      JgsCrm.JobsFixtures.job_fixture(%{
+        client_name: "Toilet Customer",
+        work_description: "Toilet replacement",
+        phone: nil
+      })
+
+    before = Jobs.list_jobs() |> length()
+
+    body =
+      "STUB_JSON " <>
+        Jason.encode!(%{
+          "actions" => [
+            %{
+              "intent" => "create",
+              "job" => %{
+                "client_name" => "Mark Sino",
+                "work_description" => "Replace refrigerator"
+              }
+            },
+            %{
+              "intent" => "create",
+              "job" => %{
+                "client_name" => "Dave Woll",
+                "work_description" => "Clogged drain"
+              }
+            },
+            %{
+              "intent" => "update",
+              "job_id" => existing.id,
+              "updates" => %{"phone" => "8029897658"}
+            }
+          ]
+        })
+
+    log =
+      capture_log([level: :info], fn ->
+        conn =
+          conn
+          |> post(~p"/webhooks/twilio/sms", %{
+            "Body" => body,
+            "From" => "+15555550123",
+            "MessageSid" => "SMbatch"
+          })
+
+        assert response(conn, 200) =~ "<Response>"
+      end)
+
+    assert log =~ "Twilio SMS parsed operations: sid=SMbatch"
+    assert log =~ "count=3"
+    assert log =~ "op_index=1"
+    assert log =~ "op_index=2"
+    assert log =~ "op_index=3"
+
+    assert Jobs.list_jobs() |> length() == before + 2
+    assert Jobs.get_job!(existing.id).phone == "8029897658"
+
+    assert Enum.any?(Jobs.list_jobs(), fn j ->
+             j.client_name == "Mark Sino" and j.work_description == "Replace refrigerator"
+           end)
+
+    assert Enum.any?(Jobs.list_jobs(), fn j ->
+             j.client_name == "Dave Woll" and j.work_description == "Clogged drain"
+           end)
+  end
 end

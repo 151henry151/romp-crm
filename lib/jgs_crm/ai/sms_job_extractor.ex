@@ -1,25 +1,22 @@
 defmodule JgsCrm.Ai.SmsJobExtractor do
   @moduledoc """
-  Turns free-form SMS text into a **create** or **update** instruction via the configured
+  Turns free-form SMS text into one or more **create/update** instructions via the configured
   adapter (Anthropic Claude in production, deterministic stub in tests).
 
   Production adapters receive `jobs_snapshot` (`Jobs.snapshot_for_sms_ai/0`) so the model can
   compare the SMS against live CRM rows (names, addresses, work text, typos, informal references).
 
-  - `{:ok, {:create, attrs}}` — attrs match `JgsCrm.Jobs.create_job/1`.
-  - `{:ok, {:update_by_id, job_id, patch}}` — `JgsCrm.Jobs.update_job/2` after validating `job_id`.
-  - `{:ok, {:update, match, patch}}` — fallback: resolve via `JgsCrm.Jobs.find_job_for_sms_update/1`.
+  - `{:ok, operations}` where `operations` is a non-empty list of:
+    - `{:create, attrs}` — attrs match `JgsCrm.Jobs.create_job/1`.
+    - `{:update_by_id, job_id, patch}` — `JgsCrm.Jobs.update_job/2` after validating `job_id`.
+    - `{:update, match, patch}` — fallback: resolve via `JgsCrm.Jobs.find_job_for_sms_update/1`.
   """
 
   alias JgsCrm.Jobs.Job
 
   @doc """
-  Returns:
-
-    - `{:ok, {:create, attrs}}` with atom keys for `JgsCrm.Jobs.create_job/1`
-    - `{:ok, {:update_by_id, job_id, patch}}` — integer id + atom-key patch
-    - `{:ok, {:update, match, patch}}` — atom-key patch; match uses string keys (legacy heuristic matching)
-    - `{:error, reason}` otherwise.
+  Returns `{:ok, operations}` where `operations` is a non-empty list of normalized
+  create/update tuples, or `{:error, reason}`.
 
   `jobs_snapshot` must be the same list passed to the adapter (for validation after extraction).
   """
@@ -27,13 +24,50 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
     mod = Application.get_env(:jgs_crm, :sms_job_extractor_adapter, __MODULE__.Anthropic)
 
     case mod.extract(raw_message, jobs_snapshot) do
-      {:ok, attrs} when is_map(attrs) -> parse_extracted_map(attrs)
+      {:ok, attrs} when is_map(attrs) -> parse_extracted_payload(attrs)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}
     end
   end
 
-  defp parse_extracted_map(map) when is_map(map) do
+  defp parse_extracted_payload(map) when is_map(map) do
+    map = stringify_top_level_keys(map)
+
+    case Map.get(map, "actions") do
+      actions when is_list(actions) ->
+        parse_actions(actions)
+
+      _ ->
+        with {:ok, op} <- parse_single_action(map) do
+          {:ok, [op]}
+        end
+    end
+  end
+
+  defp parse_actions(actions) when is_list(actions) do
+    case Enum.with_index(actions, 1) do
+      [] ->
+        {:error, :empty_actions}
+
+      indexed ->
+        Enum.reduce_while(indexed, {:ok, []}, fn {raw_action, idx}, {:ok, acc} ->
+          if is_map(raw_action) do
+            case parse_single_action(raw_action) do
+              {:ok, op} -> {:cont, {:ok, [op | acc]}}
+              {:error, reason} -> {:halt, {:error, {:invalid_action, idx, reason}}}
+            end
+          else
+            {:halt, {:error, {:invalid_action, idx, :not_an_object}}}
+          end
+        end)
+        |> case do
+          {:ok, ops} -> {:ok, Enum.reverse(ops)}
+          err -> err
+        end
+    end
+  end
+
+  defp parse_single_action(map) when is_map(map) do
     map = stringify_top_level_keys(map)
 
     intent =
@@ -134,7 +168,7 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
     payload =
       case Map.get(map, "job") do
         %{} = job_map -> job_map
-        _ -> Map.drop(map, ["intent", "match", "updates", "job_id"])
+        _ -> Map.drop(map, ["intent", "match", "updates", "job_id", "actions"])
       end
 
     {:ok, {:create, normalize_create(payload)}}
