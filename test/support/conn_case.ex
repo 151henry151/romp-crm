@@ -57,6 +57,15 @@ defmodule JgsCrmWeb.ConnCase do
   end
 
   @doc """
+  Same as `register_and_log_in_user/1` plus a default business so `/` (jobs) loads instead of redirecting to `/businesses`.
+  """
+  def register_and_log_in_user_with_business(%{conn: _conn} = context) do
+    %{conn: conn, user: user} = register_and_log_in_user(context)
+    {:ok, _business} = JgsCrm.Businesses.create_business(user, %{name: "Test Workspace"})
+    %{conn: conn, user: user}
+  end
+
+  @doc """
   Logs the given `user` into the `conn`.
 
   It returns an updated `conn`.

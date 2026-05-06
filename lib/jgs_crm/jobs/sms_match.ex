@@ -18,7 +18,11 @@ defmodule JgsCrm.Jobs.SmsMatch do
     0
     |> add_client_name(job.client_name, Map.get(spec, "client_name"))
     |> add_substring_field(job.address, Map.get(spec, "address_snippet"), 38)
-    |> add_work_description_substring_field(job.work_description, Map.get(spec, "work_description_snippet"), 48)
+    |> add_work_description_substring_field(
+      job.work_description,
+      Map.get(spec, "work_description_snippet"),
+      48
+    )
     |> add_substring_field(job.notes, Map.get(spec, "notes_snippet"), 18)
     |> add_phone_fragment(job.phone, Map.get(spec, "phone_fragment"))
   end
@@ -40,7 +44,8 @@ defmodule JgsCrm.Jobs.SmsMatch do
     end
   end
 
-  defp blank_to_nil(v), do: v |> to_string() |> String.trim() |> then(fn s -> if s == "", do: nil, else: s end)
+  defp blank_to_nil(v),
+    do: v |> to_string() |> String.trim() |> then(fn s -> if s == "", do: nil, else: s end)
 
   defp client_name_points(nil, _), do: 0
   defp client_name_points(_, nil), do: 0
@@ -71,6 +76,7 @@ defmodule JgsCrm.Jobs.SmsMatch do
   end
 
   defp add_substring_field(acc, _job_val, nil, _weight), do: acc
+
   defp add_substring_field(acc, job_val, spec_needle, weight) do
     case blank_to_nil(spec_needle) do
       nil -> acc

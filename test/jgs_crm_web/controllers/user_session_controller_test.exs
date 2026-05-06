@@ -3,6 +3,7 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
 
   import JgsCrm.AccountsFixtures
   alias JgsCrm.Accounts
+  alias JgsCrm.Businesses
 
   setup do
     %{unconfirmed_user: unconfirmed_user_fixture(), user: user_fixture()}
@@ -95,6 +96,8 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
       assert get_session(conn, :user_token)
       assert redirected_to(conn) == ~p"/"
 
+      {:ok, _} = Businesses.create_business(user, %{name: "Session Test Biz"})
+
       # Now do a logged in request and assert on the menu
       conn = get(conn, ~p"/")
       response = html_response(conn, 200)
@@ -170,6 +173,8 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
       assert get_session(conn, :user_token)
       assert redirected_to(conn) == ~p"/"
 
+      {:ok, _} = Businesses.create_business(user, %{name: "Magic Link Biz"})
+
       # Now do a logged in request and assert on the menu
       conn = get(conn, ~p"/")
       response = html_response(conn, 200)
@@ -193,6 +198,8 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "User confirmed successfully."
 
       assert Accounts.get_user!(user.id).confirmed_at
+
+      {:ok, _} = Businesses.create_business(user, %{name: "Confirmed User Biz"})
 
       # Now do a logged in request and assert on the menu
       conn = get(conn, ~p"/")

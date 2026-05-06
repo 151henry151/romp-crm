@@ -9,6 +9,13 @@ defmodule JgsCrm.Accounts.User do
     field :confirmed_at, :utc_datetime
     field :authenticated_at, :utc_datetime, virtual: true
 
+    field :phone, :string
+    field :phone_normalized, :string
+
+    belongs_to :sms_business, JgsCrm.Businesses.Business, foreign_key: :sms_business_id
+
+    has_many :business_memberships, JgsCrm.Businesses.BusinessMembership
+
     timestamps(type: :utc_datetime)
   end
 
@@ -112,6 +119,49 @@ defmodule JgsCrm.Accounts.User do
   def confirm_changeset(user) do
     now = DateTime.utc_now(:second)
     change(user, confirmed_at: now)
+  end
+
+  @doc """
+  Profile fields: phone (SMS routing from your number) and optional default business for SMS when you belong to several.
+  """
+  def profile_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:phone, :sms_business_id])
+    |> validate_length(:phone, max: 40)
+    |> maybe_normalize_phone()
+    |> validate_phone_normalized_unique()
+  end
+
+  defp maybe_normalize_phone(changeset) do
+    case get_change(changeset, :phone) do
+      nil ->
+        changeset
+
+      phone ->
+        case String.trim(to_string(phone)) do
+          "" ->
+            changeset
+            |> put_change(:phone, nil)
+            |> put_change(:phone_normalized, nil)
+
+          trimmed ->
+            norm = JgsCrm.Twilio.Phone.normalize_us(trimmed)
+            norm = if norm == "", do: nil, else: norm
+            put_change(changeset, :phone_normalized, norm)
+        end
+    end
+  end
+
+  defp validate_phone_normalized_unique(changeset) do
+    case Ecto.Changeset.get_field(changeset, :phone_normalized) do
+      nil ->
+        changeset
+
+      _norm ->
+        changeset
+        |> unsafe_validate_unique(:phone_normalized, JgsCrm.Repo)
+        |> unique_constraint(:phone_normalized)
+    end
   end
 
   @doc """

@@ -1,16 +1,51 @@
 <div class="min-h-screen bg-gray-50">
   <%!-- Header --%>
   <header class="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
-    <div class="max-w-screen-xl mx-auto">
+    <div class="max-w-screen-xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
         <h1 class="text-lg sm:text-xl font-bold text-gray-900">Romp CRM</h1>
         <p class="text-sm text-gray-500">Customer & Job Tracker</p>
         <p class="text-xs text-gray-500 mt-1">
           <span class="text-gray-600 font-medium">Text new jobs and updates:</span>
-          <a href="sms:+18022780970" class="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap">
+          <a
+            href="sms:+18022780970"
+            class="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap"
+          >
             (802) 278-0970
           </a>
         </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 shrink-0">
+        <%= if assigns[:my_businesses] && length(@my_businesses) > 1 do %>
+          <form action={~p"/business/switch"} method="post" class="flex items-center gap-2">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <label for="business-switch" class="text-xs text-gray-600 whitespace-nowrap">
+              Business
+            </label>
+            <select
+              id="business-switch"
+              name="business_id"
+              class="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white max-w-[14rem]"
+              onchange="this.form.requestSubmit()"
+            >
+              <%= for b <- @my_businesses do %>
+                <option value={b.id} selected={b.id == @current_business_id}>{b.name}</option>
+              <% end %>
+            </select>
+          </form>
+        <% end %>
+        <.link
+          navigate={~p"/businesses"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Businesses
+        </.link>
+        <.link
+          href={~p"/users/settings"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Settings
+        </.link>
       </div>
     </div>
   </header>
@@ -90,17 +125,41 @@
               class="border-t border-gray-100 px-4 py-3 text-sm text-gray-900 space-y-2"
               data-theme="light"
             >
-              <p><span class="font-medium text-gray-700">Address:</span> <span class="break-words text-gray-900">{display(job.address)}</span></p>
-              <p><span class="font-medium text-gray-700">Phone:</span> <span class="text-gray-900">{display(job.phone)}</span></p>
+              <p>
+                <span class="font-medium text-gray-700">Address:</span>
+                <span class="break-words text-gray-900">{display(job.address)}</span>
+              </p>
+              <p>
+                <span class="font-medium text-gray-700">Phone:</span>
+                <span class="text-gray-900">{display(job.phone)}</span>
+              </p>
               <p>
                 <span class="font-medium text-gray-700">Priority:</span>
-                <span class="text-gray-900"><%= if job.priority == :high do %>High<% else %>Normal<% end %></span>
+                <span class="text-gray-900">
+                  <%= if job.priority == :high do %>
+                    High
+                  <% else %>
+                    Normal
+                  <% end %>
+                </span>
               </p>
-              <p><span class="font-medium text-gray-700">Status:</span> <span class="text-gray-900">{status_label(job.status)}</span></p>
-              <p><span class="font-medium text-gray-700">Referred By:</span> <span class="break-words text-gray-900">{display(job.referred_by)}</span></p>
-              <p><span class="font-medium text-gray-700">Next Action:</span> <span class="break-words text-gray-900">{display(job.next_action)}</span></p>
+              <p>
+                <span class="font-medium text-gray-700">Status:</span>
+                <span class="text-gray-900">{status_label(job.status)}</span>
+              </p>
+              <p>
+                <span class="font-medium text-gray-700">Referred By:</span>
+                <span class="break-words text-gray-900">{display(job.referred_by)}</span>
+              </p>
+              <p>
+                <span class="font-medium text-gray-700">Next Action:</span>
+                <span class="break-words text-gray-900">{display(job.next_action)}</span>
+              </p>
               <div class="pt-2 flex items-center gap-4">
-                <.link patch={~p"/jobs/#{job.id}/edit"} class="text-blue-600 hover:text-blue-800 font-medium">
+                <.link
+                  patch={~p"/jobs/#{job.id}/edit"}
+                  class="text-blue-600 hover:text-blue-800 font-medium"
+                >
                   Edit
                 </.link>
                 <button
@@ -193,14 +252,43 @@
               <tr id={"job-expand-md-#{job.id}"} class="bg-gray-50">
                 <td colspan="9" class="px-4 py-3 text-sm text-gray-900" data-theme="light">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
-                    <p><span class="font-medium text-gray-700">Client:</span> {display(job.client_name)}</p>
-                    <p><span class="font-medium text-gray-700">Address:</span> {display(job.address)}</p>
-                    <p><span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}</p>
-                    <p><span class="font-medium text-gray-700">Priority:</span> {if job.priority == :high, do: "High", else: "Normal"}</p>
-                    <p><span class="font-medium text-gray-700">Status:</span> {status_label(job.status)}</p>
-                    <p><span class="font-medium text-gray-700">Referred By:</span> {display(job.referred_by)}</p>
-                    <p><span class="font-medium text-gray-700">Next Action:</span> {display(job.next_action)}</p>
-                    <p class="lg:col-span-2"><span class="font-medium text-gray-700">Notes:</span> {display(job.notes)}</p>
+                    <p>
+                      <span class="font-medium text-gray-700">Client:</span> {display(
+                        job.client_name
+                      )}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Address:</span> {display(
+                        job.address
+                      )}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Priority:</span> {if job.priority ==
+                                                                                     :high,
+                                                                                   do: "High",
+                                                                                   else: "Normal"}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Status:</span> {status_label(
+                        job.status
+                      )}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Referred By:</span> {display(
+                        job.referred_by
+                      )}
+                    </p>
+                    <p>
+                      <span class="font-medium text-gray-700">Next Action:</span> {display(
+                        job.next_action
+                      )}
+                    </p>
+                    <p class="lg:col-span-2">
+                      <span class="font-medium text-gray-700">Notes:</span> {display(job.notes)}
+                    </p>
                   </div>
                 </td>
               </tr>
@@ -228,6 +316,7 @@
       title={if @live_action == :new, do: "New Job", else: "Edit Job"}
       action={@live_action}
       job={@job}
+      current_business_id={@current_business_id}
       patch={~p"/"}
     />
   </.modal>

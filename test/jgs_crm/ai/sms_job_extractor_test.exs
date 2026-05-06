@@ -32,7 +32,11 @@ defmodule JgsCrm.Ai.SmsJobExtractorTest do
     test "invalid job_id string returns error" do
       raw =
         "STUB_JSON " <>
-          Jason.encode!(%{"intent" => "update", "job_id" => "xyz", "updates" => %{"address" => "z"}})
+          Jason.encode!(%{
+            "intent" => "update",
+            "job_id" => "xyz",
+            "updates" => %{"address" => "z"}
+          })
 
       assert {:error, :invalid_job_id} = SmsJobExtractor.extract(raw, [])
     end
@@ -44,7 +48,10 @@ defmodule JgsCrm.Ai.SmsJobExtractorTest do
             "actions" => [
               %{
                 "intent" => "create",
-                "job" => %{"client_name" => "Mark Sino", "work_description" => "Replace refrigerator"}
+                "job" => %{
+                  "client_name" => "Mark Sino",
+                  "work_description" => "Replace refrigerator"
+                }
               },
               %{
                 "intent" => "create",

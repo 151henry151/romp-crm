@@ -20,7 +20,8 @@ defmodule JgsCrm.Ai.SmsJobExtractor do
 
   `jobs_snapshot` must be the same list passed to the adapter (for validation after extraction).
   """
-  def extract(raw_message, jobs_snapshot \\ []) when is_binary(raw_message) and is_list(jobs_snapshot) do
+  def extract(raw_message, jobs_snapshot \\ [])
+      when is_binary(raw_message) and is_list(jobs_snapshot) do
     mod = Application.get_env(:jgs_crm, :sms_job_extractor_adapter, __MODULE__.Anthropic)
 
     case mod.extract(raw_message, jobs_snapshot) do

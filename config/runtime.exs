@@ -108,11 +108,12 @@ if config_env() == :prod do
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
     anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
     twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
-    skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
+    skip_twilio_signature_validation:
+      System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
     mail_from_name: mail_from_name,
     mail_from_address: mail_from_address,
     registration_email_allowlist: registration_allowlist,
-    enforce_registration_allowlist: true,
+    enforce_registration_allowlist: false,
     twilio_sms_allowed_from_normalized: twilio_allow_norm
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do

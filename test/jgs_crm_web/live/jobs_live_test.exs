@@ -4,11 +4,16 @@ defmodule JgsCrmWeb.JobsLiveTest do
   import Phoenix.LiveViewTest
   import JgsCrm.JobsFixtures
 
-  setup :register_and_log_in_user
+  alias JgsCrm.Businesses
 
-  test "clicking a row toggles expanded details", %{conn: conn} do
+  setup :register_and_log_in_user_with_business
+
+  test "clicking a row toggles expanded details", %{conn: conn, user: user} do
+    [business] = Businesses.list_businesses_for_user(user)
+
     job =
       job_fixture(%{
+        business_id: business.id,
         client_name: "Angela Brande",
         address: "42 Maple St",
         phone: "802-555-0101",
