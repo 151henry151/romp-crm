@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-06
+### Added
+- Log full Twilio inbound SMS body, `MessageSid`, `From`, and create/update parse and database outcomes in `TwilioWebhookController` for production debugging
+
+### Changed
+- Assert SMS pipeline log lines in Twilio webhook controller tests (`capture_log`)
+
 ## [0.2.4] - 2026-05-05
 ### Changed
 - Make jobs dashboard rows expandable so selecting a job reveals all fields inline

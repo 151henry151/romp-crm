@@ -34,41 +34,78 @@ defmodule JgsCrmWeb.TwilioWebhookController do
 
   defp deliver_inbound_sms(conn) do
     body_text = (conn.body_params["Body"] || "") |> to_string()
+    from = conn.body_params["From"] |> to_string()
+    message_sid = conn.body_params["MessageSid"] |> to_string()
+
+    Logger.info(
+      "Twilio SMS inbound: sid=#{message_sid} from=#{from} body=#{inspect(body_text)}"
+    )
 
     case SmsJobExtractor.extract(body_text) do
       {:ok, {:create, attrs}} ->
+        Logger.info(
+          "Twilio SMS parsed create: sid=#{message_sid} from=#{from} attrs=#{inspect(attrs)}"
+        )
+
         case Jobs.create_job(attrs) do
-          {:ok, _job} ->
+          {:ok, job} ->
+            Logger.info(
+              "Twilio SMS create applied: sid=#{message_sid} from=#{from} job_id=#{job.id}"
+            )
+
             twiml_ok(conn)
 
           {:error, changeset} ->
-            Logger.warning("Twilio SMS job insert failed: #{inspect(changeset.errors)}")
+            Logger.warning(
+              "Twilio SMS create failed: sid=#{message_sid} from=#{from} errors=#{inspect(changeset.errors)}"
+            )
+
             twiml_ok(conn)
         end
 
       {:ok, {:update, match, patch}} ->
+        Logger.info(
+          "Twilio SMS parsed update: sid=#{message_sid} from=#{from} match=#{inspect(match)} patch=#{inspect(patch)}"
+        )
+
         case Jobs.find_job_for_sms_update(match) do
           {:ok, job} ->
             case Jobs.update_job(job, patch) do
-              {:ok, _job} ->
+              {:ok, updated_job} ->
+                Logger.info(
+                  "Twilio SMS update applied: sid=#{message_sid} from=#{from} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
+                )
+
                 twiml_ok(conn)
 
               {:error, changeset} ->
-                Logger.warning("Twilio SMS job update failed: #{inspect(changeset.errors)}")
+                Logger.warning(
+                  "Twilio SMS update failed: sid=#{message_sid} from=#{from} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
+                )
+
                 twiml_ok(conn)
             end
 
           {:error, reason} ->
-            Logger.info("Twilio SMS update skipped (match): #{inspect(reason)}, match=#{inspect(match)}")
+            Logger.info(
+              "Twilio SMS update skipped: sid=#{message_sid} from=#{from} reason=#{inspect(reason)} match=#{inspect(match)} patch=#{inspect(patch)}"
+            )
+
             twiml_ok(conn)
         end
 
       {:error, :missing_api_key} ->
-        Logger.error("ANTHROPIC_API_KEY is not set; cannot parse SMS")
+        Logger.error(
+          "Twilio SMS extraction failed: sid=#{message_sid} from=#{from} reason=:missing_api_key body=#{inspect(body_text)}"
+        )
+
         twiml_ok(conn)
 
       {:error, reason} ->
-        Logger.warning("SMS job extraction failed: #{inspect(reason)}")
+        Logger.warning(
+          "Twilio SMS extraction failed: sid=#{message_sid} from=#{from} reason=#{inspect(reason)} body=#{inspect(body_text)}"
+        )
+
         twiml_ok(conn)
     end
   end
