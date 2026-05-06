@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-05-06
+
+### Changed
+
+- Widen the filter-row new-job plus control with horizontal padding and a minimum width so it reads less tall-narrow
+
 ## [0.5.5] - 2026-05-06
 
 ### Changed
