@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-05
+### Changed
+- Make jobs dashboard rows expandable so selecting a job reveals all fields inline
+- Add mobile stacked job cards (no horizontal scroll) with expandable details and mobile edit/delete actions
+- Reflow dashboard header controls for narrow screens to avoid account-text overlap
+
+### Added
+- Add LiveView test coverage for row expand/collapse behavior on the jobs screen
+
 ## [0.2.3] - 2026-05-05
 ### Added
 - Resolve inbound SMS updates against existing jobs via Claude `match` hints and `SmsMatch` scoring; apply patches with `find_job_for_sms_update/1`
