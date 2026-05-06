@@ -4,6 +4,13 @@ defmodule JgsCrmWeb.UserRegistrationControllerTest do
   import JgsCrm.AccountsFixtures
 
   describe "GET /users/register" do
+    test "sends no-store headers so cached register HTML cannot stale CSRF tokens", %{conn: conn} do
+      conn = get(conn, ~p"/users/register")
+
+      assert get_resp_header(conn, "cache-control") == ["private, no-store, must-revalidate"]
+      assert get_resp_header(conn, "pragma") == ["no-cache"]
+    end
+
     test "renders registration page", %{conn: conn} do
       conn = get(conn, ~p"/users/register")
       response = html_response(conn, 200)

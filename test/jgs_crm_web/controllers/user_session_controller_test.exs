@@ -9,6 +9,13 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
   end
 
   describe "GET /users/log-in" do
+    test "sends no-store headers so cached login HTML cannot stale CSRF tokens", %{conn: conn} do
+      conn = get(conn, ~p"/users/log-in")
+
+      assert get_resp_header(conn, "cache-control") == ["private, no-store, must-revalidate"]
+      assert get_resp_header(conn, "pragma") == ["no-cache"]
+    end
+
     test "renders login page", %{conn: conn} do
       conn = get(conn, ~p"/users/log-in")
       response = html_response(conn, 200)
@@ -49,6 +56,9 @@ defmodule JgsCrmWeb.UserSessionControllerTest do
         end)
 
       conn = get(conn, ~p"/users/log-in/#{token}")
+
+      assert get_resp_header(conn, "cache-control") == ["private, no-store, must-revalidate"]
+
       assert html_response(conn, 200) =~ "Confirm and stay logged in"
     end
 

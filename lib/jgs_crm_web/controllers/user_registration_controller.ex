@@ -3,6 +3,11 @@ defmodule JgsCrmWeb.UserRegistrationController do
 
   alias JgsCrm.Accounts
   alias JgsCrm.Accounts.User
+  alias JgsCrmWeb.UserAuth
+
+  plug :auth_pages_no_store when action in [:new]
+
+  defp auth_pages_no_store(conn, _opts), do: UserAuth.put_auth_pages_no_store(conn)
 
   def new(conn, _params) do
     changeset = Accounts.change_user_email(%User{})
