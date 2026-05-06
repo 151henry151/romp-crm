@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-05-06
+
+### Changed
+
+- Remove the temporary JGS logo from the jobs header and simplify the new-job control to a compact `+` button
+- Remove the duplicate jobs-header log-out link so mobile shows only the global account menu action
+
 ## [0.5.2] - 2026-05-06
 
 ### Changed
