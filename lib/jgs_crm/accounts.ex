@@ -75,9 +75,37 @@ defmodule JgsCrm.Accounts do
 
   """
   def register_user(attrs) do
-    %User{}
-    |> User.email_changeset(attrs)
-    |> Repo.insert()
+    changeset =
+      %User{}
+      |> User.email_changeset(attrs)
+
+    changeset =
+      if Application.get_env(:jgs_crm, :enforce_registration_allowlist, true) do
+        validate_registration_allowlist(changeset)
+      else
+        changeset
+      end
+
+    Repo.insert(changeset)
+  end
+
+  defp validate_registration_allowlist(changeset) do
+    allow = Application.get_env(:jgs_crm, :registration_email_allowlist, []) || []
+
+    case Ecto.Changeset.get_field(changeset, :email) do
+      email when is_binary(email) ->
+        normalized = email |> String.trim() |> String.downcase()
+        allowed? = Enum.any?(allow, &(String.downcase(String.trim(&1)) == normalized))
+
+        if allowed? do
+          changeset
+        else
+          Ecto.Changeset.add_error(changeset, :email, "is not authorized for sign-up")
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   ## Settings

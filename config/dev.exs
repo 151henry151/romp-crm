@@ -91,4 +91,12 @@ config :jgs_crm,
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
   twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
-  skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true"
+  skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
+  registration_email_allowlist: [
+    "151henry151@gmail.com",
+    "jvzieger@icloud.com",
+    "jzieger2@gmail.com",
+    "henry@hromp.com"
+  ],
+  enforce_registration_allowlist: true,
+  twilio_sms_allowed_from_normalized: ["18024587299", "18024582710"]

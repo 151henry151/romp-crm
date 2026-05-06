@@ -5,6 +5,7 @@ defmodule JgsCrmWeb.TwilioWebhookController do
 
   alias JgsCrm.Ai.SmsJobExtractor
   alias JgsCrm.Jobs
+  alias JgsCrm.Twilio
   alias JgsCrm.Twilio.Signature
 
   @doc """
@@ -28,7 +29,23 @@ defmodule JgsCrmWeb.TwilioWebhookController do
         send_resp(conn, 403, "Forbidden")
 
       true ->
-        deliver_inbound_sms(conn)
+        maybe_deliver_inbound_sms(conn)
+    end
+  end
+
+  defp maybe_deliver_inbound_sms(conn) do
+    from = conn.body_params["From"] |> to_string()
+
+    if Twilio.sms_sender_allowed?(from) do
+      deliver_inbound_sms(conn)
+    else
+      message_sid = conn.body_params["MessageSid"] |> to_string()
+
+      Logger.info(
+        "Twilio SMS rejected: from not allowlisted sid=#{message_sid} from=#{inspect(from)}"
+      )
+
+      twiml_ok(conn)
     end
   end
 
