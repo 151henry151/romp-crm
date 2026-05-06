@@ -2,27 +2,138 @@
 
 ## [Unreleased]
 
-### Added
-- Resolve inbound SMS updates against existing jobs via Claude `match` hints and `SmsMatch` scoring; apply patches with `find_job_for_sms_update/1`
-- Extend Anthropic SMS extractor prompt for `intent` create vs update; `STUB_UPDATE` JSON prefix on deterministic stub for tests
-
-### Fixed
-- Stop applying shell `PORT` to the endpoint in `:test` so `mix test` does not collide with a running release on the same host
-
-### Changed
-- Relax `SmsMatchTest` combined-hint assertion to match actual scoring weights
-
-## [0.1.1] - 2026-05-06
+## [0.5.7] - 2026-05-06
 
 ### Changed
 
 - Give the jobs list New Job (+) patch link explicit wider minimum width (`min-w-[4.5rem]`), horizontal padding (`px-6`), `inline-flex`, `self-center`, and default link underline removal so it reads as a short wide control rather than a tall narrow pill
+
+## [0.5.6] - 2026-05-06
+
+### Changed
+
+- Widen the filter-row new-job plus control with horizontal padding and a minimum width so it reads less tall-narrow
+
+## [0.5.5] - 2026-05-06
+
+### Changed
+
+- Move the compact new-job control from the dashboard header beside the status filter tabs
+- Remove the redundant header column that duplicated the global account controls
+
+## [0.5.4] - 2026-05-06
+
+### Changed
+
+- Adjust the header new-job plus button classes to render as a consistent square control
+
+## [0.5.3] - 2026-05-06
+
+### Changed
+
+- Remove the temporary JGS logo from the jobs header and simplify the new-job control to a compact `+` button
+- Remove the duplicate jobs-header log-out link so mobile shows only the global account menu action
+
+## [0.5.2] - 2026-05-06
+
+### Changed
+
+- Add dashboard header hint linking SMS intake number `(802) 278-0970` and clarify it accepts both new jobs and updates
+
+## [0.5.1] - 2026-05-06
+
+### Changed
+
+- Standardize jobs dashboard priority and status badges to fixed-size rounded rectangles for consistent sizing across labels
+
+## [0.5.0] - 2026-05-06
+
+### Added
+
+- Parse multi-operation SMS payloads into an ordered `actions` list so one inbound text can create and update multiple jobs
+- Apply each parsed SMS operation independently in the Twilio webhook with per-operation logging
+
+### Changed
+
+- Update Anthropic extraction prompt to emit `actions` arrays for multi-job messages while preserving single-action compatibility
+
+## [0.4.0] - 2026-05-06
+
+### Added
+
+- Enforce registration email allowlist (configurable via `ALLOWED_REGISTRATION_EMAILS` in production)
+- Reject inbound Twilio SMS from numbers outside `TWILIO_SMS_ALLOWED_FROM` before parsing
+- Add `JgsCrm.Twilio.Phone.normalize_us/1` for comparing formatted North-American caller IDs
+
+## [0.3.0] - 2026-05-06
+
+### Changed
+
+- Pass live `Jobs.snapshot_for_sms_ai/0` JSON into Anthropic SMS extraction so updates select `job_id` by semantic match against CRM rows (typos, informal references)
+- Validate `job_id` against the snapshot before applying Twilio SMS patches; keep heuristic `match` map path as fallback
+- Extend deterministic SMS stub with `STUB_JSON` test prefix and `STUB_UPDATE` job_id shape
+
+## [0.2.9] - 2026-05-06
+
+### Changed
+
+- Normalize `work_description_snippet` matching so phrases like "water shut off" or "water shut-off" align with CRM text stored as "water shutoff"
+- Document work-snippet normalization in the Anthropic SMS system prompt
+
+## [0.2.8] - 2026-05-06
+
+### Changed
+
+- Raise `work_description_snippet` SMS match weight so task-only references can reach the match threshold
+- Treat a single above-threshold job as the SMS update target even when its score is below 52 (keeps requiring a clear margin when multiple jobs score)
+- Extend Anthropic SMS prompt with indirect job references and a water-shutoff address-correction example
 
 ## [0.2.7] - 2026-05-05
 
 ### Fixed
 
 - Scope expanded job detail rows with explicit Tailwind text color and `data-theme="light"` so Address, Work, Priority, Status, and other values stay visible on white cards when the root uses DaisyUI dark theme
+
+## [0.2.6] - 2026-05-06
+### Fixed
+- Refresh job list from DB when toggling row expand or filters so SMS and other server-side updates show immediately in the dashboard
+
+### Changed
+- Label mobile summary line as Work; show optional Notes under the name only when the notes field has content
+- Add Work and Status rows to the mobile expanded panel; render priority with standard HEEx control flow
+
+### Added
+- Add stable ids for mobile and desktop expanded-detail blocks for LiveView tests
+
+## [0.2.5] - 2026-05-06
+### Added
+- Log full Twilio inbound SMS body, `MessageSid`, `From`, and create/update parse and database outcomes in `TwilioWebhookController` for production debugging
+
+### Changed
+- Assert SMS pipeline log lines in Twilio webhook controller tests (`capture_log`)
+
+## [0.2.4] - 2026-05-05
+### Changed
+- Make jobs dashboard rows expandable so selecting a job reveals all fields inline
+- Add mobile stacked job cards (no horizontal scroll) with expandable details and mobile edit/delete actions
+- Reflow dashboard header controls for narrow screens to avoid account-text overlap
+
+### Added
+- Add LiveView test coverage for row expand/collapse behavior on the jobs screen
+
+## [0.2.3] - 2026-05-05
+### Added
+- Resolve inbound SMS updates against existing jobs via Claude `match` hints and `SmsMatch` scoring; apply patches with `find_job_for_sms_update/1`
+- Extend Anthropic SMS extractor prompt for `intent` create vs update and add `STUB_UPDATE` JSON prefix on deterministic stub for update-path tests
+- Add SMS-match scoring tests and Twilio webhook update-flow tests
+
+### Fixed
+- Stop applying shell `PORT` to the endpoint in `:test` so test runs do not collide with a running release on the same host
+
+### Changed
+- Normalize SMS extractor output to explicit create/update intents before controller handling
+- Route Twilio webhook create and update intents to `create_job/1` or `update_job/2` with no-match/ambiguous logging
+- Relax `SmsMatchTest` combined-hint assertion to match actual scoring weights
 
 ## [0.2.2] - 2026-05-06
 ### Added
