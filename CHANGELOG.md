@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-06
+
+### Added
+
+- Enforce registration email allowlist (configurable via `ALLOWED_REGISTRATION_EMAILS` in production)
+- Reject inbound Twilio SMS from numbers outside `TWILIO_SMS_ALLOWED_FROM` before parsing
+- Add `JgsCrm.Twilio.Phone.normalize_us/1` for comparing formatted North-American caller IDs
+
 ## [0.3.0] - 2026-05-06
 
 ### Changed

@@ -159,4 +159,26 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "Twilio SMS parsed update: sid=SMbadid"
     assert log =~ "reason=:invalid_job_id"
   end
+
+  test "POST /webhooks/twilio/sms does not process CRM when From is not allowlisted", %{conn: conn} do
+    before = Jobs.list_jobs() |> length()
+
+    log =
+      capture_log([level: :info], fn ->
+        conn =
+          conn
+          |> post(~p"/webhooks/twilio/sms", %{
+            "Body" =>
+              "Customer John at 123 Main needs drain line repair urgent callback please",
+            "From" => "+19998887777",
+            "MessageSid" => "SMnotallowed"
+          })
+
+        assert response(conn, 200) =~ "<Response>"
+      end)
+
+    assert log =~ "Twilio SMS rejected: from not allowlisted"
+    refute log =~ "Twilio SMS inbound:"
+    assert Jobs.list_jobs() |> length() == before
+  end
 end

@@ -71,6 +71,38 @@ if config_env() == :prod do
       environment variable MAIL_FROM_ADDRESS is missing (From: address for magic-link and confirmation emails).
       """
 
+  default_registration_emails =
+    "151henry151@gmail.com,jvzieger@icloud.com,jzieger2@gmail.com,henry@hromp.com"
+
+  registration_emails_raw =
+    case System.get_env("ALLOWED_REGISTRATION_EMAILS") |> to_string() |> String.trim() do
+      "" -> default_registration_emails
+      s -> s
+    end
+
+  registration_allowlist =
+    registration_emails_raw
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.map(&String.downcase/1)
+    |> Enum.reject(&(&1 == ""))
+
+  default_twilio_from = "+18024587299,+18024582710"
+
+  twilio_from_raw =
+    case System.get_env("TWILIO_SMS_ALLOWED_FROM") |> to_string() |> String.trim() do
+      "" -> default_twilio_from
+      s -> s
+    end
+
+  twilio_allow_norm =
+    twilio_from_raw
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(&JgsCrm.Twilio.Phone.normalize_us/1)
+    |> Enum.reject(&(&1 == ""))
+
   config :jgs_crm,
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
@@ -78,7 +110,10 @@ if config_env() == :prod do
     twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
     skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
     mail_from_name: mail_from_name,
-    mail_from_address: mail_from_address
+    mail_from_address: mail_from_address,
+    registration_email_allowlist: registration_allowlist,
+    enforce_registration_allowlist: true,
+    twilio_sms_allowed_from_normalized: twilio_allow_norm
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
     "" ->

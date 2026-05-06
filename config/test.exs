@@ -36,4 +36,6 @@ config :phoenix,
 
 config :jgs_crm,
   skip_twilio_signature_validation: true,
-  sms_job_extractor_adapter: JgsCrm.Ai.SmsJobExtractor.DeterministicStub
+  sms_job_extractor_adapter: JgsCrm.Ai.SmsJobExtractor.DeterministicStub,
+  enforce_registration_allowlist: false,
+  twilio_sms_allowed_from_normalized: ["15555550123"]

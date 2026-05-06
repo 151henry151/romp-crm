@@ -77,6 +77,32 @@ defmodule JgsCrm.AccountsTest do
       assert "has already been taken" in errors_on(changeset).email
     end
 
+    test "rejects email when allowlist enforcement is on and email is not listed" do
+      Application.put_env(:jgs_crm, :enforce_registration_allowlist, true)
+      Application.put_env(:jgs_crm, :registration_email_allowlist, ["allow@example.com"])
+
+      on_exit(fn ->
+        Application.put_env(:jgs_crm, :enforce_registration_allowlist, false)
+        Application.delete_env(:jgs_crm, :registration_email_allowlist)
+      end)
+
+      {:error, changeset} = Accounts.register_user(%{email: "blocked@example.com"})
+      assert Enum.any?(errors_on(changeset).email, &String.contains?(&1, "not authorized"))
+    end
+
+    test "allows listed email when enforcement is on" do
+      Application.put_env(:jgs_crm, :enforce_registration_allowlist, true)
+      Application.put_env(:jgs_crm, :registration_email_allowlist, ["allowlisted@example.com"])
+
+      on_exit(fn ->
+        Application.put_env(:jgs_crm, :enforce_registration_allowlist, false)
+        Application.delete_env(:jgs_crm, :registration_email_allowlist)
+      end)
+
+      assert {:ok, user} = Accounts.register_user(%{email: "allowlisted@example.com"})
+      assert user.email == "allowlisted@example.com"
+    end
+
     test "registers users without password" do
       email = unique_user_email()
       {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
