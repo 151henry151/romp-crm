@@ -75,38 +75,95 @@ defmodule JgsCrm.Accounts do
 
   """
   def register_user(attrs) do
-    changeset =
-      %User{}
-      |> User.email_changeset(attrs)
-
-    changeset =
-      if Application.get_env(:jgs_crm, :enforce_registration_allowlist, true) do
-        validate_registration_allowlist(changeset)
-      else
-        changeset
-      end
-
-    Repo.insert(changeset)
+    %User{}
+    |> User.email_changeset(attrs)
+    |> Repo.insert()
   end
 
-  defp validate_registration_allowlist(changeset) do
-    allow = Application.get_env(:jgs_crm, :registration_email_allowlist, []) || []
+  def get_user_by_phone_normalized(nil), do: nil
+  def get_user_by_phone_normalized(""), do: nil
 
-    case Ecto.Changeset.get_field(changeset, :email) do
-      email when is_binary(email) ->
-        normalized = email |> String.trim() |> String.downcase()
-        allowed? = Enum.any?(allow, &(String.downcase(String.trim(&1)) == normalized))
+  def get_user_by_phone_normalized(phone) when is_binary(phone) do
+    Repo.get_by(User, phone_normalized: phone)
+  end
 
-        if allowed? do
+  def change_user_profile(%User{} = user, attrs \\ %{}) do
+    User.profile_changeset(user, attrs)
+  end
+
+  def update_user_profile(%User{} = user, attrs) when is_map(attrs) do
+    allowed_ids =
+      user
+      |> JgsCrm.Businesses.list_businesses_for_user()
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+
+    attrs = normalize_profile_attrs(attrs)
+
+    changeset = User.profile_changeset(user, attrs)
+
+    changeset =
+      case Ecto.Changeset.get_change(changeset, :sms_business_id) do
+        nil ->
           changeset
-        else
-          Ecto.Changeset.add_error(changeset, :email, "is not authorized for sign-up")
+
+        bid when is_integer(bid) ->
+          if MapSet.member?(allowed_ids, bid) do
+            changeset
+          else
+            Ecto.Changeset.add_error(
+              changeset,
+              :sms_business_id,
+              "must be a business you belong to"
+            )
+          end
+
+        _ ->
+          changeset
+      end
+
+    Repo.update(changeset)
+  end
+
+  defp normalize_profile_attrs(attrs) when is_map(attrs) do
+    attrs =
+      Enum.into(attrs, %{}, fn
+        {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+        {k, v} -> {to_string(k), v}
+      end)
+
+    case attrs["sms_business_id"] do
+      "" ->
+        Map.put(attrs, "sms_business_id", nil)
+
+      nil ->
+        attrs
+
+      v when is_integer(v) ->
+        attrs
+
+      v when is_binary(v) ->
+        case Integer.parse(String.trim(v)) do
+          {n, _} -> Map.put(attrs, "sms_business_id", n)
+          :error -> Map.put(attrs, "sms_business_id", nil)
         end
 
       _ ->
-        changeset
+        attrs
     end
   end
+
+  @doc """
+  Sets `sms_business_id` the first time a user creates their only (or first) business.
+  """
+  def maybe_set_default_sms_business(%User{sms_business_id: nil} = user, business_id)
+      when is_integer(business_id) do
+    user
+    |> Ecto.Changeset.change(sms_business_id: business_id)
+    |> Repo.update()
+  end
+
+  def maybe_set_default_sms_business(%User{}, _), do: {:ok, :skipped}
 
   ## Settings
 

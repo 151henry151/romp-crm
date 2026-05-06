@@ -3,15 +3,16 @@ defmodule JgsCrm.Jobs do
   alias JgsCrm.Repo
   alias JgsCrm.Jobs.Job
 
-  @topic "jobs"
-
-  def subscribe do
-    Phoenix.PubSub.subscribe(JgsCrm.PubSub, @topic)
+  def subscribe(business_id) when is_integer(business_id) do
+    Phoenix.PubSub.subscribe(JgsCrm.PubSub, topic(business_id))
   end
 
-  def list_jobs do
+  defp topic(business_id), do: "jobs:business:#{business_id}"
+
+  def list_jobs(business_id) when is_integer(business_id) do
     Repo.all(
       from j in Job,
+        where: j.business_id == ^business_id,
         order_by: [
           asc: fragment("CASE ? WHEN 'high' THEN 0 ELSE 1 END", j.priority),
           asc:
@@ -24,17 +25,21 @@ defmodule JgsCrm.Jobs do
     )
   end
 
-  def get_job!(id), do: Repo.get!(Job, id)
+  def get_job!(id, business_id) when is_integer(business_id) do
+    Repo.get_by!(Job, id: id, business_id: business_id)
+  end
 
-  def get_job(id), do: Repo.get(Job, id)
+  def get_job(id, business_id) when is_integer(business_id) do
+    Repo.get_by(Job, id: id, business_id: business_id)
+  end
 
   @doc """
   Returns jobs as plain maps suitable for embedding in an SMS-extraction LLM prompt.
 
   Each row includes integer `"id"` (database primary key). Fields may be `null` when empty.
   """
-  def snapshot_for_sms_ai do
-    Enum.map(list_jobs(), fn j ->
+  def snapshot_for_sms_ai(business_id) when is_integer(business_id) do
+    Enum.map(list_jobs(business_id), fn j ->
       %{
         "id" => j.id,
         "client_name" => j.client_name,
@@ -52,21 +57,23 @@ defmodule JgsCrm.Jobs do
 
   def create_job(attrs) do
     with {:ok, job} <- %Job{} |> Job.changeset(attrs) |> Repo.insert() do
-      broadcast({:created, job})
+      broadcast(job.business_id, {:created, job})
       {:ok, job}
     end
   end
 
   def update_job(%Job{} = job, attrs) do
     with {:ok, job} <- job |> Job.changeset(attrs) |> Repo.update() do
-      broadcast({:updated, job})
+      broadcast(job.business_id, {:updated, job})
       {:ok, job}
     end
   end
 
   def delete_job(%Job{} = job) do
+    bid = job.business_id
+
     with {:ok, job} <- Repo.delete(job) do
-      broadcast({:deleted, job})
+      broadcast(bid, {:deleted, job})
       {:ok, job}
     end
   end
@@ -80,9 +87,10 @@ defmodule JgsCrm.Jobs do
 
   Returns `{:ok, job}`, `{:error, :no_match}`, or `{:error, :ambiguous}` when two jobs score too close.
   """
-  def find_job_for_sms_update(match_spec) when is_map(match_spec) do
+  def find_job_for_sms_update(match_spec, business_id)
+      when is_map(match_spec) and is_integer(business_id) do
     scored =
-      list_jobs()
+      list_jobs(business_id)
       |> Enum.map(fn job -> {job, JgsCrm.Jobs.SmsMatch.score(job, match_spec)} end)
       |> Enum.filter(fn {_, sc} -> sc >= sms_match_min_score() end)
       |> Enum.sort_by(fn {_, sc} -> -sc end)
@@ -104,9 +112,6 @@ defmodule JgsCrm.Jobs do
 
   defp sms_match_min_score, do: 38
 
-  # When only one job clears the min score, accept it at that score so address-only snippets (38)
-  # and distinctive work-only snippets (see `SmsMatch` weights) can resolve updates.
-  # When several jobs score, require a stronger top score and a clear gap vs the runner-up.
   defp sms_unique_winner?(top, second) do
     min = sms_match_min_score()
 
@@ -119,7 +124,7 @@ defmodule JgsCrm.Jobs do
     end
   end
 
-  defp broadcast(message) do
-    Phoenix.PubSub.broadcast(JgsCrm.PubSub, @topic, message)
+  defp broadcast(business_id, message) do
+    Phoenix.PubSub.broadcast(JgsCrm.PubSub, topic(business_id), message)
   end
 end

@@ -1,7 +1,7 @@
 defmodule JgsCrmWeb.PageControllerTest do
   use JgsCrmWeb.ConnCase
 
-  setup :register_and_log_in_user
+  setup :register_and_log_in_user_with_business
 
   test "GET / renders jobs dashboard when authenticated", %{conn: conn} do
     conn = get(conn, ~p"/")

@@ -2,9 +2,33 @@
   <div class="text-center">
     <.header>
       Account Settings
-      <:subtitle>Manage your account email address and password settings</:subtitle>
+      <:subtitle>Manage your profile, email address, and password</:subtitle>
     </.header>
   </div>
+
+  <.form :let={f} for={@profile_changeset} action={~p"/users/settings"} id="update_profile">
+    <input type="hidden" name="action" value="update_profile" />
+
+    <.input field={f[:phone]} type="tel" label="Your mobile number (SMS)" autocomplete="tel" />
+
+    <p class="text-sm text-base-content/70 -mt-2 mb-4">
+      Set this to the same number you text from so inbound SMS routes to the correct workspace.
+    </p>
+
+    <%= if assigns[:profile_businesses] && length(@profile_businesses) > 1 do %>
+      <.input
+        field={f[:sms_business_id]}
+        type="select"
+        label="SMS workspace (when you belong to several businesses)"
+        prompt="Choose automatically"
+        options={Enum.map(@profile_businesses, &{&1.name, &1.id})}
+      />
+    <% end %>
+
+    <.button variant="primary" phx-disable-with="Saving...">Save profile</.button>
+  </.form>
+
+  <div class="divider" />
 
   <.form :let={f} for={@email_changeset} action={~p"/users/settings"} id="update_email">
     <input type="hidden" name="action" value="update_email" />

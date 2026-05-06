@@ -6,6 +6,7 @@ defmodule JgsCrmWeb.UserAuth do
 
   alias JgsCrm.Accounts
   alias JgsCrm.Accounts.Scope
+  alias JgsCrm.Businesses
 
   # Make the remember me cookie valid for 14 days. This should match
   # the session validity setting in UserToken.
@@ -35,9 +36,38 @@ defmodule JgsCrmWeb.UserAuth do
   def log_in_user(conn, user, params \\ %{}) do
     user_return_to = get_session(conn, :user_return_to)
 
+    conn =
+      conn
+      |> create_or_extend_session(user, params)
+      |> accept_pending_business_invitation(user)
+
     conn
-    |> create_or_extend_session(user, params)
     |> redirect(to: user_return_to || signed_in_path(conn))
+  end
+
+  defp accept_pending_business_invitation(conn, user) do
+    case get_session(conn, "pending_invitation_token") do
+      nil ->
+        conn
+
+      raw ->
+        conn = delete_session(conn, "pending_invitation_token")
+
+        case Businesses.accept_invitation_raw(raw, user) do
+          {:ok, business} ->
+            put_flash(conn, :info, "You joined #{business.name}.")
+
+          {:error, :email_mismatch} ->
+            put_flash(
+              conn,
+              :error,
+              "That invitation is for a different email address than the account you used."
+            )
+
+          {:error, _} ->
+            put_flash(conn, :error, "Could not accept the invitation.")
+        end
+    end
   end
 
   @doc """
@@ -211,6 +241,54 @@ defmodule JgsCrmWeb.UserAuth do
         |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
 
       {:halt, socket}
+    end
+  end
+
+  # Requires `:require_authenticated` to run first. Assigns `current_business_id` and `my_businesses`.
+  @doc false
+  def on_mount(:ensure_business_scope, _params, session, socket) do
+    user = socket.assigns.current_scope.user
+    businesses = Businesses.list_businesses_for_user(user)
+
+    cond do
+      businesses == [] ->
+        {:halt,
+         socket
+         |> Phoenix.LiveView.put_flash(:info, "Create or join a business to see jobs.")
+         |> Phoenix.LiveView.redirect(to: ~p"/businesses")}
+
+      true ->
+        bid = resolve_session_business_id(session, businesses)
+
+        {:cont,
+         socket
+         |> Phoenix.Component.assign(:current_business_id, bid)
+         |> Phoenix.Component.assign(:my_businesses, businesses)}
+    end
+  end
+
+  defp resolve_session_business_id(session, businesses) do
+    ids = Enum.map(businesses, & &1.id)
+
+    sb =
+      case session["current_business_id"] do
+        nil ->
+          nil
+
+        id when is_integer(id) ->
+          id
+
+        id when is_binary(id) ->
+          case Integer.parse(id) do
+            {n, _} -> n
+            :error -> nil
+          end
+      end
+
+    if sb && sb in ids do
+      sb
+    else
+      hd(businesses).id
     end
   end
 

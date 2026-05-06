@@ -20,21 +20,25 @@ defmodule JgsCrm.JobsTest do
       next_action: nil
     }
 
-    test "list_jobs/0 returns all jobs" do
-      job = job_fixture()
-      other = job_fixture(%{client_name: "other client"})
-      listed = Jobs.list_jobs()
+    test "list_jobs/1 returns jobs for the business" do
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+      other = job_fixture(%{client_name: "other client", business_id: b.id})
+      listed = Jobs.list_jobs(b.id)
       assert job in listed
       assert other in listed
     end
 
-    test "get_job!/1 returns the job with given id" do
+    test "get_job!/2 returns the job with given id for that business" do
       job = job_fixture()
-      assert Jobs.get_job!(job.id) == job
+      assert Jobs.get_job!(job.id, job.business_id) == job
     end
 
     test "create_job/1 with valid data creates a job" do
+      b = business_fixture()
+
       valid_attrs = %{
+        business_id: b.id,
         priority: :high,
         status: :pending,
         address: "some address",
@@ -74,7 +78,7 @@ defmodule JgsCrm.JobsTest do
         work_description: "some updated work_description",
         referred_by: "some updated referred_by",
         notes: "some updated notes",
-        next_action: "some updated next_action"
+        next_action: "some next_action"
       }
 
       assert {:ok, %Job{} = job} = Jobs.update_job(job, update_attrs)
@@ -86,19 +90,22 @@ defmodule JgsCrm.JobsTest do
       assert job.work_description == "some updated work_description"
       assert job.referred_by == "some updated referred_by"
       assert job.notes == "some updated notes"
-      assert job.next_action == "some updated next_action"
+      assert job.next_action == "some next_action"
     end
 
     test "update_job/2 with invalid data returns error changeset" do
       job = job_fixture()
       assert {:error, %Ecto.Changeset{}} = Jobs.update_job(job, @invalid_attrs)
-      assert Jobs.get_job!(job.id).client_name == job.client_name
+      assert Jobs.get_job!(job.id, job.business_id).client_name == job.client_name
     end
 
     test "delete_job/1 deletes the job" do
       job = job_fixture()
       assert {:ok, %Job{}} = Jobs.delete_job(job)
-      assert_raise Ecto.NoResultsError, fn -> Jobs.get_job!(job.id) end
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Jobs.get_job!(job.id, job.business_id)
+      end
     end
 
     test "change_job/2 returns a job changeset" do
@@ -106,79 +113,101 @@ defmodule JgsCrm.JobsTest do
       assert %Ecto.Changeset{} = Jobs.change_job(job)
     end
 
-    test "find_job_for_sms_update/1 returns job when match hints uniquely" do
+    test "find_job_for_sms_update/2 returns job when match hints uniquely" do
+      b = business_fixture()
+
       j =
         job_fixture(%{
+          business_id: b.id,
           client_name: "Angela Brande",
           address: "old",
           work_description: "line repair"
         })
 
       assert {:ok, got} =
-               Jobs.find_job_for_sms_update(%{"client_name" => "Angela Brande"})
+               Jobs.find_job_for_sms_update(%{"client_name" => "Angela Brande"}, b.id)
 
       assert got.id == j.id
     end
 
-    test "find_job_for_sms_update/1 returns :ambiguous when two jobs tie closely" do
-      job_fixture(%{client_name: "Same Client Dup", address: "1 A St"})
-      job_fixture(%{client_name: "Same Client Dup", address: "2 B St"})
+    test "find_job_for_sms_update/2 returns :ambiguous when two jobs tie closely" do
+      b = business_fixture()
+      job_fixture(%{business_id: b.id, client_name: "Same Client Dup", address: "1 A St"})
+      job_fixture(%{business_id: b.id, client_name: "Same Client Dup", address: "2 B St"})
 
       assert {:error, :ambiguous} =
-               Jobs.find_job_for_sms_update(%{"client_name" => "Same Client Dup"})
+               Jobs.find_job_for_sms_update(%{"client_name" => "Same Client Dup"}, b.id)
     end
 
-    test "find_job_for_sms_update/1 disambiguates duplicate names with address_snippet" do
-      job_fixture(%{client_name: "Dup Name", address: "100 Oak Ave"})
-      target = job_fixture(%{client_name: "Dup Name", address: "200 Pine Rd"})
+    test "find_job_for_sms_update/2 disambiguates duplicate names with address_snippet" do
+      b = business_fixture()
+      job_fixture(%{business_id: b.id, client_name: "Dup Name", address: "100 Oak Ave"})
+      target = job_fixture(%{business_id: b.id, client_name: "Dup Name", address: "200 Pine Rd"})
 
       assert {:ok, got} =
-               Jobs.find_job_for_sms_update(%{
-                 "client_name" => "Dup Name",
-                 "address_snippet" => "200 Pine"
-               })
+               Jobs.find_job_for_sms_update(
+                 %{
+                   "client_name" => "Dup Name",
+                   "address_snippet" => "200 Pine"
+                 },
+                 b.id
+               )
 
       assert got.id == target.id
     end
 
-    test "find_job_for_sms_update/1 returns :no_match when nothing scores enough" do
-      job_fixture(%{client_name: "Someone Else"})
+    test "find_job_for_sms_update/2 returns :no_match when nothing scores enough" do
+      b = business_fixture()
+      job_fixture(%{business_id: b.id, client_name: "Someone Else"})
 
       assert {:error, :no_match} =
-               Jobs.find_job_for_sms_update(%{"client_name" => "ZZZ Nonexistent Person"})
+               Jobs.find_job_for_sms_update(%{"client_name" => "ZZZ Nonexistent Person"}, b.id)
     end
 
-    test "find_job_for_sms_update/1 matches by work_description_snippet when it is the only strong hint" do
+    test "find_job_for_sms_update/2 matches by work_description_snippet when it is the only strong hint" do
+      b = business_fixture()
+
       j =
         job_fixture(%{
+          business_id: b.id,
           client_name: "Bud Reed",
           address: "Evergreen Lane",
           work_description: "Water shutoff"
         })
 
       assert {:ok, got} =
-               Jobs.find_job_for_sms_update(%{"work_description_snippet" => "water shutoff"})
+               Jobs.find_job_for_sms_update(
+                 %{"work_description_snippet" => "water shutoff"},
+                 b.id
+               )
 
       assert got.id == j.id
     end
 
-    test "find_job_for_sms_update/1 returns :ambiguous when two jobs share the same work phrase" do
-      job_fixture(%{client_name: "Ann", work_description: "Water shutoff"})
-      job_fixture(%{client_name: "Bob", work_description: "Water shutoff"})
+    test "find_job_for_sms_update/2 returns :ambiguous when two jobs share the same work phrase" do
+      b = business_fixture()
+      job_fixture(%{business_id: b.id, client_name: "Ann", work_description: "Water shutoff"})
+      job_fixture(%{business_id: b.id, client_name: "Bob", work_description: "Water shutoff"})
 
       assert {:error, :ambiguous} =
-               Jobs.find_job_for_sms_update(%{"work_description_snippet" => "water shutoff"})
+               Jobs.find_job_for_sms_update(
+                 %{"work_description_snippet" => "water shutoff"},
+                 b.id
+               )
     end
 
-    test "find_job_for_sms_update/1 accepts address_snippet alone when exactly one job matches" do
+    test "find_job_for_sms_update/2 accepts address_snippet alone when exactly one job matches" do
+      b = business_fixture()
+
       j =
         job_fixture(%{
+          business_id: b.id,
           client_name: "Corner Case",
           address: "999 Zephyr Road"
         })
 
       assert {:ok, got} =
-               Jobs.find_job_for_sms_update(%{"address_snippet" => "Zephyr"})
+               Jobs.find_job_for_sms_update(%{"address_snippet" => "Zephyr"}, b.id)
 
       assert got.id == j.id
     end

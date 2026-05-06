@@ -1,5 +1,5 @@
 defmodule JgsCrmWeb.UserSettingsControllerTest do
-  use JgsCrmWeb.ConnCase
+  use JgsCrmWeb.ConnCase, async: false
 
   alias JgsCrm.Accounts
   import JgsCrm.AccountsFixtures

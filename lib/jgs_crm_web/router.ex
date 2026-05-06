@@ -54,6 +54,8 @@ defmodule JgsCrmWeb.Router do
   scope "/", JgsCrmWeb do
     pipe_through [:browser]
 
+    get "/invitations/:token", InvitationController, :show
+
     get "/users/log-in", UserSessionController, :new
     get "/users/log-in/:token", UserSessionController, :confirm
     post "/users/log-in", UserSessionController, :create
@@ -68,8 +70,18 @@ defmodule JgsCrmWeb.Router do
     put "/users/settings", UserSettingsController, :update
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
 
-    live_session :require_authenticated_user,
+    post "/business/switch", BusinessSwitchController, :update
+
+    live_session :authenticated_business_pages,
       on_mount: [{JgsCrmWeb.UserAuth, :require_authenticated}] do
+      live "/businesses", BusinessesLive, :index
+    end
+
+    live_session :authenticated_jobs,
+      on_mount: [
+        {JgsCrmWeb.UserAuth, :require_authenticated},
+        {JgsCrmWeb.UserAuth, :ensure_business_scope}
+      ] do
       live "/", JobsLive, :index
       live "/jobs/new", JobsLive, :new
       live "/jobs/:id/edit", JobsLive, :edit

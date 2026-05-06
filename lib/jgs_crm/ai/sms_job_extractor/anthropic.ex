@@ -3,7 +3,8 @@ defmodule JgsCrm.Ai.SmsJobExtractor.Anthropic do
 
   @api "https://api.anthropic.com/v1/messages"
 
-  def extract(raw_message, jobs_snapshot \\ []) when is_binary(raw_message) and is_list(jobs_snapshot) do
+  def extract(raw_message, jobs_snapshot \\ [])
+      when is_binary(raw_message) and is_list(jobs_snapshot) do
     api_key = Application.get_env(:jgs_crm, :anthropic_api_key)
     model = Application.get_env(:jgs_crm, :anthropic_model, "claude-sonnet-4-20250514")
 

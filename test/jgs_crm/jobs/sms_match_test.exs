@@ -61,11 +61,12 @@ defmodule JgsCrm.Jobs.SmsMatchTest do
   end
 
   test "score/2 combines multiple hints" do
-    j = job(%{
-      client_name: "Bob Sinclair",
-      address: "10 Oak Street",
-      work_description: "Sump pump install basement"
-    })
+    j =
+      job(%{
+        client_name: "Bob Sinclair",
+        address: "10 Oak Street",
+        work_description: "Sump pump install basement"
+      })
 
     multi =
       SmsMatch.score(j, %{

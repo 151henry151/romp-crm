@@ -6,13 +6,15 @@ defmodule JgsCrmWeb.JobsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Jobs.subscribe()
+    bid = socket.assigns.current_business_id
+
+    if connected?(socket), do: Jobs.subscribe(bid)
 
     {:ok,
      socket
      |> assign(:filter, :all)
      |> assign(:expanded_job_id, nil)
-     |> assign(:jobs, Jobs.list_jobs())}
+     |> assign(:jobs, Jobs.list_jobs(bid))}
   end
 
   @impl true
@@ -25,28 +27,35 @@ defmodule JgsCrmWeb.JobsLive do
   end
 
   defp apply_action(socket, :new, _params) do
-    assign(socket, :job, %Job{})
+    bid = socket.assigns.current_business_id
+    assign(socket, :job, %Job{business_id: bid})
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
-    assign(socket, :job, Jobs.get_job!(id))
+    bid = socket.assigns.current_business_id
+    assign(socket, :job, Jobs.get_job!(String.to_integer(id), bid))
   end
 
   @impl true
   def handle_info({:created, _job}, socket) do
-    {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
+    {:noreply, refresh_jobs(socket)}
   end
 
   def handle_info({:updated, _job}, socket) do
-    {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
+    {:noreply, refresh_jobs(socket)}
   end
 
   def handle_info({:deleted, _job}, socket) do
-    {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
+    {:noreply, refresh_jobs(socket)}
   end
 
   def handle_info({JgsCrmWeb.JobFormComponent, {:saved, _job}}, socket) do
-    {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
+    {:noreply, refresh_jobs(socket)}
+  end
+
+  defp refresh_jobs(socket) do
+    bid = socket.assigns.current_business_id
+    assign(socket, :jobs, Jobs.list_jobs(bid))
   end
 
   @impl true
@@ -54,13 +63,14 @@ defmodule JgsCrmWeb.JobsLive do
     {:noreply,
      socket
      |> assign(:filter, String.to_existing_atom(status))
-     |> assign(:jobs, Jobs.list_jobs())}
+     |> refresh_jobs()}
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    job = Jobs.get_job!(String.to_integer(id))
+    bid = socket.assigns.current_business_id
+    job = Jobs.get_job!(String.to_integer(id), bid)
     {:ok, _} = Jobs.delete_job(job)
-    {:noreply, assign(socket, :jobs, Jobs.list_jobs())}
+    {:noreply, refresh_jobs(socket)}
   end
 
   def handle_event("toggle_row", %{"id" => id}, socket) do
@@ -76,7 +86,7 @@ defmodule JgsCrmWeb.JobsLive do
     {:noreply,
      socket
      |> assign(:expanded_job_id, expanded)
-     |> assign(:jobs, Jobs.list_jobs())}
+     |> refresh_jobs()}
   end
 
   defp visible_jobs(jobs, :all), do: jobs

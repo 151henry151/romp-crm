@@ -3,9 +3,11 @@ defmodule JgsCrmWeb.TwilioWebhookController do
 
   require Logger
 
+  alias JgsCrm.Accounts
   alias JgsCrm.Ai.SmsJobExtractor
+  alias JgsCrm.Businesses
   alias JgsCrm.Jobs
-  alias JgsCrm.Twilio
+  alias JgsCrm.Twilio.Phone
   alias JgsCrm.Twilio.Signature
 
   @doc """
@@ -35,30 +37,56 @@ defmodule JgsCrmWeb.TwilioWebhookController do
 
   defp maybe_deliver_inbound_sms(conn) do
     from = conn.body_params["From"] |> to_string()
+    norm = Phone.normalize_us(from)
+    message_sid = conn.body_params["MessageSid"] |> to_string()
 
-    if Twilio.sms_sender_allowed?(from) do
-      deliver_inbound_sms(conn)
-    else
-      message_sid = conn.body_params["MessageSid"] |> to_string()
+    cond do
+      norm == "" ->
+        Logger.info("Twilio SMS: empty From after normalize sid=#{message_sid}")
+        twiml_ok(conn)
 
-      Logger.info(
-        "Twilio SMS rejected: from not allowlisted sid=#{message_sid} from=#{inspect(from)}"
-      )
+      true ->
+        case Accounts.get_user_by_phone_normalized(norm) do
+          nil ->
+            Logger.info(
+              "Twilio SMS: no user with profile phone matching from=#{inspect(from)} sid=#{message_sid}"
+            )
 
-      twiml_ok(conn)
+            twiml_ok(conn)
+
+          user ->
+            case Businesses.resolve_sms_business_id(user) do
+              {:ok, business_id} ->
+                deliver_inbound_sms(conn, user, business_id)
+
+              {:error, :no_membership} ->
+                Logger.warning(
+                  "Twilio SMS: user id=#{user.id} has no business membership sid=#{message_sid}"
+                )
+
+                twiml_ok(conn)
+
+              {:error, :ambiguous_sms_routing} ->
+                Logger.warning(
+                  "Twilio SMS: user id=#{user.id} belongs to multiple businesses and has no SMS default set sid=#{message_sid}"
+                )
+
+                twiml_ok(conn)
+            end
+        end
     end
   end
 
-  defp deliver_inbound_sms(conn) do
+  defp deliver_inbound_sms(conn, user, business_id) do
     body_text = (conn.body_params["Body"] || "") |> to_string()
     from = conn.body_params["From"] |> to_string()
     message_sid = conn.body_params["MessageSid"] |> to_string()
 
     Logger.info(
-      "Twilio SMS inbound: sid=#{message_sid} from=#{from} body=#{inspect(body_text)}"
+      "Twilio SMS inbound: sid=#{message_sid} user_id=#{user.id} business_id=#{business_id} from=#{from} body=#{inspect(body_text)}"
     )
 
-    jobs_snapshot = Jobs.snapshot_for_sms_ai()
+    jobs_snapshot = Jobs.snapshot_for_sms_ai(business_id)
     allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
 
     case SmsJobExtractor.extract(body_text, jobs_snapshot) do
@@ -69,7 +97,7 @@ defmodule JgsCrmWeb.TwilioWebhookController do
 
         Enum.with_index(operations, 1)
         |> Enum.each(fn {op, idx} ->
-          apply_sms_operation(op, idx, message_sid, from, allowed_job_ids)
+          apply_sms_operation(op, idx, message_sid, from, business_id, allowed_job_ids)
         end)
 
         twiml_ok(conn)
@@ -90,10 +118,22 @@ defmodule JgsCrmWeb.TwilioWebhookController do
     end
   end
 
-  defp apply_sms_operation({:create, attrs}, idx, message_sid, from, _allowed_job_ids) do
+  defp apply_sms_operation(
+         {:create, attrs},
+         idx,
+         message_sid,
+         from,
+         business_id,
+         _allowed_job_ids
+       ) do
     Logger.info(
       "Twilio SMS parsed create: sid=#{message_sid} from=#{from} op_index=#{idx} attrs=#{inspect(attrs)}"
     )
+
+    attrs =
+      attrs
+      |> Enum.into(%{}, fn {k, v} -> {to_string(k), v} end)
+      |> Map.put("business_id", business_id)
 
     case Jobs.create_job(attrs) do
       {:ok, job} ->
@@ -108,7 +148,14 @@ defmodule JgsCrmWeb.TwilioWebhookController do
     end
   end
 
-  defp apply_sms_operation({:update_by_id, job_id, patch}, idx, message_sid, from, allowed_job_ids) do
+  defp apply_sms_operation(
+         {:update_by_id, job_id, patch},
+         idx,
+         message_sid,
+         from,
+         business_id,
+         allowed_job_ids
+       ) do
     Logger.info(
       "Twilio SMS parsed update: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job_id} patch=#{inspect(patch)}"
     )
@@ -120,13 +167,15 @@ defmodule JgsCrmWeb.TwilioWebhookController do
         )
 
       true ->
-        case Jobs.get_job(job_id) do
+        case Jobs.get_job(job_id, business_id) do
           nil ->
             Logger.info(
               "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=:job_not_found job_id=#{job_id}"
             )
 
           job ->
+            patch = Enum.into(patch, %{}, fn {k, v} -> {to_string(k), v} end)
+
             case Jobs.update_job(job, patch) do
               {:ok, updated_job} ->
                 Logger.info(
@@ -142,12 +191,21 @@ defmodule JgsCrmWeb.TwilioWebhookController do
     end
   end
 
-  defp apply_sms_operation({:update, match, patch}, idx, message_sid, from, _allowed_job_ids) do
+  defp apply_sms_operation(
+         {:update, match, patch},
+         idx,
+         message_sid,
+         from,
+         business_id,
+         _allowed_job_ids
+       ) do
     Logger.info(
       "Twilio SMS parsed update: sid=#{message_sid} from=#{from} op_index=#{idx} match=#{inspect(match)} patch=#{inspect(patch)}"
     )
 
-    case Jobs.find_job_for_sms_update(match) do
+    patch = Enum.into(patch, %{}, fn {k, v} -> {to_string(k), v} end)
+
+    case Jobs.find_job_for_sms_update(match, business_id) do
       {:ok, job} ->
         case Jobs.update_job(job, patch) do
           {:ok, updated_job} ->

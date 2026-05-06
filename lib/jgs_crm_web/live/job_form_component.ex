@@ -8,6 +8,7 @@ defmodule JgsCrmWeb.JobFormComponent do
     {:ok,
      socket
      |> assign(assigns)
+     |> assign_new(:current_business_id, fn -> nil end)
      |> assign_new(:form, fn -> to_form(Jobs.change_job(job)) end)}
   end
 
@@ -25,6 +26,12 @@ defmodule JgsCrmWeb.JobFormComponent do
   end
 
   defp create_job(socket, params) do
+    bid = socket.assigns.current_business_id
+
+    params =
+      params
+      |> Map.put("business_id", to_string(bid))
+
     case Jobs.create_job(params) do
       {:ok, job} ->
         notify_parent({:saved, job})

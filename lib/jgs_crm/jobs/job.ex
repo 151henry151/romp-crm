@@ -9,6 +9,8 @@ defmodule JgsCrm.Jobs.Job do
   def statuses, do: @statuses
 
   schema "jobs" do
+    belongs_to :business, JgsCrm.Businesses.Business
+
     field :client_name, :string
     field :address, :string
     field :phone, :string
@@ -25,6 +27,7 @@ defmodule JgsCrm.Jobs.Job do
   def changeset(job, attrs) do
     job
     |> cast(attrs, [
+      :business_id,
       :client_name,
       :address,
       :phone,
@@ -35,6 +38,6 @@ defmodule JgsCrm.Jobs.Job do
       :notes,
       :next_action
     ])
-    |> validate_required([:client_name, :priority, :status])
+    |> validate_required([:business_id, :client_name, :priority, :status])
   end
 end

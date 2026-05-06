@@ -43,6 +43,14 @@ defmodule JgsCrmWeb.Layouts do
       </div>
       <div class="flex-none">
         <ul class="flex flex-column px-1 space-x-4 items-center">
+          <%= if @current_scope && @current_scope.user do %>
+            <li>
+              <a href={~p"/businesses"} class="link link-hover text-sm">Businesses</a>
+            </li>
+            <li>
+              <a href={~p"/users/settings"} class="link link-hover text-sm">Settings</a>
+            </li>
+          <% end %>
           <li>
             <.theme_toggle />
           </li>

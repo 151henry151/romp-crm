@@ -2,6 +2,7 @@ defmodule JgsCrmWeb.UserSettingsController do
   use JgsCrmWeb, :controller
 
   alias JgsCrm.Accounts
+  alias JgsCrm.Businesses
   alias JgsCrmWeb.UserAuth
 
   import JgsCrmWeb.UserAuth, only: [require_sudo_mode: 2]
@@ -11,6 +12,21 @@ defmodule JgsCrmWeb.UserSettingsController do
 
   def edit(conn, _params) do
     render(conn, :edit)
+  end
+
+  def update(conn, %{"action" => "update_profile"} = params) do
+    %{"user" => user_params} = params
+    user = conn.assigns.current_scope.user
+
+    case Accounts.update_user_profile(user, user_params) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "Profile updated.")
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        render(conn, :edit, profile_changeset: cs)
+    end
   end
 
   def update(conn, %{"action" => "update_email"} = params) do
@@ -73,5 +89,7 @@ defmodule JgsCrmWeb.UserSettingsController do
     conn
     |> assign(:email_changeset, Accounts.change_user_email(user))
     |> assign(:password_changeset, Accounts.change_user_password(user))
+    |> assign(:profile_changeset, Accounts.change_user_profile(user))
+    |> assign(:profile_businesses, Businesses.list_businesses_for_user(user))
   end
 end

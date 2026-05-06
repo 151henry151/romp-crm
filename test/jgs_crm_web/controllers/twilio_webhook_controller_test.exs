@@ -3,20 +3,30 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
 
   import ExUnit.CaptureLog
 
-  require Logger
-
+  alias JgsCrm.Accounts
+  alias JgsCrm.AccountsFixtures
+  alias JgsCrm.Businesses
   alias JgsCrm.Jobs
 
-  setup do
+  setup %{conn: conn} do
     previous = Logger.level()
     Logger.configure(level: :info)
     on_exit(fn -> Logger.configure(level: previous) end)
-    :ok
+
+    user = AccountsFixtures.user_fixture()
+    {:ok, business} = Businesses.create_business(user, %{name: "SMS Test Co"})
+    {:ok, _} = Accounts.update_user_profile(user, %{phone: "+15555550123"})
+
+    {:ok, conn: conn, sms_business: business}
   end
 
-  test "POST /webhooks/twilio/sms updates job when Body uses STUB_UPDATE with job_id", %{conn: conn} do
+  test "POST /webhooks/twilio/sms updates job when Body uses STUB_UPDATE with job_id", %{
+    conn: conn,
+    sms_business: biz
+  } do
     job =
       JgsCrm.JobsFixtures.job_fixture(%{
+        business_id: biz.id,
         client_name: "Angela Brande",
         address: nil,
         phone: nil
@@ -46,13 +56,17 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "job_id=#{job.id}"
     assert log =~ "Twilio SMS update applied: sid=SMstubupdatebyid"
 
-    updated = Jobs.get_job!(job.id)
+    updated = Jobs.get_job!(job.id, biz.id)
     assert updated.address == "42 Maple St, Burlington VT"
   end
 
-  test "POST /webhooks/twilio/sms updates job when Body uses STUB_UPDATE match fallback", %{conn: conn} do
+  test "POST /webhooks/twilio/sms updates job when Body uses STUB_UPDATE match fallback", %{
+    conn: conn,
+    sms_business: biz
+  } do
     job =
       JgsCrm.JobsFixtures.job_fixture(%{
+        business_id: biz.id,
         client_name: "Angela Brande",
         address: nil,
         phone: nil
@@ -78,17 +92,18 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
         assert response(conn, 200) =~ "<Response>"
       end)
 
-    assert log =~ "Twilio SMS inbound: sid=SMstubupdate from=+15555550123"
+    assert log =~ "Twilio SMS inbound: sid=SMstubupdate"
+    assert log =~ "from=+15555550123"
     assert log =~ "match="
     assert log =~ "Twilio SMS parsed update: sid=SMstubupdate"
     assert log =~ "Twilio SMS update applied: sid=SMstubupdate"
 
-    updated = Jobs.get_job!(job.id)
+    updated = Jobs.get_job!(job.id, biz.id)
     assert updated.address == "42 Maple St, Burlington VT"
   end
 
-  test "POST /webhooks/twilio/sms creates a job from SMS Body", %{conn: conn} do
-    before = Jobs.list_jobs() |> length()
+  test "POST /webhooks/twilio/sms creates a job from SMS Body", %{conn: conn, sms_business: biz} do
+    before = Jobs.list_jobs(biz.id) |> length()
 
     conn =
       conn
@@ -99,9 +114,9 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
       })
 
     assert response(conn, 200) =~ "<Response>"
-    assert Jobs.list_jobs() |> length() == before + 1
+    assert Jobs.list_jobs(biz.id) |> length() == before + 1
 
-    assert Enum.any?(Jobs.list_jobs(), fn j ->
+    assert Enum.any?(Jobs.list_jobs(biz.id), fn j ->
              j.client_name == "Test SMS Lead" and
                String.contains?(j.work_description || "", "Customer John")
            end)
@@ -133,8 +148,11 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "reason=:no_match"
   end
 
-  test "POST /webhooks/twilio/sms skips update when STUB job_id not in snapshot", %{conn: conn} do
-    _job = JgsCrm.JobsFixtures.job_fixture(%{client_name: "Someone"})
+  test "POST /webhooks/twilio/sms skips update when STUB job_id not in snapshot", %{
+    conn: conn,
+    sms_business: biz
+  } do
+    _job = JgsCrm.JobsFixtures.job_fixture(%{business_id: biz.id, client_name: "Someone"})
 
     body =
       "STUB_UPDATE " <>
@@ -160,16 +178,18 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "reason=:invalid_job_id"
   end
 
-  test "POST /webhooks/twilio/sms does not process CRM when From is not allowlisted", %{conn: conn} do
-    before = Jobs.list_jobs() |> length()
+  test "POST /webhooks/twilio/sms ignores CRM when From does not match any user profile phone", %{
+    conn: conn,
+    sms_business: biz
+  } do
+    before = Jobs.list_jobs(biz.id) |> length()
 
     log =
       capture_log([level: :info], fn ->
         conn =
           conn
           |> post(~p"/webhooks/twilio/sms", %{
-            "Body" =>
-              "Customer John at 123 Main needs drain line repair urgent callback please",
+            "Body" => "Customer John at 123 Main needs drain line repair urgent callback please",
             "From" => "+19998887777",
             "MessageSid" => "SMnotallowed"
           })
@@ -177,22 +197,24 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
         assert response(conn, 200) =~ "<Response>"
       end)
 
-    assert log =~ "Twilio SMS rejected: from not allowlisted"
-    refute log =~ "Twilio SMS inbound:"
-    assert Jobs.list_jobs() |> length() == before
+    assert log =~ "no user with profile phone matching"
+    refute log =~ "Twilio SMS inbound: sid=SMnotallowed"
+    assert Jobs.list_jobs(biz.id) |> length() == before
   end
 
   test "POST /webhooks/twilio/sms applies multiple create/update operations from one message", %{
-    conn: conn
+    conn: conn,
+    sms_business: biz
   } do
     existing =
       JgsCrm.JobsFixtures.job_fixture(%{
+        business_id: biz.id,
         client_name: "Toilet Customer",
         work_description: "Toilet replacement",
         phone: nil
       })
 
-    before = Jobs.list_jobs() |> length()
+    before = Jobs.list_jobs(biz.id) |> length()
 
     body =
       "STUB_JSON " <>
@@ -239,14 +261,14 @@ defmodule JgsCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "op_index=2"
     assert log =~ "op_index=3"
 
-    assert Jobs.list_jobs() |> length() == before + 2
-    assert Jobs.get_job!(existing.id).phone == "8029897658"
+    assert Jobs.list_jobs(biz.id) |> length() == before + 2
+    assert Jobs.get_job!(existing.id, biz.id).phone == "8029897658"
 
-    assert Enum.any?(Jobs.list_jobs(), fn j ->
+    assert Enum.any?(Jobs.list_jobs(biz.id), fn j ->
              j.client_name == "Mark Sino" and j.work_description == "Replace refrigerator"
            end)
 
-    assert Enum.any?(Jobs.list_jobs(), fn j ->
+    assert Enum.any?(Jobs.list_jobs(biz.id), fn j ->
              j.client_name == "Dave Woll" and j.work_description == "Clogged drain"
            end)
   end

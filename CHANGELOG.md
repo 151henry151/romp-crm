@@ -2,12 +2,24 @@
 
 ## [Unreleased]
 
-## [0.6.1] - 2026-05-06
+## [0.7.0] - 2026-05-06
+
+### Added
+
+- Multi-tenant businesses: memberships, invitations by email, `/businesses` LiveView to create a business and invite members
+- User profile fields `phone` and `sms_business_id` (settings) for routing inbound Twilio SMS to the correct job list
+- `POST /business/switch` and jobs header switcher when the user belongs to multiple businesses
+- Public `GET /invitations/:token` acceptance flow with pending token stored across login/register
 
 ### Changed
 
-- Harden login/register GET responses against stale cached HTML (`Cache-Control: private, no-store`) so embedded CSRF tokens stay aligned with the session cookie
-- Allow Plug CSRF host validation for both **`hromp.com`** and **`www.hromp.com`** behind nginx
+- Scope jobs by `business_id`; PubSub topic `jobs:business:<id>`
+- Resolve inbound SMS `From` via normalized profile phone and `Businesses.resolve_sms_business_id/1` instead of config allowlists
+- Disable registration email allowlist in runtime config by default (invitations gate workspace access)
+
+### Removed
+
+- Twilio webhook gate on `TWILIO_SMS_ALLOWED_FROM` allowlist (unknown numbers log and skip CRM updates)
 
 ## [0.6.0] - 2026-05-06
 

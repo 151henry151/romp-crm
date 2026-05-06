@@ -98,5 +98,5 @@ config :jgs_crm,
     "jzieger2@gmail.com",
     "henry@hromp.com"
   ],
-  enforce_registration_allowlist: true,
+  enforce_registration_allowlist: false,
   twilio_sms_allowed_from_normalized: ["18024587299", "18024582710"]
