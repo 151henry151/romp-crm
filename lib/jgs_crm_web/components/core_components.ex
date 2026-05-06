@@ -71,14 +71,15 @@ defmodule JgsCrmWeb.CoreComponents do
             phx-click-away={@on_cancel}
             phx-window-keydown={@on_cancel}
             phx-key="escape"
-            class="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl ring-1 ring-gray-200"
+            data-theme="light"
+            class="w-full max-w-2xl rounded-xl bg-white p-6 text-gray-900 shadow-xl ring-1 ring-gray-200"
           >
             <div class="absolute top-4 right-4">
               <button phx-click={@on_cancel} type="button" class="text-gray-400 hover:text-gray-600">
                 <.icon name="hero-x-mark" class="size-5" />
               </button>
             </div>
-            <%= render_slot(@inner_block) %>
+            {render_slot(@inner_block)}
           </div>
         </div>
       </div>
@@ -90,14 +91,20 @@ defmodule JgsCrmWeb.CoreComponents do
     js
     |> JS.show(to: "##{id}")
     |> JS.show(to: "##{id}-bg", transition: {"transition-all", "opacity-0", "opacity-100"})
-    |> JS.show(to: "##{id}-container", transition: {"transition-all", "opacity-0 scale-95", "opacity-100 scale-100"})
+    |> JS.show(
+      to: "##{id}-container",
+      transition: {"transition-all", "opacity-0 scale-95", "opacity-100 scale-100"}
+    )
     |> JS.focus_first(to: "##{id}-container")
   end
 
   defp hide_modal(js \\ %JS{}, id) when is_binary(id) do
     js
     |> JS.hide(to: "##{id}-bg", transition: {"transition-all", "opacity-100", "opacity-0"})
-    |> JS.hide(to: "##{id}-container", transition: {"transition-all", "opacity-100 scale-100", "opacity-95 scale-95"})
+    |> JS.hide(
+      to: "##{id}-container",
+      transition: {"transition-all", "opacity-100 scale-100", "opacity-95 scale-95"}
+    )
     |> JS.hide(to: "##{id}", transition: {"block", "block", "hidden"})
   end
 
