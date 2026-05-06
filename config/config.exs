@@ -24,7 +24,7 @@ config :jgs_crm,
   ecto_repos: [JgsCrm.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-# URL prefix for mounting the app (e.g. `/jgs-crm` on hromp.com). Dev/test use `/`.
+# URL prefix for mounting the app (e.g. `/romp-crm` on hromp.com). Dev/test use `/`.
 config :jgs_crm, :path_prefix, "/"
 
 # Configure the endpoint

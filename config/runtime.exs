@@ -25,7 +25,7 @@ if config_env() == :prod do
     System.get_env("DATABASE_PATH") ||
       raise """
       environment variable DATABASE_PATH is missing.
-      For example: /home/henry/jgs-crm/data/jgs_crm.db
+      For example: /home/henry/romp-crm/data/romp_crm.db
       """
 
   config :jgs_crm, JgsCrm.Repo,
@@ -42,7 +42,7 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
-  # `/jgs-crm` etc. — set at compile time in config/prod.exs (`:path_prefix`).
+  # `/romp-crm` etc. — set at compile time in config/prod.exs (`:path_prefix`).
   path_prefix = Application.compile_env(:jgs_crm, :path_prefix, "/")
 
   http_ip =
@@ -63,7 +63,7 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
-  mail_from_name = System.get_env("MAIL_FROM_NAME") || "JGS CRM"
+  mail_from_name = System.get_env("MAIL_FROM_NAME") || "Romp CRM"
 
   mail_from_address =
     System.get_env("MAIL_FROM_ADDRESS") ||

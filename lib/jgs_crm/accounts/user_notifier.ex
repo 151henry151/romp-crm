@@ -6,7 +6,7 @@ defmodule JgsCrm.Accounts.UserNotifier do
 
   # Delivers the email using the application mailer.
   defp deliver(recipient, subject, body) do
-    from_name = Application.get_env(:jgs_crm, :mail_from_name, "JGS CRM")
+    from_name = Application.get_env(:jgs_crm, :mail_from_name, "Romp CRM")
     from_address = Application.get_env(:jgs_crm, :mail_from_address, "contact@example.com")
 
     email =
