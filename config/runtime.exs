@@ -51,8 +51,11 @@ if config_env() == :prod do
 
   config :jgs_crm, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  path_prefix = Application.compile_env(:jgs_crm, :path_prefix, "/")
+
   config :jgs_crm, JgsCrmWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: [host: host, port: 443, scheme: "https", path: path_prefix],
+    static_url: [path: path_prefix],
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
@@ -61,6 +64,13 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
     secret_key_base: secret_key_base
+
+  config :jgs_crm,
+    twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+    anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+    anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
+    twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
+    skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true"
 
   # ## SSL Support
   #

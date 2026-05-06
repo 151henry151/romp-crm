@@ -39,3 +39,6 @@ npm-debug.log
 *.db
 *.db-*
 
+# Production secrets copied from deploy/jgs-crm.env.example
+/deploy/jgs-crm.env
+

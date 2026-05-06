@@ -24,6 +24,9 @@ config :jgs_crm,
   ecto_repos: [JgsCrm.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+# URL prefix for mounting the app (e.g. `/jgs-crm` on hromp.com). Dev/test use `/`.
+config :jgs_crm, :path_prefix, "/"
+
 # Configure the endpoint
 config :jgs_crm, JgsCrmWeb.Endpoint,
   url: [host: "localhost"],
@@ -68,6 +71,11 @@ config :jgs_crm, JgsCrm.Mailer, adapter: Swoosh.Adapters.Local
 
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
 config :swoosh, :finch_name, JgsCrm.Finch
+
+config :jgs_crm,
+  sms_job_extractor_adapter: JgsCrm.Ai.SmsJobExtractor.Anthropic,
+  anthropic_model: "claude-sonnet-4-20250514",
+  skip_twilio_signature_validation: false
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -4,7 +4,7 @@ defmodule JgsCrm.MixProject do
   def project do
     [
       app: :jgs_crm,
-      version: "0.1.0",
+      version: "0.2.2",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -66,7 +66,8 @@ defmodule JgsCrm.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:swoosh, "~> 1.5"},
-      {:finch, "~> 0.13"}
+      {:finch, "~> 0.13"},
+      {:req, "~> 0.5"}
     ]
   end
 
