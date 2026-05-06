@@ -37,13 +37,8 @@ defmodule JgsCrmWeb.Layouts do
     ~H"""
     <header class="navbar px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href="/" class="flex w-fit items-center gap-3">
-          <img
-            src={~p"/images/jgs_logo.png"}
-            alt="JGS Mechanical"
-            class="h-9 w-auto object-contain"
-          />
-          <span class="text-sm font-semibold tracking-tight">JGS Mechanical</span>
+        <a href={~p"/"} class="flex w-fit items-center gap-3">
+          <span class="text-base font-semibold tracking-tight">Romp CRM</span>
         </a>
       </div>
       <div class="flex-none">

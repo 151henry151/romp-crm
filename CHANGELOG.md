@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-06
+
+### Changed
+
+- Mount production app at `/romp-crm` instead of `/jgs-crm` (`config/prod.exs` path prefix)
+- Set compile-time `Endpoint` URL path `/romp-crm` in prod so Phoenix VerifiedRoutes (`~p`) generate prefixed paths
+- Rebrand user-visible strings from JGS Mechanical / JGS CRM to Romp CRM; remove navbar logo image in favor of text nav branding
+- Rename session cookie key to `_romp_crm_key`
+- Replace deploy snippets with `deploy/romp-crm.*` and update runtime/docs examples for `romp-crm` paths
+- Point the app layout brand link at verified route `~p"/"` so subpath deployments keep navigation under `/romp-crm`
+
 ## [0.5.8] - 2026-05-06
 
 ### Changed

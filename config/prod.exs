@@ -1,6 +1,9 @@
 import Config
 
-config :jgs_crm, :path_prefix, "/jgs-crm"
+config :jgs_crm, :path_prefix, "/romp-crm"
+
+# VerifiedRoutes (`~p`) read Endpoint `:url` `:path` at compile time — must match `:path_prefix`.
+config :jgs_crm, JgsCrmWeb.Endpoint, url: [path: "/romp-crm"]
 
 # Note we also include the path to a cache manifest
 # containing the digested version of static files. This

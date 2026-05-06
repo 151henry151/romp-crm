@@ -1,0 +1,27 @@
+# systemd unit — paths match production on hromp.com (user henry, repo under $HOME).
+#
+#   sudo install -m 644 deploy/romp-crm.service /etc/systemd/system/romp-crm.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now romp-crm
+#
+# Expects:
+#   • Release at /home/henry/romp-crm/_build/prod/rel/jgs_crm (OTP app name remains :jgs_crm)
+#   • Environment file at /home/henry/romp-crm/.env.production
+
+[Unit]
+Description=Romp CRM (Phoenix LiveView) at https://hromp.com/romp-crm/
+After=network.target
+
+[Service]
+Type=simple
+User=henry
+Group=henry
+WorkingDirectory=/home/henry/romp-crm
+EnvironmentFile=/home/henry/romp-crm/.env.production
+ExecStart=/home/henry/romp-crm/_build/prod/rel/jgs_crm/bin/jgs_crm start
+ExecStop=/home/henry/romp-crm/_build/prod/rel/jgs_crm/bin/jgs_crm stop
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
