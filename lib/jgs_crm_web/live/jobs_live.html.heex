@@ -86,7 +86,7 @@
                   </p>
                 <% end %>
               </div>
-              <span class={"rounded-full px-2.5 py-0.5 text-xs font-medium #{status_class(job.status)}"}>
+              <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap #{status_class(job.status)}"}>
                 {status_label(job.status)}
               </span>
             </div>
@@ -172,13 +172,13 @@
               </td>
               <td class="px-4 py-3">
                 <%= if job.priority == :high do %>
-                  <span class={"rounded-full px-2 py-0.5 text-xs font-semibold #{priority_class(job.priority)}"}>
+                  <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-semibold whitespace-nowrap #{priority_class(job.priority)}"}>
                     HIGH
                   </span>
                 <% end %>
               </td>
               <td class="px-4 py-3">
-                <span class={"rounded-full px-2.5 py-0.5 text-xs font-medium #{status_class(job.status)}"}>
+                <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap #{status_class(job.status)}"}>
                   {status_label(job.status)}
                 </span>
               </td>
