@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-05-06
+
+### Changed
+
+- Move the compact new-job control from the dashboard header beside the status filter tabs
+- Remove the redundant header column that duplicated the global account controls
+
 ## [0.5.4] - 2026-05-06
 
 ### Changed
