@@ -4,6 +4,10 @@ defmodule JgsCrmWeb.UserSessionController do
   alias JgsCrm.Accounts
   alias JgsCrmWeb.UserAuth
 
+  plug :auth_pages_no_store when action in [:new, :confirm]
+
+  defp auth_pages_no_store(conn, _opts), do: UserAuth.put_auth_pages_no_store(conn)
+
   def new(conn, _params) do
     email = get_in(conn.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
     form = Phoenix.Component.to_form(%{"email" => email}, as: "user")

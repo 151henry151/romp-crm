@@ -244,4 +244,11 @@ defmodule JgsCrmWeb.UserAuth do
   end
 
   defp maybe_store_return_to(conn), do: conn
+
+  @doc false
+  def put_auth_pages_no_store(conn) do
+    conn
+    |> put_resp_header("cache-control", "private, no-store, must-revalidate")
+    |> put_resp_header("pragma", "no-cache")
+  end
 end

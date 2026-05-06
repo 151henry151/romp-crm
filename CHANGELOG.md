@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-06
+
+### Changed
+
+- Harden login/register GET responses against stale cached HTML (`Cache-Control: private, no-store`) so embedded CSRF tokens stay aligned with the session cookie
+- Allow Plug CSRF host validation for both **`hromp.com`** and **`www.hromp.com`** behind nginx
+
 ## [0.6.0] - 2026-05-06
 
 ### Changed

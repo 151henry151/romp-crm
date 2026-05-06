@@ -8,10 +8,15 @@ defmodule JgsCrmWeb.Router do
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {JgsCrmWeb.Layouts, :root}
-    plug :protect_from_forgery
+    plug :protect_from_forgery_with_hosts
     plug :put_secure_browser_headers
     plug :fetch_current_scope_for_user
   end
+
+  # CSRF tokens may embed the request host; behind nginx allow apex + www so occasional
+  # Host variance does not reject valid posts with "Forbidden".
+  defp protect_from_forgery_with_hosts(conn, _opts),
+    do: protect_from_forgery(conn, allow_hosts: ["hromp.com", "www.hromp.com"])
 
   pipeline :api do
     plug :accepts, ["json"]
