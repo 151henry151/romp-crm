@@ -39,17 +39,17 @@ defmodule RompCrmWeb.Layouts do
       <div class="flex-1">
         <a
           href={~p"/"}
-          class="flex w-fit items-center gap-3 rounded-2xl border border-base-300 bg-base-100/80 p-2 shadow-sm"
+          class="flex w-fit items-center gap-3 overflow-hidden rounded-2xl border border-base-300 bg-base-100/80 p-2 shadow-sm"
         >
           <img
             src={~p"/images/romp-crm-logo-main.png"}
             alt="Romp CRM"
-            class="brand-logo-light h-10 w-auto rounded-lg sm:h-12"
+            class="brand-logo-light block h-10 w-auto sm:h-12"
           />
           <img
             src={~p"/images/romp-crm-logo-main-dark.png"}
             alt="Romp CRM"
-            class="brand-logo-dark h-10 w-auto rounded-lg sm:h-12"
+            class="brand-logo-dark block h-10 w-auto sm:h-12"
           />
         </a>
       </div>

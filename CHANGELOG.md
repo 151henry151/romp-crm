@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-05-07
+
+### Changed
+
+- Re-export light and dark main logo PNGs from **`assets/logos/all_logos.png`**: transparent background on the light asset so **`base-100`** shows through the rounded header, and tighter crops on the dark asset to drop grid gutter and white-edge artifacts
+- Use **`overflow-hidden`** on logo wrapper containers and transparent **`img`** backgrounds so branding aligns with rounded corners in **`Layouts.app`** and the jobs page header
+
 ## [0.8.5] - 2026-05-07
 
 ### Changed
