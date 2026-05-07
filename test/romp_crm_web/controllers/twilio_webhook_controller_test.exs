@@ -7,6 +7,8 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
   alias RompCrm.AccountsFixtures
   alias RompCrm.Businesses
   alias RompCrm.Jobs
+  alias RompCrm.JobsFixtures
+  alias RompCrm.Repo
 
   setup %{conn: conn} do
     previous = Logger.level()
@@ -271,5 +273,53 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
     assert Enum.any?(Jobs.list_jobs(biz.id), fn j ->
              j.client_name == "Dave Woll" and j.work_description == "Clogged drain"
            end)
+  end
+
+  test "POST /webhooks/twilio/sms targets Jobs picker workspace, not Settings SMS default alone",
+       %{
+         conn: conn
+       } do
+    user = AccountsFixtures.user_fixture()
+    {:ok, biz_a} = Businesses.create_business(user, %{name: "Default SMS Org"})
+    {:ok, biz_b} = Businesses.create_business(user, %{name: "Picker Org"})
+    {:ok, _} = Accounts.update_user_profile(user, %{phone: "+15555550999"})
+
+    job =
+      JobsFixtures.job_fixture(%{
+        business_id: biz_b.id,
+        client_name: "Picker-only client",
+        address: nil
+      })
+
+    {:ok, _} =
+      Accounts.get_user!(user.id)
+      |> Ecto.Changeset.change(sms_business_id: biz_a.id)
+      |> Repo.update()
+
+    assert {:ok, _} = Accounts.put_jobs_workspace_selection(Accounts.get_user!(user.id), biz_b.id)
+
+    body =
+      "STUB_UPDATE " <>
+        Jason.encode!(%{
+          "job_id" => job.id,
+          "updates" => %{"address" => "Via picker routing"}
+        })
+
+    log =
+      capture_log([level: :info], fn ->
+        conn =
+          conn
+          |> post(~p"/webhooks/twilio/sms", %{
+            "Body" => body,
+            "From" => "+15555550999",
+            "MessageSid" => "SMpickerworkspace"
+          })
+
+        assert response(conn, 200) =~ "<Response>"
+      end)
+
+    assert log =~ "business_id=#{biz_b.id}"
+    assert log =~ "Twilio SMS update applied: sid=SMpickerworkspace"
+    assert Jobs.get_job!(job.id, biz_b.id).address == "Via picker routing"
   end
 end
