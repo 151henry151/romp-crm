@@ -45,7 +45,7 @@
 
             <%= if RompCrm.Businesses.owner?(@user, b.id) do %>
               <.form
-                for={@invite_form}
+                for={Map.fetch!(@invite_forms, b.id)}
                 id={"invite-#{b.id}"}
                 phx-change="validate_invite"
                 phx-submit="invite"
@@ -53,7 +53,8 @@
               >
                 <input type="hidden" name="invite[business_id]" value={b.id} />
                 <.input
-                  field={@invite_form[:email]}
+                  id={"invite-email-#{b.id}"}
+                  field={Map.fetch!(@invite_forms, b.id)[:email]}
                   type="email"
                   label="Invite by email"
                   required

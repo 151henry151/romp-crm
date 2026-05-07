@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.8] - 2026-05-07
+
+### Fixed
+
+- Store **`BusinessesLive`** invite **`to_form`** data in **`invite_forms`** keyed by **`business_id`** so **`phx-change`** on one business no longer mirrors the email field on other businesses
+- Set distinct **`id`** values on per-business invite email inputs so LiveView no longer mounts duplicate **`invite_email`** DOM ids
+
 ## [0.8.7] - 2026-05-07
 
 ### Changed

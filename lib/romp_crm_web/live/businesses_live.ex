@@ -12,10 +12,21 @@ defmodule RompCrmWeb.BusinessesLive do
      socket
      |> assign(:businesses, businesses)
      |> assign(:invitation_lists, invitation_lists_for(businesses))
+     |> assign(:invite_forms, invite_forms_init(businesses))
      |> assign(:user, user)
      |> assign_new(:form, fn -> to_form(%{"name" => ""}, as: :business) end)
-     |> assign_new(:invite_form, fn -> to_form(%{"email" => ""}, as: :invite) end)
      |> assign(:page_title, "Businesses")}
+  end
+
+  defp invite_forms_init(businesses) do
+    Map.new(businesses, fn b -> {b.id, empty_invite_form(b.id)} end)
+  end
+
+  defp empty_invite_form(business_id) when is_integer(business_id) do
+    to_form(
+      %{"email" => "", "business_id" => to_string(business_id)},
+      as: :invite
+    )
   end
 
   defp invitation_lists_for(businesses) do
@@ -24,10 +35,23 @@ defmodule RompCrmWeb.BusinessesLive do
 
   defp refresh_businesses(socket) do
     businesses = Businesses.list_businesses_for_user(socket.assigns.user)
+    old_forms = socket.assigns.invite_forms
+    ids = MapSet.new(Enum.map(businesses, & &1.id))
+
+    preserved =
+      old_forms
+      |> Enum.filter(fn {id, _} -> MapSet.member?(ids, id) end)
+      |> Map.new()
+
+    invite_forms =
+      Enum.reduce(businesses, preserved, fn b, acc ->
+        Map.put_new_lazy(acc, b.id, fn -> empty_invite_form(b.id) end)
+      end)
 
     socket
     |> assign(:businesses, businesses)
     |> assign(:invitation_lists, invitation_lists_for(businesses))
+    |> assign(:invite_forms, invite_forms)
   end
 
   @impl true
@@ -52,7 +76,15 @@ defmodule RompCrmWeb.BusinessesLive do
   end
 
   def handle_event("validate_invite", %{"invite" => params}, socket) do
-    {:noreply, assign(socket, :invite_form, to_form(params, as: :invite))}
+    case Integer.parse(to_string(params["business_id"] || "")) do
+      {bid, _} ->
+        form = to_form(params, as: :invite)
+
+        {:noreply, assign(socket, :invite_forms, Map.put(socket.assigns.invite_forms, bid, form))}
+
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event(
@@ -68,7 +100,9 @@ defmodule RompCrmWeb.BusinessesLive do
         {:noreply,
          socket
          |> refresh_businesses()
-         |> assign(:invite_form, to_form(%{"email" => ""}, as: :invite))
+         |> then(fn s ->
+           assign(s, :invite_forms, Map.put(s.assigns.invite_forms, bid, empty_invite_form(bid)))
+         end)
          |> put_flash(:info, "Invitation sent.")}
 
       {:error, :not_owner} ->
