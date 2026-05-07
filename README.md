@@ -82,3 +82,9 @@ The trailing slash on **`proxy_pass`** makes nginx map `/romp-crm/foo` → `/foo
 | `ANTHROPIC_API_KEY` | SMS → job parsing |
 
 See **`deploy/README.md`** for systemd and env setup.
+
+## License
+
+Romp CRM is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either **version 3** of the License, or (at your option) any later version. See the file **[`LICENSE`](LICENSE)** in this repository for the full license text.
+
+SPDX: **`GPL-3.0-or-later`**
