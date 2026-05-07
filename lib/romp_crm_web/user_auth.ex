@@ -310,11 +310,17 @@ defmodule RompCrmWeb.UserAuth do
       conn
     else
       conn
-      |> put_flash(:error, "You must log in to access this page.")
+      |> maybe_put_auth_required_flash()
       |> maybe_store_return_to()
       |> redirect(to: ~p"/users/log-in")
       |> halt()
     end
+  end
+
+  defp maybe_put_auth_required_flash(%{path_info: []} = conn), do: conn
+
+  defp maybe_put_auth_required_flash(conn) do
+    put_flash(conn, :error, "You must log in to access this page.")
   end
 
   defp maybe_store_return_to(%{method: "GET"} = conn) do
