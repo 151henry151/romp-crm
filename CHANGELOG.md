@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-05-07
+
+### Changed
+
+- Embed screen recordings in **`README.md`** with `<video>` (full MP4) plus looping **GIF** previews (**first ~15s**, **`docs/screencaps/*-preview.gif`**) for Markdown viewers without HTML video support
+
 ## [0.9.2] - 2026-05-07
 
 ### Added

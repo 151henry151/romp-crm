@@ -29,14 +29,29 @@ Captured from the live app. All assets live under **[`docs/screencaps/`](docs/sc
   </tr>
 </table>
 
-### Screen recordings (MP4)
+### Screen recordings
 
-| File | Link |
-|------|------|
-| Recording 1 | **[`1000001486.mp4`](docs/screencaps/1000001486.mp4)** |
-| Recording 2 | **[`1000001495.mp4`](docs/screencaps/1000001495.mp4)** |
+Each clip is about **one minute** on disk (**[`1000001486.mp4`](docs/screencaps/1000001486.mp4)**, **[`1000001495.mp4`](docs/screencaps/1000001495.mp4)**).
 
-On GitHub, open the link and use **Download** or **View raw** to play locally (repository-relative video playback in the README itself is not reliable).
+On **github.com**, the HTML `<video>` tags below render an inline player (same relative paths as the screenshots above).
+
+Many Markdown previews **hide `<video>`** (including some IDEs). For those, there are looping **GIF previews** — first ~15 seconds, 640px wide, generated with **`ffmpeg`** palette mode — so motion still shows without loading the full MP4.
+
+#### Recording 1
+
+<p align="center">
+  <img src="docs/screencaps/1000001486-preview.gif" alt="Recording 1 — animated preview (first ~15s)" width="720" />
+</p>
+
+<video src="docs/screencaps/1000001486.mp4" controls playsinline width="100%"></video>
+
+#### Recording 2
+
+<p align="center">
+  <img src="docs/screencaps/1000001495-preview.gif" alt="Recording 2 — animated preview (first ~15s)" width="720" />
+</p>
+
+<video src="docs/screencaps/1000001495.mp4" controls playsinline width="100%"></video>
 
 ## Deploying under a subpath (`https://hromp.com/romp-crm/`)
 
