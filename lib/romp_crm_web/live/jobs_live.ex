@@ -3,6 +3,7 @@ defmodule RompCrmWeb.JobsLive do
 
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
+  alias RompCrm.Twilio.Phone
 
   @impl true
   def mount(_params, _session, socket) do
@@ -10,11 +11,25 @@ defmodule RompCrmWeb.JobsLive do
 
     if connected?(socket), do: Jobs.subscribe(bid)
 
+    sms_from =
+      case Application.get_env(:romp_crm, :twilio_messaging_from_number) do
+        s when is_binary(s) ->
+          case String.trim(s) do
+            "" -> "+18022780965"
+            t -> t
+          end
+
+        _ ->
+          "+18022780965"
+      end
+
     {:ok,
      socket
      |> assign(:filter, :all)
      |> assign(:expanded_job_id, nil)
-     |> assign(:jobs, Jobs.list_jobs(bid))}
+     |> assign(:jobs, Jobs.list_jobs(bid))
+     |> assign(:sms_intake_href, Phone.sms_uri(sms_from))
+     |> assign(:sms_intake_display, Phone.format_us_display(sms_from))}
   end
 
   @impl true

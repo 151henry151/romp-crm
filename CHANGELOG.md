@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-05-07
+
+### Changed
+
+- Drive jobs header SMS link and label from **`TWILIO_MESSAGING_FROM`** via **`RompCrm.Twilio.Phone`** (`format_us_display/1`, **`sms_uri/1`**)
+- Run **`mix twilio.configure_sms`** with **`Req`** only (no full **`app.start`**) so it does not bind **`PORT`** while the production release is running
+
 ## [0.9.6] - 2026-05-07
 
 ### Added
