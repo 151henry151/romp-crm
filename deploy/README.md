@@ -57,3 +57,11 @@ TWILIO_WEBHOOK_PUBLIC_URL="https://hromp.com/romp-crm/webhooks/twilio/sms" mix t
 ```
 
 Match **`TWILIO_WEBHOOK_PUBLIC_URL`** in `.env.production` to that exact URL if you use signature validation. Set **`TWILIO_ACCOUNT_SID`**, **`TWILIO_AUTH_TOKEN`**, and **`TWILIO_MESSAGING_FROM`** (`+18022780965`) so the CRM can send confirmation and clarification replies (`TWILIO_SMS_REPLIES_ENABLED=false` disables outbound SMS).
+
+**Messaging Service:** If **`+18022780965`** is attached to a Twilio Messaging Service (common for A2P outbound), Twilio may **not** call the number's **SmsUrl** for inbound unless **“Defer to sender’s webhook”** / **`UseInboundWebhookOnNumber`** is enabled on that service, or you set the service **Inbound Request URL**. After exporting `.env.production`, run:
+
+```bash
+TWILIO_MESSAGING_SERVICE_SID='MG…' mix twilio.messaging_service_inbound
+```
+
+(or enable **Defer to sender’s webhook** in Console → Messaging → your Service → Integration).
