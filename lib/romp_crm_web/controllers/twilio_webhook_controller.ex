@@ -68,7 +68,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
               {:error, :ambiguous_sms_routing} ->
                 Logger.warning(
-                  "Twilio SMS: user id=#{user.id} belongs to multiple businesses and has no SMS default set sid=#{message_sid}"
+                  "Twilio SMS: user id=#{user.id} belongs to multiple businesses; set a workspace in the Jobs picker or SMS workspace in Settings sid=#{message_sid}"
                 )
 
                 twiml_ok(conn)

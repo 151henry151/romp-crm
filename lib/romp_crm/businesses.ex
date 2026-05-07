@@ -57,7 +57,10 @@ defmodule RompCrm.Businesses do
                role: :owner
              })
              |> Repo.insert() do
-        _ = RompCrm.Accounts.maybe_set_default_sms_business(user, business.id)
+        # Reload so `sms_business_id` reflects the DB (avoid stale struct overwriting default).
+        _ =
+          RompCrm.Accounts.maybe_set_default_sms_business(Repo.get!(User, user.id), business.id)
+
         business
       else
         {:error, cs} -> Repo.rollback(cs)
@@ -68,8 +71,14 @@ defmodule RompCrm.Businesses do
   @doc """
   Resolves which business inbound SMS should apply to for this user.
 
-  Uses `user.sms_business_id` when set and valid; otherwise the sole membership;
-  returns error when ambiguous (multiple memberships and no explicit SMS business).
+  Priority:
+
+  1. **`user.selected_business_id`** — matches the Jobs workspace / header picker (updated when the user switches businesses or accepts an invite).
+  2. **`user.sms_business_id`** — optional override from **Settings → SMS workspace** when several memberships exist and no picker selection is stored.
+  3. **Sole membership** — only one business.
+  4. **`ambiguous_sms_routing`** — multiple memberships and neither (1) nor (2) resolves.
+
+  The webhook identifies the texter by normalizing Twilio **`From`** and looking up **`users.phone_normalized`**.
   """
   def resolve_sms_business_id(%User{} = user) do
     memberships =
@@ -79,11 +88,17 @@ defmodule RompCrm.Businesses do
           select: m.business_id
       )
 
+    membership_set = MapSet.new(memberships)
+
     cond do
       memberships == [] ->
         {:error, :no_membership}
 
-      user.sms_business_id && user.sms_business_id in memberships ->
+      user.selected_business_id &&
+          MapSet.member?(membership_set, user.selected_business_id) ->
+        {:ok, user.selected_business_id}
+
+      user.sms_business_id && MapSet.member?(membership_set, user.sms_business_id) ->
         {:ok, user.sms_business_id}
 
       length(memberships) == 1 ->

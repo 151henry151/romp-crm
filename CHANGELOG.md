@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-07
+
+### Changed
+
+- Resolve inbound SMS jobs workspace with **`users.selected_business_id`** first (Jobs header picker / recent workspace), then **`users.sms_business_id`** (Settings), then sole membership
+- Reload the user from the DB before **`maybe_set_default_sms_business`** when creating a business so a stale struct does not move the SMS default to every newly created org
+
+### Added
+
+- **`BusinessesTest`** coverage for **`resolve_sms_business_id/1`** and a Twilio webhook test that proves picker routing overrides SMS Settings when both differ
+
 ## [0.9.0] - 2026-05-07
 
 ### Added
