@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-05-07
+
+### Changed
+
+- Remove bordered **`base-100`** logo wrapper chrome in **`Layouts.app`** and **`jobs_live`** headers; clip main logo PNGs with **`aspect-ratio`**, **`overflow-hidden`**, and a slight **`scale`** so baked-in bezel and light-mode “double rectangle” stay outside the viewport
+- Expose **`--brand-logo-clip-scale`** default **`1.11`** so deploys can tweak clipping without rebuilding assets
+
 ## [0.8.6] - 2026-05-07
 
 ### Changed
