@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-05-07
+
+### Changed
+
+- Keep a single README screencast (**`1000001495`**); remove **`1000001486`** assets from **`docs/screencaps/`**
+- Show preview GIF and **`<video>`** at **480px** width (centered) so the player does not span the full README column
+
 ## [0.9.3] - 2026-05-07
 
 ### Changed
