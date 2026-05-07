@@ -1,16 +1,23 @@
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen bg-base-200/40 text-base-content">
   <%!-- Header --%>
-  <header class="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+  <header class="bg-base-100 border-b border-base-300 px-4 sm:px-6 py-4">
     <div class="max-w-screen-xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
-        <img
-          src={~p"/images/romp-crm-logo-main.png"}
-          alt="Romp CRM"
-          class="h-12 sm:h-14 w-auto"
-        />
-        <p class="text-sm text-gray-500 mt-1">Customer & Job Tracker</p>
-        <p class="text-xs text-gray-500 mt-1">
-          <span class="text-gray-600 font-medium">Text new jobs and updates:</span>
+        <div class="inline-flex rounded-2xl border border-base-300 bg-base-100 p-2 shadow-sm">
+          <img
+            src={~p"/images/romp-crm-logo-main.png"}
+            alt="Romp CRM"
+            class="h-12 w-auto rounded-lg sm:h-14 [[data-theme=dark]_&]:hidden"
+          />
+          <img
+            src={~p"/images/romp-crm-logo-main-dark.png"}
+            alt="Romp CRM"
+            class="hidden h-12 w-auto rounded-lg sm:h-14 [[data-theme=dark]_&]:block"
+          />
+        </div>
+        <p class="text-sm text-base-content/70 mt-1">Customer & Job Tracker</p>
+        <p class="text-xs text-base-content/70 mt-1">
+          <span class="text-base-content/80 font-medium">Text new jobs and updates:</span>
           <a
             href="sms:+18022780970"
             class="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap"
@@ -23,13 +30,13 @@
         <%= if assigns[:my_businesses] && length(@my_businesses) > 1 do %>
           <form action={~p"/business/switch"} method="post" class="flex items-center gap-2">
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-            <label for="business-switch" class="text-xs text-gray-600 whitespace-nowrap">
+            <label for="business-switch" class="text-xs text-base-content/80 whitespace-nowrap">
               Business
             </label>
             <select
               id="business-switch"
               name="business_id"
-              class="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white max-w-[14rem]"
+              class="text-sm border border-base-300 rounded-md px-2 py-1 bg-base-100 max-w-[14rem]"
               onchange="this.form.requestSubmit()"
             >
               <%= for b <- @my_businesses do %>
@@ -50,13 +57,14 @@
         >
           Settings
         </.link>
+        <Layouts.theme_toggle />
       </div>
     </div>
   </header>
 
   <main class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
     <%!-- Status filter tabs + new job --%>
-    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-gray-200">
+    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300">
       <div class="flex min-w-0 flex-1 flex-wrap gap-1">
         <%= for {label, status} <- [{"All", :all} | Enum.map([:lead, :pending, :in_progress, :done], &{status_label(&1), &1})] do %>
           <button
@@ -66,7 +74,7 @@
               "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors",
               if(@filter == status,
                 do: "border-blue-600 text-blue-600",
-                else: "border-transparent text-gray-500 hover:text-gray-700"
+                else: "border-transparent text-base-content/70 hover:text-base-content"
               )
             ]}
           >
@@ -75,7 +83,7 @@
               "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
               if(@filter == status,
                 do: "bg-blue-100 text-blue-700",
-                else: "bg-gray-100 text-gray-600"
+                else: "bg-base-200 text-base-content/70"
               )
             ]}>
               {count_for(@jobs, status)}
@@ -95,7 +103,7 @@
 
     <div class="md:hidden space-y-3">
       <%= for job <- visible_jobs(@jobs, @filter) do %>
-        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div class="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
           <button
             type="button"
             phx-click="toggle_row"
@@ -104,16 +112,16 @@
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0 space-y-1">
-                <p class="font-semibold text-gray-900 break-words">{job.client_name}</p>
+                <p class="font-semibold text-base-content break-words">{job.client_name}</p>
                 <%= if not expanded?(@expanded_job_id, job.id) do %>
-                  <p class="text-sm text-gray-600 break-words line-clamp-2">
-                    <span class="font-medium text-gray-700">Work:</span>
+                  <p class="text-sm text-base-content/80 break-words line-clamp-2">
+                    <span class="font-medium text-base-content/90">Work:</span>
                     {display(job.work_description)}
                   </p>
                 <% end %>
                 <%= if is_binary(job.notes) && String.trim(job.notes) != "" do %>
-                  <p class="text-sm text-gray-600 break-words">
-                    <span class="font-medium text-gray-700">Notes:</span>
+                  <p class="text-sm text-base-content/80 break-words">
+                    <span class="font-medium text-base-content/90">Notes:</span>
                     {job.notes}
                   </p>
                 <% end %>
@@ -125,29 +133,27 @@
           </button>
 
           <%= if expanded?(@expanded_job_id, job.id) do %>
-            <%!-- Explicit text color: dark DaisyUI theme sets a light base `color` on the root; without Tailwind text-* here, values inherit near-white and disappear on white cards. --%>
             <div
               id={"job-expand-sm-#{job.id}"}
-              class="border-t border-gray-100 px-4 py-3 text-sm text-gray-900 space-y-2"
-              data-theme="light"
+              class="border-t border-base-300 px-4 py-3 text-sm text-base-content space-y-2"
             >
               <p>
-                <span class="font-medium text-gray-700">Address:</span>
-                <span class="break-words text-gray-900">{display(job.address)}</span>
+                <span class="font-medium text-base-content/90">Address:</span>
+                <span class="break-words text-base-content">{display(job.address)}</span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Phone:</span>
-                <span class="text-gray-900">{display(job.phone)}</span>
+                <span class="font-medium text-base-content/90">Phone:</span>
+                <span class="text-base-content">{display(job.phone)}</span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Work:</span>
-                <span class="block mt-0.5 break-words text-gray-900">
+                <span class="font-medium text-base-content/90">Work:</span>
+                <span class="block mt-0.5 break-words text-base-content">
                   {display(job.work_description)}
                 </span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Priority:</span>
-                <span class="text-gray-900">
+                <span class="font-medium text-base-content/90">Priority:</span>
+                <span class="text-base-content">
                   <%= if job.priority == :high do %>
                     High
                   <% else %>
@@ -156,16 +162,16 @@
                 </span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Status:</span>
-                <span class="text-gray-900">{status_label(job.status)}</span>
+                <span class="font-medium text-base-content/90">Status:</span>
+                <span class="text-base-content">{status_label(job.status)}</span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Referred By:</span>
-                <span class="break-words text-gray-900">{display(job.referred_by)}</span>
+                <span class="font-medium text-base-content/90">Referred By:</span>
+                <span class="break-words text-base-content">{display(job.referred_by)}</span>
               </p>
               <p>
-                <span class="font-medium text-gray-700">Next Action:</span>
-                <span class="break-words text-gray-900">{display(job.next_action)}</span>
+                <span class="font-medium text-base-content/90">Next Action:</span>
+                <span class="break-words text-base-content">{display(job.next_action)}</span>
               </p>
               <div class="pt-2 flex items-center gap-4">
                 <.link
@@ -189,42 +195,42 @@
       <% end %>
 
       <%= if visible_jobs(@jobs, @filter) == [] do %>
-        <div class="bg-white rounded-lg border border-gray-200 px-4 py-12 text-center text-gray-400">
+        <div class="bg-base-100 rounded-lg border border-base-300 px-4 py-12 text-center text-base-content/60">
           No jobs found.
         </div>
       <% end %>
     </div>
 
     <%!-- Job table --%>
-    <div class="hidden md:block bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="hidden md:block bg-base-100 rounded-lg border border-base-300 overflow-hidden">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b border-gray-100 bg-gray-50">
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Client</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Address</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Work</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Priority</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Referred By</th>
-            <th class="text-left px-4 py-3 font-medium text-gray-600">Next Action</th>
+          <tr class="border-b border-base-300 bg-base-200/40">
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Client</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Address</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Phone</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Work</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Priority</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Status</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Referred By</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Next Action</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-base-300">
           <%= for job <- visible_jobs(@jobs, @filter) do %>
             <tr
               id={"job-row-#{job.id}"}
               phx-click="toggle_row"
               phx-value-id={job.id}
-              class="hover:bg-gray-50 group cursor-pointer"
+              class="hover:bg-base-200/40 group cursor-pointer"
             >
-              <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+              <td class="px-4 py-3 font-medium text-base-content whitespace-nowrap">
                 {job.client_name}
               </td>
-              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate">{job.address}</td>
-              <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{job.phone}</td>
-              <td class="px-4 py-3 text-gray-700 max-w-[220px] align-top">
+              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">{job.address}</td>
+              <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">{job.phone}</td>
+              <td class="px-4 py-3 text-base-content/90 max-w-[220px] align-top">
                 <%= if expanded?(@expanded_job_id, job.id) do %>
                   <span class="sr-only">Work description shown in expanded row below</span>
                 <% else %>
@@ -243,8 +249,10 @@
                   {status_label(job.status)}
                 </span>
               </td>
-              <td class="px-4 py-3 text-gray-600">{job.referred_by}</td>
-              <td class="px-4 py-3 text-gray-600 max-w-[150px] truncate">{job.next_action}</td>
+              <td class="px-4 py-3 text-base-content/80">{job.referred_by}</td>
+              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
+                {job.next_action}
+              </td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <.link
@@ -265,51 +273,57 @@
               </td>
             </tr>
             <%= if expanded?(@expanded_job_id, job.id) do %>
-              <tr id={"job-expand-md-#{job.id}"} class="bg-gray-50">
-                <td colspan="9" class="px-4 py-3 text-sm text-gray-900" data-theme="light">
+              <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
+                <td colspan="9" class="px-4 py-3 text-sm text-base-content">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
                     <p>
-                      <span class="font-medium text-gray-700">Client:</span> {display(
+                      <span class="font-medium text-base-content/90">Client:</span> {display(
                         job.client_name
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Address:</span> {display(
+                      <span class="font-medium text-base-content/90">Address:</span> {display(
                         job.address
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Phone:</span> {display(job.phone)}
+                      <span class="font-medium text-base-content/90">Phone:</span> {display(
+                        job.phone
+                      )}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Priority:</span> {if job.priority ==
-                                                                                     :high,
-                                                                                   do: "High",
-                                                                                   else: "Normal"}
+                      <span class="font-medium text-base-content/90">Priority:</span> {if job.priority ==
+                                                                                            :high,
+                                                                                          do:
+                                                                                            "High",
+                                                                                          else:
+                                                                                            "Normal"}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Status:</span> {status_label(
+                      <span class="font-medium text-base-content/90">Status:</span> {status_label(
                         job.status
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Referred By:</span> {display(
+                      <span class="font-medium text-base-content/90">Referred By:</span> {display(
                         job.referred_by
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-gray-700">Next Action:</span> {display(
+                      <span class="font-medium text-base-content/90">Next Action:</span> {display(
                         job.next_action
                       )}
                     </p>
                     <p class="lg:col-span-2">
-                      <span class="font-medium text-gray-700">Work:</span>
-                      <span class="mt-1 block whitespace-pre-wrap break-words text-gray-900">
+                      <span class="font-medium text-base-content/90">Work:</span>
+                      <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">
                         {display(job.work_description)}
                       </span>
                     </p>
                     <p class="lg:col-span-2">
-                      <span class="font-medium text-gray-700">Notes:</span> {display(job.notes)}
+                      <span class="font-medium text-base-content/90">Notes:</span> {display(
+                        job.notes
+                      )}
                     </p>
                   </div>
                 </td>
@@ -318,7 +332,7 @@
           <% end %>
           <%= if visible_jobs(@jobs, @filter) == [] do %>
             <tr>
-              <td colspan="9" class="px-4 py-12 text-center text-gray-400">
+              <td colspan="9" class="px-4 py-12 text-center text-base-content/60">
                 No jobs found.
               </td>
             </tr>
