@@ -36,7 +36,8 @@ config :romp_crm, RompCrmWeb.Endpoint,
     layout: false
   ],
   pubsub_server: RompCrm.PubSub,
-  live_view: [signing_salt: "aHbfT4Nq"]
+  # Rotate when LiveView session payload changes incompatibly (e.g. app module rename).
+  live_view: [signing_salt: "rompCrmLv08"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
