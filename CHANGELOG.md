@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-05-07
+
+### Fixed
+
+- Append **`Endpoint.path`** in **`Businesses`** invitation mail URLs (**`Endpoint.url`** does not carry the **`/romp-crm`** mount), so mailed links resolve under the production reverse-proxy prefix
+
 ## [0.8.8] - 2026-05-07
 
 ### Fixed
