@@ -143,11 +143,12 @@ defmodule RompCrm.Businesses do
     end
   end
 
-  # `RompCrmWeb.Endpoint.url/0` includes the public mount path (e.g. `/romp-crm` in prod);
-  # append only the route segment to avoid doubling the prefix.
+  # `RompCrmWeb.Endpoint.url/0` has no path component; the mount (`/romp-crm`, etc.)
+  # belongs in `RompCrmWeb.Endpoint.path/1`. See Phoenix endpoint callbacks.
   defp invitation_accept_url(raw_token) do
-    String.trim_trailing(RompCrmWeb.Endpoint.url(), "/") <>
-      "/invitations/#{raw_token}"
+    RompCrmWeb.Endpoint.url()
+    |> String.trim_trailing("/")
+    |> Kernel.<>(RompCrmWeb.Endpoint.path("/invitations/#{raw_token}"))
   end
 
   def get_invitation_by_raw_token(raw) when is_binary(raw) do
