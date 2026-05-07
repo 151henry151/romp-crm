@@ -113,4 +113,9 @@
   html:not([data-theme]) .brand-logo-dark { display: block; }
 }
 
+img.brand-logo-light,
+img.brand-logo-dark {
+  background-color: transparent;
+}
+
 /* This file is for your main application CSS */
