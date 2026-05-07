@@ -7,8 +7,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Ai.SmsJobExtractor
   alias RompCrm.Businesses
   alias RompCrm.Jobs
+  alias RompCrm.Jobs.Job
+  alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
   alias RompCrm.Twilio.Signature
+  alias RompCrm.Twilio.SmsReplyBuilder
 
   @doc """
   Twilio `POST` webhook for inbound SMS. Configure the number's "A message comes in"
@@ -71,10 +74,19 @@ defmodule RompCrmWeb.TwilioWebhookController do
                   "Twilio SMS: user id=#{user.id} belongs to multiple businesses; set a workspace in the Jobs picker or SMS workspace in Settings sid=#{message_sid}"
                 )
 
+                maybe_reply_routing_help(from)
                 twiml_ok(conn)
             end
         end
     end
+  end
+
+  defp maybe_reply_routing_help(from) do
+    reply =
+      "Pick a workspace in Romp CRM (jobs picker), then text again—or set SMS workspace in Settings."
+
+    _ = Messages.send_sms(from, reply)
+    :ok
   end
 
   defp deliver_inbound_sms(conn, user, business_id) do
@@ -90,17 +102,28 @@ defmodule RompCrmWeb.TwilioWebhookController do
     allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
 
     case SmsJobExtractor.extract(body_text, jobs_snapshot) do
-      {:ok, operations} when is_list(operations) ->
-        Logger.info(
-          "Twilio SMS parsed operations: sid=#{message_sid} from=#{from} count=#{length(operations)}"
-        )
-
-        Enum.with_index(operations, 1)
-        |> Enum.each(fn {op, idx} ->
-          apply_sms_operation(op, idx, message_sid, from, business_id, allowed_job_ids)
-        end)
+      {:ok, %{assistant_sms: assistant, operations: ops}} when ops == [] ->
+        if is_binary(assistant) and String.trim(assistant) != "" do
+          _ = Messages.send_sms(from, String.trim(assistant))
+        end
 
         twiml_ok(conn)
+
+      {:ok, %{assistant_sms: assistant, operations: ops}} ->
+        Logger.info(
+          "Twilio SMS parsed operations: sid=#{message_sid} count=#{length(ops)} from=#{from}"
+        )
+
+        case run_operations(ops, message_sid, from, business_id, allowed_job_ids) do
+          {:clarify, msg} ->
+            _ = Messages.send_sms(from, msg)
+            twiml_ok(conn)
+
+          {:ok, results} ->
+            reply = SmsReplyBuilder.compose(assistant, results)
+            _ = Messages.send_sms(from, reply)
+            twiml_ok(conn)
+        end
 
       {:error, :missing_api_key} ->
         Logger.error(
@@ -114,11 +137,42 @@ defmodule RompCrmWeb.TwilioWebhookController do
           "Twilio SMS extraction failed: sid=#{message_sid} from=#{from} reason=#{inspect(reason)} body=#{inspect(body_text)}"
         )
 
+        _ =
+          Messages.send_sms(
+            from,
+            parse_error_user_message(reason)
+          )
+
         twiml_ok(conn)
     end
   end
 
-  defp apply_sms_operation(
+  defp parse_error_user_message(:empty_extract),
+    do: "Not sure what to change—name the client or paste more detail."
+
+  defp parse_error_user_message(_),
+    do: "Couldn't parse that—try naming the client or job."
+
+  defp run_operations(ops, message_sid, from, business_id, allowed_job_ids) do
+    Enum.reduce_while(Enum.with_index(ops, 1), [], fn {op, idx}, acc ->
+      case apply_sms_operation_ret(op, idx, message_sid, from, business_id, allowed_job_ids) do
+        {:clarify_match, msg} ->
+          {:halt, {:clarify, msg}}
+
+        other ->
+          {:cont, [other | acc]}
+      end
+    end)
+    |> case do
+      {:clarify, msg} ->
+        {:clarify, msg}
+
+      rev when is_list(rev) ->
+        {:ok, Enum.reverse(rev)}
+    end
+  end
+
+  defp apply_sms_operation_ret(
          {:create, attrs},
          idx,
          message_sid,
@@ -136,19 +190,23 @@ defmodule RompCrmWeb.TwilioWebhookController do
       |> Map.put("business_id", business_id)
 
     case Jobs.create_job(attrs) do
-      {:ok, job} ->
+      {:ok, %Job{} = job} ->
         Logger.info(
           "Twilio SMS create applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id}"
         )
+
+        {:created, job}
 
       {:error, changeset} ->
         Logger.warning(
           "Twilio SMS create failed: sid=#{message_sid} from=#{from} op_index=#{idx} errors=#{inspect(changeset.errors)}"
         )
+
+        {:error, :create_failed}
     end
   end
 
-  defp apply_sms_operation(
+  defp apply_sms_operation_ret(
          {:update_by_id, job_id, patch},
          idx,
          message_sid,
@@ -166,6 +224,8 @@ defmodule RompCrmWeb.TwilioWebhookController do
           "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=:invalid_job_id job_id=#{job_id} patch=#{inspect(patch)}"
         )
 
+        {:skipped, :invalid_job_id}
+
       true ->
         case Jobs.get_job(job_id, business_id) do
           nil ->
@@ -173,25 +233,31 @@ defmodule RompCrmWeb.TwilioWebhookController do
               "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=:job_not_found job_id=#{job_id}"
             )
 
+            {:skipped, :job_not_found}
+
           job ->
             patch = Enum.into(patch, %{}, fn {k, v} -> {to_string(k), v} end)
 
             case Jobs.update_job(job, patch) do
-              {:ok, updated_job} ->
+              {:ok, %Job{} = updated_job} ->
                 Logger.info(
                   "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
                 )
+
+                {:updated, updated_job, Map.keys(patch)}
 
               {:error, changeset} ->
                 Logger.warning(
                   "Twilio SMS update failed: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
                 )
+
+                {:error, :update_failed}
             end
         end
     end
   end
 
-  defp apply_sms_operation(
+  defp apply_sms_operation_ret(
          {:update, match, patch},
          idx,
          message_sid,
@@ -208,21 +274,31 @@ defmodule RompCrmWeb.TwilioWebhookController do
     case Jobs.find_job_for_sms_update(match, business_id) do
       {:ok, job} ->
         case Jobs.update_job(job, patch) do
-          {:ok, updated_job} ->
+          {:ok, %Job{} = updated_job} ->
             Logger.info(
               "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
             )
+
+            {:updated, updated_job, Map.keys(patch)}
 
           {:error, changeset} ->
             Logger.warning(
               "Twilio SMS update failed: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id} errors=#{inspect(changeset.errors)}"
             )
+
+            {:error, :update_failed}
         end
+
+      {:error, :ambiguous} ->
+        msg = Jobs.ambiguous_match_clarification_sms(match, business_id)
+        {:clarify_match, msg}
 
       {:error, reason} ->
         Logger.info(
           "Twilio SMS update skipped: sid=#{message_sid} from=#{from} op_index=#{idx} reason=#{inspect(reason)} match=#{inspect(match)} patch=#{inspect(patch)}"
         )
+
+        {:skipped, reason}
     end
   end
 

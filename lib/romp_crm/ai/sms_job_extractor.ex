@@ -6,7 +6,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
   Production adapters receive `jobs_snapshot` (`Jobs.snapshot_for_sms_ai/0`) so the model can
   compare the SMS against live CRM rows (names, addresses, work text, typos, informal references).
 
-  - `{:ok, operations}` where `operations` is a non-empty list of:
+  - `{:ok, %{assistant_sms: String.t() | nil, operations: list}}` where `operations` contains zero or more:
     - `{:create, attrs}` — attrs match `RompCrm.Jobs.create_job/1`.
     - `{:update_by_id, job_id, patch}` — `RompCrm.Jobs.update_job/2` after validating `job_id`.
     - `{:update, match, patch}` — fallback: resolve via `RompCrm.Jobs.find_job_for_sms_update/1`.
@@ -15,8 +15,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
   alias RompCrm.Jobs.Job
 
   @doc """
-  Returns `{:ok, operations}` where `operations` is a non-empty list of normalized
-  create/update tuples, or `{:error, reason}`.
+  Returns `{:ok, %{assistant_sms: nil | String.t(), operations: list}}` or `{:error, reason}`.
 
   `jobs_snapshot` must be the same list passed to the adapter (for validation after extraction).
   """
@@ -33,22 +32,55 @@ defmodule RompCrm.Ai.SmsJobExtractor do
 
   defp parse_extracted_payload(map) when is_map(map) do
     map = stringify_top_level_keys(map)
+    assistant = assistant_from_map(map)
 
-    case Map.get(map, "actions") do
-      actions when is_list(actions) ->
-        parse_actions(actions)
+    parsed_ops =
+      case Map.get(map, "actions") do
+        actions when is_list(actions) ->
+          parse_actions(actions)
 
-      _ ->
-        with {:ok, op} <- parse_single_action(map) do
-          {:ok, [op]}
-        end
+        nil ->
+          case parse_single_action(Map.drop(map, ["assistant_sms"])) do
+            {:ok, op} -> {:ok, [op]}
+            err -> err
+          end
+
+        _ ->
+          {:error, :invalid_actions}
+      end
+
+    case parsed_ops do
+      {:ok, ops} -> finalize_extract(assistant, ops)
+      err -> err
     end
   end
+
+  defp assistant_from_map(map) do
+    case Map.get(map, "assistant_sms") do
+      s when is_binary(s) ->
+        s |> String.trim() |> String.slice(0, 480)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp finalize_extract(assistant, ops) do
+    cond do
+      ops == [] and (assistant == nil or assistant == "") ->
+        {:error, :empty_extract}
+
+      true ->
+        {:ok, %{assistant_sms: assistant, operations: ops}}
+    end
+  end
+
+  defp parse_actions([]), do: {:ok, []}
 
   defp parse_actions(actions) when is_list(actions) do
     case Enum.with_index(actions, 1) do
       [] ->
-        {:error, :empty_actions}
+        {:ok, []}
 
       indexed ->
         Enum.reduce_while(indexed, {:ok, []}, fn {raw_action, idx}, {:ok, acc} ->
@@ -67,6 +99,8 @@ defmodule RompCrm.Ai.SmsJobExtractor do
         end
     end
   end
+
+  defp parse_actions(_), do: {:error, :invalid_actions}
 
   defp parse_single_action(map) when is_map(map) do
     map = stringify_top_level_keys(map)
@@ -169,7 +203,15 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     payload =
       case Map.get(map, "job") do
         %{} = job_map -> job_map
-        _ -> Map.drop(map, ["intent", "match", "updates", "job_id", "actions"])
+        _ ->
+          Map.drop(map, [
+            "intent",
+            "match",
+            "updates",
+            "job_id",
+            "actions",
+            "assistant_sms"
+          ])
       end
 
     {:ok, {:create, normalize_create(payload)}}

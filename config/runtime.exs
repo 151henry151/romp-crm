@@ -87,7 +87,7 @@ if config_env() == :prod do
     |> Enum.map(&String.downcase/1)
     |> Enum.reject(&(&1 == ""))
 
-  default_twilio_from = "+18024587299,+18024582710"
+  default_twilio_from = "+18024587299,+18024582710,+18022780965"
 
   twilio_from_raw =
     case System.get_env("TWILIO_SMS_ALLOWED_FROM") |> to_string() |> String.trim() do
@@ -103,13 +103,24 @@ if config_env() == :prod do
     |> Enum.map(&RompCrm.Twilio.Phone.normalize_us/1)
     |> Enum.reject(&(&1 == ""))
 
+  twilio_messaging_from_raw =
+    case System.get_env("TWILIO_MESSAGING_FROM") |> to_string() |> String.trim() do
+      "" -> "+18022780965"
+      s -> s
+    end
+
+  twilio_sms_replies_enabled =
+    System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false"
+
   config :romp_crm,
+    twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+    twilio_messaging_from_number: twilio_messaging_from_raw,
+    twilio_sms_replies_enabled: twilio_sms_replies_enabled,
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
     anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
     twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
-    skip_twilio_signature_validation:
-      System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
+    skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
     mail_from_name: mail_from_name,
     mail_from_address: mail_from_address,
     registration_email_allowlist: registration_allowlist,

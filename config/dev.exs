@@ -87,7 +87,14 @@ config :phoenix_live_view,
 
 # Twilio inbound SMS + Anthropic parsing (export env vars before `mix phx.server`)
 config :romp_crm,
+  twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
   twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+  twilio_messaging_from_number:
+    case System.get_env("TWILIO_MESSAGING_FROM") |> to_string() |> String.trim() do
+      "" -> "+18022780965"
+      s -> s
+    end,
+  twilio_sms_replies_enabled: System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false",
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
   twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
@@ -99,4 +106,4 @@ config :romp_crm,
     "henry@hromp.com"
   ],
   enforce_registration_allowlist: false,
-  twilio_sms_allowed_from_normalized: ["18024587299", "18024582710"]
+  twilio_sms_allowed_from_normalized: ["18024587299", "18024582710", "18022780965"]
