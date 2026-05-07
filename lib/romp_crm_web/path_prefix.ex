@@ -10,9 +10,16 @@ defmodule RompCrmWeb.PathPrefix do
 
   @doc "WebSocket path the browser must use (e.g. `/live` or `/romp-crm/live`)."
   def live_socket_path do
+    request_path("/live")
+  end
+
+  @doc "Builds an app path prefixed for public URLs."
+  def request_path(path) when is_binary(path) do
+    normalized_path = "/" <> String.trim_leading(path, "/")
+
     case @path_prefix do
-      "/" -> "/live"
-      prefix -> String.trim_trailing(prefix, "/") <> "/live"
+      "/" -> normalized_path
+      prefix -> String.trim_trailing(prefix, "/") <> normalized_path
     end
   end
 end

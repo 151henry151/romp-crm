@@ -19,6 +19,13 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       assert response =~ ~p"/users/register"
     end
 
+    test "prefills email from query params", %{conn: conn} do
+      conn = get(conn, ~p"/users/register?#{[email: "invitee@example.com"]}")
+      response = html_response(conn, 200)
+
+      assert response =~ ~s(value="invitee@example.com")
+    end
+
     test "redirects if already logged in", %{conn: conn} do
       conn = conn |> log_in_user(user_fixture()) |> get(~p"/users/register")
 

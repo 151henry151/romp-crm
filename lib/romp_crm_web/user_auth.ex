@@ -39,35 +39,9 @@ defmodule RompCrmWeb.UserAuth do
     conn =
       conn
       |> create_or_extend_session(user, params)
-      |> accept_pending_business_invitation(user)
 
     conn
     |> redirect(to: user_return_to || signed_in_path(conn))
-  end
-
-  defp accept_pending_business_invitation(conn, user) do
-    case get_session(conn, "pending_invitation_token") do
-      nil ->
-        conn
-
-      raw ->
-        conn = delete_session(conn, "pending_invitation_token")
-
-        case Businesses.accept_invitation_raw(raw, user) do
-          {:ok, business} ->
-            put_flash(conn, :info, "You joined #{business.name}.")
-
-          {:error, :email_mismatch} ->
-            put_flash(
-              conn,
-              :error,
-              "That invitation is for a different email address than the account you used."
-            )
-
-          {:error, _} ->
-            put_flash(conn, :error, "Could not accept the invitation.")
-        end
-    end
   end
 
   @doc """

@@ -9,8 +9,14 @@ defmodule RompCrmWeb.UserRegistrationController do
 
   defp auth_pages_no_store(conn, _opts), do: UserAuth.put_auth_pages_no_store(conn)
 
-  def new(conn, _params) do
-    changeset = Accounts.change_user_email(%User{})
+  def new(conn, params) do
+    initial_email =
+      params
+      |> Map.get("email", "")
+      |> to_string()
+      |> String.trim()
+
+    changeset = Accounts.change_user_email(%User{email: initial_email})
     render(conn, :new, changeset: changeset)
   end
 

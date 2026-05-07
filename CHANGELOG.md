@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-05-07
+
+### Changed
+
+- Build business invitation acceptance URLs from **`RompCrmWeb.Endpoint.url/0`** plus **`/invitations/...`** so emailed links inherit the configured public mount (**`/romp-crm`**) and no longer omit the proxy prefix
+- Extend invitation acceptance flow: persist **`pending_invitation_token`** and **`user_return_to`**, redirect unauthenticated invitees to **login** or **register** with prefilled email, and notify wrong-account sessions before login
+- Remove eager invitation acceptance on login completion so redirects to the invitation URL can finish acceptance after credentials are verified
+- Prefill **`GET /users/register`** email from **`?email=`**
+
+### Added
+
+- Controller tests covering invitation redirects, wrong-user handling, and successful acceptance
+
 ## [0.8.4] - 2026-05-07
 
 ### Changed
