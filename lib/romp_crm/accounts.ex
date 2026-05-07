@@ -165,6 +165,23 @@ defmodule RompCrm.Accounts do
 
   def maybe_set_default_sms_business(%User{}, _), do: {:ok, :skipped}
 
+  @doc """
+  Saves which business/workspace the Jobs list and picker use (`users.selected_business_id`).
+  Fails when the user is not a member of that business.
+
+  Prefer this over touching `selected_business_id` directly so eligibility is enforced.
+  """
+  def put_jobs_workspace_selection(%User{} = user, business_id)
+      when is_integer(business_id) do
+    if RompCrm.Businesses.member?(user, business_id) do
+      user
+      |> Ecto.Changeset.change(selected_business_id: business_id)
+      |> Repo.update()
+    else
+      {:error, :not_member}
+    end
+  end
+
   ## Settings
 
   @doc """

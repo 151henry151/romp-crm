@@ -1,6 +1,7 @@
 defmodule RompCrmWeb.BusinessSwitchController do
   use RompCrmWeb, :controller
 
+  alias RompCrm.Accounts
   alias RompCrm.Businesses
 
   def update(conn, %{"business_id" => id}) do
@@ -8,6 +9,8 @@ defmodule RompCrmWeb.BusinessSwitchController do
     bid = String.to_integer(id)
 
     if Businesses.member?(user, bid) do
+      _ = Accounts.put_jobs_workspace_selection(user, bid)
+
       conn
       |> put_session("current_business_id", Integer.to_string(bid))
       |> redirect(to: ~p"/")

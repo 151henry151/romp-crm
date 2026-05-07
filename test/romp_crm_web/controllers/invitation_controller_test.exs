@@ -3,6 +3,7 @@ defmodule RompCrmWeb.InvitationControllerTest do
 
   import RompCrm.AccountsFixtures
 
+  alias RompCrm.Accounts
   alias RompCrm.Businesses
   alias RompCrm.Businesses.{BusinessInvitation, BusinessMembership}
   alias RompCrm.Repo
@@ -65,11 +66,7 @@ defmodule RompCrmWeb.InvitationControllerTest do
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ invitee_email
   end
 
-  test "accepts invitation for logged in matching user", %{
-    conn: conn,
-    inviter: inviter,
-    business: business
-  } do
+  test "accepts invitation for logged in matching user", %{conn: conn, inviter: inviter, business: business} do
     invitee = user_fixture(%{email: "joiner@example.com"})
     invitation = create_invitation!(business, inviter, invitee.email)
 
@@ -80,6 +77,9 @@ defmodule RompCrmWeb.InvitationControllerTest do
 
     assert redirected_to(conn) == ~p"/"
     assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "You joined"
+    assert get_session(conn, "current_business_id") == Integer.to_string(business.id)
+
+    assert Accounts.get_user!(invitee.id).selected_business_id == business.id
 
     assert Repo.get_by(BusinessMembership, business_id: business.id, user_id: invitee.id)
     refute Repo.get(BusinessInvitation, invitation.id)

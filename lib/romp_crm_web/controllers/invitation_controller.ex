@@ -23,7 +23,10 @@ defmodule RompCrmWeb.InvitationController do
                 String.downcase(String.trim(invitation.email)) ->
             case Businesses.accept_invitation_raw(token, scope.user) do
               {:ok, business} ->
+                _ = Accounts.put_jobs_workspace_selection(scope.user, business.id)
+
                 conn
+                |> put_session("current_business_id", Integer.to_string(business.id))
                 |> put_flash(:info, "You joined #{business.name}.")
                 |> redirect(to: ~p"/")
 

@@ -5,6 +5,7 @@ defmodule RompCrm.AccountsTest do
 
   import RompCrm.AccountsFixtures
   alias RompCrm.Accounts.{User, UserToken}
+  alias RompCrm.Businesses
 
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
@@ -386,6 +387,26 @@ defmodule RompCrm.AccountsTest do
       assert user_token.user_id == user.id
       assert user_token.sent_to == user.email
       assert user_token.context == "login"
+    end
+  end
+
+  describe "put_jobs_workspace_selection/2" do
+    test "persists when the user is a member" do
+      owner = user_fixture()
+      {:ok, _a} = Businesses.create_business(owner, %{name: "Alpha"})
+      {:ok, b} = Businesses.create_business(owner, %{name: "Beta"})
+
+      assert {:ok, %User{selected_business_id: bid}} =
+               Accounts.put_jobs_workspace_selection(owner, b.id)
+
+      assert bid == b.id
+    end
+
+    test "returns not_member when the user does not belong" do
+      owner = user_fixture()
+      other = user_fixture()
+      {:ok, biz} = Businesses.create_business(owner, %{name: "Solo"})
+      assert {:error, :not_member} == Accounts.put_jobs_workspace_selection(other, biz.id)
     end
   end
 
