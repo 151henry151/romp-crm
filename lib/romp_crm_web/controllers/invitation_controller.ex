@@ -1,10 +1,12 @@
 defmodule RompCrmWeb.InvitationController do
   use RompCrmWeb, :controller
 
+  alias RompCrm.Accounts
   alias RompCrm.Businesses
 
   def show(conn, %{"token" => token}) do
-    token = URI.decode(token)
+    token = token |> URI.decode() |> String.trim()
+    invitation_path = ~p"/invitations/#{token}"
 
     case Businesses.get_invitation_by_raw_token(token) do
       nil ->
@@ -38,18 +40,31 @@ defmodule RompCrmWeb.InvitationController do
 
           scope && scope.user ->
             conn
+            |> put_session("pending_invitation_token", token)
+            |> put_session(:user_return_to, invitation_path)
             |> put_flash(
               :error,
               "This invitation is for #{invitation.email}. Log in with that address or ask for a new invite."
             )
-            |> redirect(to: ~p"/users/settings")
+            |> redirect(to: ~p"/users/log-in")
 
           true ->
-            conn
-            |> put_session("pending_invitation_token", token)
-            |> put_flash(:info, "Sign in or register as #{invitation.email} to join.")
-            |> redirect(to: ~p"/users/log-in")
+            redirect_for_unauthenticated(conn, token, invitation.email, invitation_path)
         end
     end
+  end
+
+  defp redirect_for_unauthenticated(conn, token, invitation_email, invitation_path) do
+    conn
+    |> put_session("pending_invitation_token", token)
+    |> put_session(:user_return_to, invitation_path)
+    |> put_flash(:info, "Sign in or register as #{invitation_email} to join.")
+    |> redirect(
+      to:
+        case Accounts.get_user_by_email(invitation_email) do
+          nil -> ~p"/users/register?#{[email: invitation_email]}"
+          _user -> ~p"/users/log-in"
+        end
+    )
   end
 end
