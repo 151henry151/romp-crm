@@ -244,9 +244,10 @@ defmodule RompCrmWeb.UserAuthTest do
       %{conn: UserAuth.fetch_current_scope_for_user(conn, [])}
     end
 
-    test "redirects with login flash on protected non-root pages when user is not authenticated", %{
-      conn: conn
-    } do
+    test "redirects with login flash on protected non-root pages when user is not authenticated",
+         %{
+           conn: conn
+         } do
       conn =
         %{conn | path_info: ["users", "settings"], query_string: ""}
         |> fetch_flash()

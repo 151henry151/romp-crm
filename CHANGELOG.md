@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-05-07
+
+### Changed
+
+- Extract and add new Romp CRM logo assets (main logo plus light/dark badge icons) and apply them to the app header and jobs page header
+- Set light/dark favicon badges using the new branding assets in the root layout
+
 ## [0.8.2] - 2026-05-07
 
 ### Changed

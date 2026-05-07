@@ -6,6 +6,18 @@
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="live-socket-path" content={RompCrmWeb.PathPrefix.live_socket_path()} />
     <.live_title default="Romp CRM" suffix=" · Customer & Job Tracker" phx-no-format>{assigns[:page_title]}</.live_title>
+    <link
+      rel="icon"
+      type="image/png"
+      media="(prefers-color-scheme: light)"
+      href={~p"/images/romp-crm-badge-light.png"}
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      media="(prefers-color-scheme: dark)"
+      href={~p"/images/romp-crm-badge-dark.png"}
+    />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
