@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-06
+
+### Changed
+
+- Rename OTP application and modules from legacy internal identifiers to **`:romp_crm`**, **`RompCrm.*`**, **`RompCrmWeb.*`**; release binary **`romp_crm`**; dev SQLite files **`romp_crm_dev.db`** / **`romp_crm_test.db`**; remember-me cookie **`_romp_crm_web_user_remember_me`**; telemetry metric prefix **`romp_crm.repo`**
+- Align **`config/runtime.exs`** with **`:romp_crm`** and **`RompCrm.*`** modules so production releases load correct endpoint, repo, mailer, and Twilio settings at runtime
+
+## [0.7.2] - 2026-05-06
+
+### Changed
+
+- When a job row is expanded, hide truncated work text in the summary row and show the full work description in the expanded panel (desktop table and mobile cards)
+
 ## [0.7.1] - 2026-05-06
 
 ### Changed
@@ -32,9 +45,9 @@
 
 ### Changed
 
-- Mount production app at `/romp-crm` instead of `/jgs-crm` (`config/prod.exs` path prefix)
+- Mount production app at `/romp-crm` URL prefix (`config/prod.exs`)
 - Set compile-time `Endpoint` URL path `/romp-crm` in prod so Phoenix VerifiedRoutes (`~p`) generate prefixed paths
-- Rebrand user-visible strings from JGS Mechanical / JGS CRM to Romp CRM; remove navbar logo image in favor of text nav branding
+- Rebrand user-visible strings to Romp CRM; remove navbar logo image in favor of text nav branding
 - Rename session cookie key to `_romp_crm_key`
 - Replace deploy snippets with `deploy/romp-crm.*` and update runtime/docs examples for `romp-crm` paths
 - Point the app layout brand link at verified route `~p"/"` so subpath deployments keep navigation under `/romp-crm`
@@ -74,7 +87,7 @@
 
 ### Changed
 
-- Remove the temporary JGS logo from the jobs header and simplify the new-job control to a compact `+` button
+- Remove the temporary branded logo from the jobs header and simplify the new-job control to a compact `+` button
 - Remove the duplicate jobs-header log-out link so mobile shows only the global account menu action
 
 ## [0.5.2] - 2026-05-06
@@ -106,7 +119,7 @@
 
 - Enforce registration email allowlist (configurable via `ALLOWED_REGISTRATION_EMAILS` in production)
 - Reject inbound Twilio SMS from numbers outside `TWILIO_SMS_ALLOWED_FROM` before parsing
-- Add `JgsCrm.Twilio.Phone.normalize_us/1` for comparing formatted North-American caller IDs
+- Add `RompCrm.Twilio.Phone.normalize_us/1` for comparing formatted North-American caller IDs
 
 ## [0.3.0] - 2026-05-06
 
@@ -180,20 +193,20 @@
 
 ## [0.2.2] - 2026-05-06
 ### Added
-- Add `deploy/` with nginx location snippet, `jgs-crm.env.example`, systemd unit, and server runbook
-- Add `JgsCrm.Release` for `bin/jgs_crm eval "JgsCrm.Release.migrate"` in production
+- Add `deploy/` with nginx location snippet, env example, systemd unit, and server runbook
+- Add `RompCrm.Release` for `bin/romp_crm eval "RompCrm.Release.migrate"` in production
 
 ## [0.2.1] - 2026-05-06
 ### Changed
-- Document reverse-proxy stripping for `/jgs-crm` instead of mounting routes under a scope (fixes verified routes / prod compile; nginx `proxy_pass` trailing slash)
+- Document reverse-proxy stripping for the public URL prefix instead of mounting routes under a scope (fixes verified routes / prod compile; nginx `proxy_pass` trailing slash)
 
 ## [0.2.0] - 2026-05-06
 ### Changed
 - Add `req` dependency for outbound Anthropic API calls
 - Align `Jobs` context tests and `JobsFixtures` with `create_job/1`, `list_jobs/0`, and no user scope on jobs
 - Expect authenticated session for `GET /` controller test so it matches the jobs LiveView route
-- Replace default Phoenix navbar with JGS logo (`/images/jgs_logo.png`), app name, and theme toggle only; remove Phoenix Website, GitHub, and Get Started links
-- Show the same logo in the jobs dashboard header and set the default browser title suffix to `JGS Mechanical · CRM`
+- Replace default Phoenix navbar with custom logo, app name, and theme toggle only; remove Phoenix Website, GitHub, and Get Started links
+- Show the same logo in the jobs dashboard header and set the default browser title suffix for CRM branding
 - Scope modal dialog content with `data-theme="light"` and explicit text color so DaisyUI field labels stay readable on the white modal when the app uses a dark theme
 
 ### Added

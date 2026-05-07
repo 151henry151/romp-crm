@@ -1,5 +1,5 @@
-alias JgsCrm.Repo
-alias JgsCrm.Jobs.Job
+alias RompCrm.Repo
+alias RompCrm.Jobs.Job
 
 jobs = [
   %{

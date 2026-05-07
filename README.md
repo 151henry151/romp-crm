@@ -2,7 +2,7 @@
 
 Phoenix CRM for **Romp** — jobs list, auth, and inbound SMS leads via Twilio + Anthropic Claude.
 
-The OTP application and modules keep the historical name **`jgs_crm`** / **`JgsCrm*`**; branding and the public mount path are **Romp CRM** at **`https://hromp.com/romp-crm/`**.
+The OTP application is **`:romp_crm`** with modules under **`RompCrm.*`** and **`RompCrmWeb.*`**. Public URLs use **Romp CRM** at **`https://hromp.com/romp-crm/`**.
 
 ## Deploying under a subpath (`https://hromp.com/romp-crm/`)
 

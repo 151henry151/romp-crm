@@ -1,8 +1,8 @@
 import Config
 
 # Configure your database
-config :jgs_crm, JgsCrm.Repo,
-  database: Path.expand("../jgs_crm_dev.db", __DIR__),
+config :romp_crm, RompCrm.Repo,
+  database: Path.expand("../romp_crm_dev.db", __DIR__),
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
@@ -13,7 +13,7 @@ config :jgs_crm, JgsCrm.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :jgs_crm, JgsCrmWeb.Endpoint,
+config :romp_crm, RompCrmWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -22,8 +22,8 @@ config :jgs_crm, JgsCrmWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "6tv7ol7HTB4RUH4C+5y9jK46dcdwlTWOC1dQgcIVc1AXunluXa+yZD9DsQ6s7Mkm",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:jgs_crm, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:jgs_crm, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:romp_crm, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:romp_crm, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -50,7 +50,7 @@ config :jgs_crm, JgsCrmWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :jgs_crm, JgsCrmWeb.Endpoint,
+config :romp_crm, RompCrmWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -59,13 +59,13 @@ config :jgs_crm, JgsCrmWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$",
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/jgs_crm_web/router\.ex$",
-      ~r"lib/jgs_crm_web/(controllers|live|components)/.*\.(ex|heex)$"
+      ~r"lib/romp_crm_web/router\.ex$",
+      ~r"lib/romp_crm_web/(controllers|live|components)/.*\.(ex|heex)$"
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :jgs_crm, dev_routes: true
+config :romp_crm, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
@@ -86,7 +86,7 @@ config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
 # Twilio inbound SMS + Anthropic parsing (export env vars before `mix phx.server`)
-config :jgs_crm,
+config :romp_crm,
   twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",

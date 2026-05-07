@@ -1,4 +1,4 @@
-defmodule JgsCrm.Repo.Migrations.AddBusinessIdToJobsAndBackfill do
+defmodule RompCrm.Repo.Migrations.AddBusinessIdToJobsAndBackfill do
   use Ecto.Migration
 
   import Ecto.Query
@@ -10,22 +10,22 @@ defmodule JgsCrm.Repo.Migrations.AddBusinessIdToJobsAndBackfill do
 
     flush()
 
-    repo = JgsCrm.Repo
+    repo = RompCrm.Repo
 
     {:ok, business} =
-      %JgsCrm.Businesses.Business{}
-      |> JgsCrm.Businesses.Business.changeset(%{name: "Default workspace"})
+      %RompCrm.Businesses.Business{}
+      |> RompCrm.Businesses.Business.changeset(%{name: "Default workspace"})
       |> repo.insert()
 
     bid = business.id
 
-    repo.update_all(from(j in JgsCrm.Jobs.Job), set: [business_id: bid])
+    repo.update_all(from(j in RompCrm.Jobs.Job), set: [business_id: bid])
 
-    users = repo.all(JgsCrm.Accounts.User)
+    users = repo.all(RompCrm.Accounts.User)
 
     Enum.each(users, fn user ->
-      %JgsCrm.Businesses.BusinessMembership{}
-      |> JgsCrm.Businesses.BusinessMembership.changeset(%{
+      %RompCrm.Businesses.BusinessMembership{}
+      |> RompCrm.Businesses.BusinessMembership.changeset(%{
         business_id: bid,
         user_id: user.id,
         role: :owner

@@ -1,0 +1,95 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-lg space-y-8 text-base-content">
+    <.header>
+      Businesses
+      <:subtitle>
+        Create a business, invite team members by email, and switch between them from the job list.
+      </:subtitle>
+    </.header>
+
+    <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm">
+      <h2 class="text-sm font-semibold text-base-content">Create a business</h2>
+      <.form
+        for={@form}
+        id="new-business"
+        phx-change="validate_business"
+        phx-submit="create_business"
+        class="mt-3 space-y-3"
+      >
+        <.input field={@form[:name]} type="text" label="Business name" required />
+        <.button class="btn btn-primary w-full" type="submit">Create</.button>
+      </.form>
+    </div>
+
+    <div class="space-y-4">
+      <h2 class="text-sm font-semibold text-base-content">Your businesses</h2>
+      <%= if @businesses == [] do %>
+        <p class="text-sm text-base-content/70">
+          You are not part of any business yet — create one above.
+        </p>
+      <% else %>
+        <%= for b <- @businesses do %>
+          <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-base-content">{b.name}</p>
+                <%= if RompCrm.Businesses.owner?(@user, b.id) do %>
+                  <p class="text-xs text-base-content/60">
+                    You are an owner — you can invite users.
+                  </p>
+                <% else %>
+                  <p class="text-xs text-base-content/60">Member</p>
+                <% end %>
+              </div>
+            </div>
+
+            <%= if RompCrm.Businesses.owner?(@user, b.id) do %>
+              <.form
+                for={@invite_form}
+                id={"invite-#{b.id}"}
+                phx-change="validate_invite"
+                phx-submit="invite"
+                class="space-y-2"
+              >
+                <input type="hidden" name="invite[business_id]" value={b.id} />
+                <.input
+                  field={@invite_form[:email]}
+                  type="email"
+                  label="Invite by email"
+                  required
+                />
+                <.button class="btn btn-primary btn-sm" type="submit">Send invitation</.button>
+              </.form>
+
+              <% invites = Map.get(@invitation_lists, b.id, []) %>
+              <%= if invites != [] do %>
+                <div class="border-t border-base-300 pt-3 mt-2">
+                  <p class="text-xs font-medium text-base-content/80 mb-2">Pending invitations</p>
+                  <ul class="space-y-1">
+                    <%= for inv <- invites do %>
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="text-base-content">{inv.email}</span>
+                        <button
+                          type="button"
+                          phx-click="cancel_invite"
+                          phx-value-id={inv.id}
+                          class="text-xs font-medium text-error hover:opacity-90"
+                        >
+                          Cancel
+                        </button>
+                      </li>
+                    <% end %>
+                  </ul>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+
+    <p class="text-center">
+      <.link navigate={~p"/"} class="link link-primary text-sm font-medium">← Back to jobs</.link>
+    </p>
+  </div>
+</Layouts.app>
