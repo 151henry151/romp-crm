@@ -17,10 +17,13 @@ defmodule Mix.Tasks.Twilio.ConfigureSms do
 
   use Mix.Task
 
-  @requirements ["app.start"]
-
   @impl Mix.Task
   def run(args) do
+    # Avoid `@requirements ["app.start"]`: production `.env` sets `PORT` for Bandit; starting the
+    # full Phoenix app here conflicts with the running release (`eaddrinuse`).
+    Mix.Task.run("app.config")
+    {:ok, _} = Application.ensure_all_started(:req)
+
     {opts, _} =
       OptionParser.parse!(args,
         strict: [phone: :string, sms_url: :string],
