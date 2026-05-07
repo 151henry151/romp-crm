@@ -92,10 +92,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp deliver_inbound_sms(conn, user, business_id) do
     body_text = (conn.body_params["Body"] || "") |> to_string()
     from = conn.body_params["From"] |> to_string()
+    to_num = conn.body_params["To"] |> to_string()
     message_sid = conn.body_params["MessageSid"] |> to_string()
 
     Logger.info(
-      "Twilio SMS inbound: sid=#{message_sid} user_id=#{user.id} business_id=#{business_id} from=#{from} body=#{inspect(body_text)}"
+      "Twilio SMS inbound: sid=#{message_sid} to=#{inspect(to_num)} user_id=#{user.id} business_id=#{business_id} from=#{from} body=#{inspect(body_text)}"
     )
 
     jobs_snapshot = Jobs.snapshot_for_sms_ai(business_id)

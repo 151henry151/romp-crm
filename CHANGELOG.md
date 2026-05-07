@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-05-07
+
+### Added
+
+- Add **`mix twilio.messaging_service_inbound`** to set **`UseInboundWebhookOnNumber`** on a Twilio Messaging Service so inbound SMS uses each number's **SmsUrl**
+
+### Changed
+
+- Log Twilio **`To`** on inbound SMS for multi-number debugging
+
 ## [0.9.7] - 2026-05-07
 
 ### Changed
