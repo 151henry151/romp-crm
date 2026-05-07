@@ -5,7 +5,7 @@
 #   sudo systemctl enable --now romp-crm
 #
 # Expects:
-#   • Release at /home/henry/romp-crm/_build/prod/rel/jgs_crm (OTP app name remains :jgs_crm)
+#   • Release at /home/henry/romp-crm/_build/prod/rel/romp_crm (OTP app :romp_crm)
 #   • Environment file at /home/henry/romp-crm/.env.production
 
 [Unit]
@@ -18,8 +18,8 @@ User=henry
 Group=henry
 WorkingDirectory=/home/henry/romp-crm
 EnvironmentFile=/home/henry/romp-crm/.env.production
-ExecStart=/home/henry/romp-crm/_build/prod/rel/jgs_crm/bin/jgs_crm start
-ExecStop=/home/henry/romp-crm/_build/prod/rel/jgs_crm/bin/jgs_crm stop
+ExecStart=/home/henry/romp-crm/_build/prod/rel/romp_crm/bin/romp_crm start
+ExecStop=/home/henry/romp-crm/_build/prod/rel/romp_crm/bin/romp_crm stop
 Restart=on-failure
 RestartSec=5
 

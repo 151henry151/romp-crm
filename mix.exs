@@ -1,10 +1,10 @@
-defmodule JgsCrm.MixProject do
+defmodule RompCrm.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :jgs_crm,
-      version: "0.7.1",
+      app: :romp_crm,
+      version: "0.8.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -20,7 +20,7 @@ defmodule JgsCrm.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {JgsCrm.Application, []},
+      mod: {RompCrm.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -89,11 +89,11 @@ defmodule JgsCrm.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind jgs_crm", "esbuild jgs_crm"],
+      "assets.build": ["compile", "tailwind romp_crm", "esbuild romp_crm"],
       "assets.deploy": [
         "compile",
-        "tailwind jgs_crm --minify",
-        "esbuild jgs_crm --minify",
+        "tailwind romp_crm --minify",
+        "esbuild romp_crm --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

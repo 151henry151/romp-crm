@@ -1,4 +1,4 @@
-defmodule JgsCrm.Repo.Migrations.CreateJobs do
+defmodule RompCrm.Repo.Migrations.CreateJobs do
   use Ecto.Migration
 
   def change do

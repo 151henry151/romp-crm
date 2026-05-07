@@ -7,41 +7,41 @@
 # General application configuration
 import Config
 
-config :jgs_crm, :scopes,
+config :romp_crm, :scopes,
   user: [
     default: true,
-    module: JgsCrm.Accounts.Scope,
+    module: RompCrm.Accounts.Scope,
     assign_key: :current_scope,
     access_path: [:user, :id],
     schema_key: :user_id,
     schema_type: :id,
     schema_table: :users,
-    test_data_fixture: JgsCrm.AccountsFixtures,
+    test_data_fixture: RompCrm.AccountsFixtures,
     test_setup_helper: :register_and_log_in_user
   ]
 
-config :jgs_crm,
-  ecto_repos: [JgsCrm.Repo],
+config :romp_crm,
+  ecto_repos: [RompCrm.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # URL prefix for mounting the app (e.g. `/romp-crm` on hromp.com). Dev/test use `/`.
-config :jgs_crm, :path_prefix, "/"
+config :romp_crm, :path_prefix, "/"
 
 # Configure the endpoint
-config :jgs_crm, JgsCrmWeb.Endpoint,
+config :romp_crm, RompCrmWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: JgsCrmWeb.ErrorHTML, json: JgsCrmWeb.ErrorJSON],
+    formats: [html: RompCrmWeb.ErrorHTML, json: RompCrmWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: JgsCrm.PubSub,
+  pubsub_server: RompCrm.PubSub,
   live_view: [signing_salt: "aHbfT4Nq"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  jgs_crm: [
+  romp_crm: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -51,7 +51,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  jgs_crm: [
+  romp_crm: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
@@ -67,13 +67,13 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-config :jgs_crm, JgsCrm.Mailer, adapter: Swoosh.Adapters.Local
+config :romp_crm, RompCrm.Mailer, adapter: Swoosh.Adapters.Local
 
 config :swoosh, :api_client, Swoosh.ApiClient.Finch
-config :swoosh, :finch_name, JgsCrm.Finch
+config :swoosh, :finch_name, RompCrm.Finch
 
-config :jgs_crm,
-  sms_job_extractor_adapter: JgsCrm.Ai.SmsJobExtractor.Anthropic,
+config :romp_crm,
+  sms_job_extractor_adapter: RompCrm.Ai.SmsJobExtractor.Anthropic,
   anthropic_model: "claude-sonnet-4-20250514",
   skip_twilio_signature_validation: false
 

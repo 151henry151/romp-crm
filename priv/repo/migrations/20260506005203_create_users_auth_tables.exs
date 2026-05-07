@@ -1,4 +1,4 @@
-defmodule JgsCrm.Repo.Migrations.CreateUsersAuthTables do
+defmodule RompCrm.Repo.Migrations.CreateUsersAuthTables do
   use Ecto.Migration
 
   def change do

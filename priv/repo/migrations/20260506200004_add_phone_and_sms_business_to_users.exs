@@ -1,4 +1,4 @@
-defmodule JgsCrm.Repo.Migrations.AddPhoneAndSmsBusinessToUsers do
+defmodule RompCrm.Repo.Migrations.AddPhoneAndSmsBusinessToUsers do
   use Ecto.Migration
 
   def change do

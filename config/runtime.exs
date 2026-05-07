@@ -12,12 +12,12 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/jgs_crm start
+#     PHX_SERVER=true bin/romp_crm start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :jgs_crm, JgsCrmWeb.Endpoint, server: true
+  config :romp_crm, RompCrmWeb.Endpoint, server: true
 end
 
 if config_env() == :prod do
@@ -28,7 +28,7 @@ if config_env() == :prod do
       For example: /home/henry/romp-crm/data/romp_crm.db
       """
 
-  config :jgs_crm, JgsCrm.Repo,
+  config :romp_crm, RompCrm.Repo,
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
@@ -43,7 +43,7 @@ if config_env() == :prod do
   port = String.to_integer(System.get_env("PORT") || "4000")
 
   # `/romp-crm` etc. — set at compile time in config/prod.exs (`:path_prefix`).
-  path_prefix = Application.compile_env(:jgs_crm, :path_prefix, "/")
+  path_prefix = Application.compile_env(:romp_crm, :path_prefix, "/")
 
   http_ip =
     if System.get_env("PHX_BIND") == "all" do
@@ -52,9 +52,9 @@ if config_env() == :prod do
       {127, 0, 0, 1}
     end
 
-  config :jgs_crm, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :romp_crm, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :jgs_crm, JgsCrmWeb.Endpoint,
+  config :romp_crm, RompCrmWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https", path: path_prefix],
     static_url: [path: path_prefix],
     http: [
@@ -100,10 +100,10 @@ if config_env() == :prod do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
-    |> Enum.map(&JgsCrm.Twilio.Phone.normalize_us/1)
+    |> Enum.map(&RompCrm.Twilio.Phone.normalize_us/1)
     |> Enum.reject(&(&1 == ""))
 
-  config :jgs_crm,
+  config :romp_crm,
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
     anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
@@ -138,7 +138,7 @@ if config_env() == :prod do
           _ -> :always
         end
 
-      config :jgs_crm, JgsCrm.Mailer,
+      config :romp_crm, RompCrm.Mailer,
         adapter: Swoosh.Adapters.SMTP,
         relay: relay,
         username: smtp_username,
@@ -155,7 +155,7 @@ else
   # Only apply shell PORT in dev; test uses `config/test.exs` (avoid clashing with
   # production `PORT` when running `mix test` on the same host as the release).
   if config_env() == :dev do
-    config :jgs_crm, JgsCrmWeb.Endpoint,
+    config :romp_crm, RompCrmWeb.Endpoint,
       http: [port: String.to_integer(System.get_env("PORT", "4000"))]
   end
 end

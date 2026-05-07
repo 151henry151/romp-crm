@@ -1,10 +1,10 @@
-defmodule JgsCrm.JobsFixtures do
+defmodule RompCrm.JobsFixtures do
   @moduledoc """
-  Test helpers for creating jobs via `JgsCrm.Jobs`.
+  Test helpers for creating jobs via `RompCrm.Jobs`.
   """
 
-  alias JgsCrm.AccountsFixtures
-  alias JgsCrm.Businesses
+  alias RompCrm.AccountsFixtures
+  alias RompCrm.Businesses
 
   @doc """
   Creates a business owned by a fresh user unless `:owner_user` is passed.
@@ -44,7 +44,7 @@ defmodule JgsCrm.JobsFixtures do
         work_description: "some work_description"
       })
 
-    {:ok, job} = JgsCrm.Jobs.create_job(attrs)
+    {:ok, job} = RompCrm.Jobs.create_job(attrs)
     job
   end
 end

@@ -1,4 +1,4 @@
-defmodule JgsCrm.Repo.Migrations.CreateBusinessMemberships do
+defmodule RompCrm.Repo.Migrations.CreateBusinessMemberships do
   use Ecto.Migration
 
   def change do

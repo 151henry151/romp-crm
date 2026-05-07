@@ -1,12 +1,12 @@
 # Deploying on hromp.com (`/romp-crm`)
 
-Run these steps **on the server**. This repo’s OTP application name remains `:jgs_crm` (release binary `jgs_crm`); public URLs use **`/romp-crm`**.
+Run these steps **on the server**. This repo’s OTP application name is **`:romp_crm`** (release binary **`romp_crm`**); public URLs use **`/romp-crm`**.
 
 ## Step 1 — Nginx
 
 1. Edit the TLS `server { ... }` block for **hromp.com**.
 2. Use **`nginx-location-romp-crm.conf`** as the `location` block (same pattern as other proxied apps).
-3. Redirect legacy **`/jgs-crm`** URLs to **`/romp-crm`** (see comments in `nginx/conf.d/00-hromp.com.conf` in the webserver repo).
+3. Redirect any legacy alternate mount URLs to **`/romp-crm`** (see comments in `nginx/conf.d/00-hromp.com.conf` in the webserver repo).
 4. Validate and reload:
 
 ```bash

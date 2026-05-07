@@ -1,4 +1,4 @@
-defmodule JgsCrmWeb.ConnCase do
+defmodule RompCrmWeb.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule JgsCrmWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use JgsCrmWeb.ConnCase, async: true`, although
+  by setting `use RompCrmWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -20,19 +20,19 @@ defmodule JgsCrmWeb.ConnCase do
   using do
     quote do
       # The default endpoint for testing
-      @endpoint JgsCrmWeb.Endpoint
+      @endpoint RompCrmWeb.Endpoint
 
-      use JgsCrmWeb, :verified_routes
+      use RompCrmWeb, :verified_routes
 
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import JgsCrmWeb.ConnCase
+      import RompCrmWeb.ConnCase
     end
   end
 
   setup tags do
-    JgsCrm.DataCase.setup_sandbox(tags)
+    RompCrm.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
@@ -45,8 +45,8 @@ defmodule JgsCrmWeb.ConnCase do
   test context.
   """
   def register_and_log_in_user(%{conn: conn} = context) do
-    user = JgsCrm.AccountsFixtures.user_fixture()
-    scope = JgsCrm.Accounts.Scope.for_user(user)
+    user = RompCrm.AccountsFixtures.user_fixture()
+    scope = RompCrm.Accounts.Scope.for_user(user)
 
     opts =
       context
@@ -61,7 +61,7 @@ defmodule JgsCrmWeb.ConnCase do
   """
   def register_and_log_in_user_with_business(%{conn: _conn} = context) do
     %{conn: conn, user: user} = register_and_log_in_user(context)
-    {:ok, _business} = JgsCrm.Businesses.create_business(user, %{name: "Test Workspace"})
+    {:ok, _business} = RompCrm.Businesses.create_business(user, %{name: "Test Workspace"})
     %{conn: conn, user: user}
   end
 
@@ -71,7 +71,7 @@ defmodule JgsCrmWeb.ConnCase do
   It returns an updated `conn`.
   """
   def log_in_user(conn, user, opts \\ []) do
-    token = JgsCrm.Accounts.generate_user_session_token(user)
+    token = RompCrm.Accounts.generate_user_session_token(user)
 
     maybe_set_token_authenticated_at(token, opts[:token_authenticated_at])
 
@@ -83,6 +83,6 @@ defmodule JgsCrmWeb.ConnCase do
   defp maybe_set_token_authenticated_at(_token, nil), do: nil
 
   defp maybe_set_token_authenticated_at(token, authenticated_at) do
-    JgsCrm.AccountsFixtures.override_token_authenticated_at(token, authenticated_at)
+    RompCrm.AccountsFixtures.override_token_authenticated_at(token, authenticated_at)
   end
 end
