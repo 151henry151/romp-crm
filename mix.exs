@@ -4,14 +4,23 @@ defmodule RompCrm.MixProject do
   def project do
     [
       app: :romp_crm,
-      version: "0.9.8",
+      version: "0.9.9",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      package: package()
+    ]
+  end
+
+  defp package do
+    [
+      name: :romp_crm,
+      licenses: ["GPL-3.0-or-later"],
+      links: %{"GitHub" => "https://github.com/151henry151/romp-crm"}
     ]
   end
 

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-05-07
+
+### Added
+
+- License Romp CRM under the **GNU General Public License v3.0 or later**; add full **`LICENSE`** text and document in **`README.md`**
+
 ## [0.9.8] - 2026-05-07
 
 ### Added
