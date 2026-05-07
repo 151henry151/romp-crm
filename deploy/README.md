@@ -44,8 +44,16 @@ sudo systemctl enable --now romp-crm
 sudo systemctl status romp-crm
 ```
 
-5. **Twilio:** set **“A message comes in”** webhook to:
+5. **Twilio:** point **“A message comes in”** at:
 
 `https://hromp.com/romp-crm/webhooks/twilio/sms` (HTTP POST).
 
-Match **`TWILIO_WEBHOOK_PUBLIC_URL`** in `.env.production` to that exact URL if you use signature validation.
+Either set it in the Twilio Console on your SMS-capable number (**+18022780965** recommended), or from the repo with secrets exported:
+
+```bash
+cd /home/henry/romp-crm
+set -a && source .env.production && set +a
+TWILIO_WEBHOOK_PUBLIC_URL="https://hromp.com/romp-crm/webhooks/twilio/sms" mix twilio.configure_sms
+```
+
+Match **`TWILIO_WEBHOOK_PUBLIC_URL`** in `.env.production` to that exact URL if you use signature validation. Set **`TWILIO_ACCOUNT_SID`**, **`TWILIO_AUTH_TOKEN`**, and **`TWILIO_MESSAGING_FROM`** (`+18022780965`) so the CRM can send confirmation and clarification replies (`TWILIO_SMS_REPLIES_ENABLED=false` disables outbound SMS).

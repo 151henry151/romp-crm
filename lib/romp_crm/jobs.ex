@@ -124,6 +124,52 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  @doc """
+  Returns up to `limit` `{job, score}` pairs for SMS match scoring (highest scores first).
+  Used to word clarification texts when matching is ambiguous.
+  """
+  def top_match_candidates(match_spec, business_id, limit \\ 3)
+      when is_map(match_spec) and is_integer(business_id) and is_integer(limit) do
+    scored =
+      list_jobs(business_id)
+      |> Enum.map(fn job -> {job, RompCrm.Jobs.SmsMatch.score(job, match_spec)} end)
+      |> Enum.sort_by(fn {_, sc} -> -sc end)
+      |> Enum.take(limit)
+
+    scored
+  end
+
+  @doc """
+  Short SMS asking which job the user meant when heuristic matching ties.
+
+  Uses the top two scored jobs from `match_spec`.
+  """
+  def ambiguous_match_clarification_sms(match_spec, business_id) when is_map(match_spec) do
+    case top_match_candidates(match_spec, business_id, 3) do
+      [{j1, _}, {j2, _} | _] ->
+        n1 = job_label(j1)
+        n2 = job_label(j2)
+
+        "Which one—#{n1} or #{n2}? Reply with that client name."
+
+      _ ->
+        "Multiple jobs match—which client did you mean? Be specific."
+    end
+  end
+
+  defp job_label(%Job{} = j) do
+    cn = j.client_name || "Unknown"
+
+    wd =
+      case j.work_description do
+        nil -> ""
+        "" -> ""
+        w -> String.slice(String.trim(w), 0, 44)
+      end
+
+    if wd != "", do: "#{cn} (#{wd})", else: cn
+  end
+
   defp broadcast(business_id, message) do
     Phoenix.PubSub.broadcast(RompCrm.PubSub, topic(business_id), message)
   end

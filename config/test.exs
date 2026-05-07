@@ -38,4 +38,7 @@ config :romp_crm,
   skip_twilio_signature_validation: true,
   sms_job_extractor_adapter: RompCrm.Ai.SmsJobExtractor.DeterministicStub,
   enforce_registration_allowlist: false,
-  twilio_sms_allowed_from_normalized: ["15555550123"]
+  twilio_sms_allowed_from_normalized: ["15555550123"],
+  twilio_account_sid: nil,
+  twilio_messaging_from_number: "+15551234567",
+  twilio_sms_replies_enabled: false

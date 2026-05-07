@@ -13,7 +13,8 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
             "updates" => %{"address" => "99 Oak"}
           })
 
-      assert {:ok, [{:update_by_id, 44, %{address: "99 Oak"}}]} = SmsJobExtractor.extract(raw, [])
+      assert {:ok, %{assistant_sms: "Stub: applied.", operations: [{:update_by_id, 44, %{address: "99 Oak"}}]}} =
+               SmsJobExtractor.extract(raw, [])
     end
 
     test "returns legacy update tuple when job_id absent and match present" do
@@ -25,7 +26,8 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
             "updates" => %{"phone" => "802"}
           })
 
-      assert {:ok, [{:update, match, %{phone: "802"}}]} = SmsJobExtractor.extract(raw, [])
+      assert {:ok, %{assistant_sms: "Stub: applied.", operations: [{:update, match, %{phone: "802"}}]}} =
+               SmsJobExtractor.extract(raw, [])
       assert match == %{"client_name" => "Pat"}
     end
 
@@ -66,11 +68,14 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
           })
 
       assert {:ok,
-              [
-                {:create, %{client_name: "Mark Sino", work_description: "Replace refrigerator"}},
-                {:create, %{client_name: "Dave Woll", work_description: "Clogged drain"}},
-                {:update_by_id, 7, %{phone: "8029897658"}}
-              ]} = SmsJobExtractor.extract(raw, [])
+              %{
+                assistant_sms: "Stub: applied.",
+                operations: [
+                  {:create, %{client_name: "Mark Sino", work_description: "Replace refrigerator"}},
+                  {:create, %{client_name: "Dave Woll", work_description: "Clogged drain"}},
+                  {:update_by_id, 7, %{phone: "8029897658"}}
+                ]
+              }} = SmsJobExtractor.extract(raw, [])
     end
   end
 end

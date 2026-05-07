@@ -18,7 +18,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.DeterministicStub do
       <<"STUB_JSON ", json::binary>> ->
         case Jason.decode(json) do
           {:ok, %{} = map} ->
-            {:ok, map}
+            {:ok, Map.put_new(map, "assistant_sms", "Stub: applied.")}
 
           {:error, _} ->
             {:error, :stub_bad_json}
@@ -27,10 +27,22 @@ defmodule RompCrm.Ai.SmsJobExtractor.DeterministicStub do
       <<"STUB_UPDATE ", json::binary>> ->
         case Jason.decode(json) do
           {:ok, %{"job_id" => job_id, "updates" => %{} = updates}} ->
-            {:ok, %{"intent" => "update", "job_id" => job_id, "updates" => updates}}
+            {:ok,
+             %{
+               "intent" => "update",
+               "job_id" => job_id,
+               "updates" => updates,
+               "assistant_sms" => "Stub: updated job."
+             }}
 
           {:ok, %{"match" => %{} = match, "updates" => %{} = updates}} ->
-            {:ok, %{"intent" => "update", "match" => match, "updates" => updates}}
+            {:ok,
+             %{
+               "intent" => "update",
+               "match" => match,
+               "updates" => updates,
+               "assistant_sms" => "Stub: matched update."
+             }}
 
           {:ok, _} ->
             {:error, :stub_missing_job_id_or_match_updates}
@@ -39,9 +51,19 @@ defmodule RompCrm.Ai.SmsJobExtractor.DeterministicStub do
             {:error, :stub_bad_json}
         end
 
+      <<"STUB_CLARIFY ", rest::binary>> ->
+        msg = String.trim(rest)
+
+        {:ok,
+         %{
+           "assistant_sms" => if(msg != "", do: msg, else: "Which job did you mean?"),
+           "actions" => []
+         }}
+
       _ ->
         {:ok,
          %{
+           "assistant_sms" => "Added lead from SMS.",
            "intent" => "create",
            "job" => %{
              "client_name" => "Test SMS Lead",

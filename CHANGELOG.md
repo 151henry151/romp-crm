@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-05-07
+
+### Added
+
+- Add **`RompCrm.Twilio.Messages`** outbound SMS and **`RompCrm.Twilio.SmsReplyBuilder`** short confirmations after inbound CRM updates
+- Add **`mix twilio.configure_sms`** to set **`SmsUrl`** / **`SmsMethod`** on a Twilio **`IncomingPhoneNumber`** via the REST API
+
+### Changed
+
+- Configure **`TWILIO_ACCOUNT_SID`**, **`TWILIO_MESSAGING_FROM`** (default **`+18022780965`**), and **`TWILIO_SMS_REPLIES_ENABLED`** in **`config/runtime.exs`** (prod) and **`config/dev.exs`**
+- Extend **`SmsJobExtractor`** / webhook flow with **`assistant_sms`**, clarification replies, and **`Jobs`** ambiguous-match SMS copy
+- Include **`+18022780965`** in default **`TWILIO_SMS_ALLOWED_FROM`** examples where applicable
+
 ## [0.9.5] - 2026-05-07
 
 ### Changed

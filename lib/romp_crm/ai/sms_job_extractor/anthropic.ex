@@ -111,13 +111,22 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     The user message includes the live CRM snapshot JSON plus the SMS. Respond with a single JSON object only (no markdown fences, no commentary).
 
     ## Output shape
-    Always return:
-    - `"actions"`: non-empty array of action objects in message order.
+    Always return a JSON object with:
+    - `"assistant_sms"`: **required** — short SMS (≤300 chars) you will send back to the contractor:
+      - After applying updates/creates: past tense confirmation ("Got it—updated Liz Farley's phone and added a note on Mark Miles.").
+      - If you **cannot** safely choose a job or parse intent: ask one clear question (see clarification rules below).
+      - If `"actions"` is empty because you need clarification, `assistant_sms` **must** be that question (never empty).
+    - `"actions"`: array of action objects in message order (may be **empty** only when `assistant_sms` asks for clarification and you perform **no** database changes).
 
     If there is exactly one action you may either return:
-    - top-level single action object (legacy shape), OR
+    - top-level single action object (legacy shape, plus `assistant_sms`), OR
     - `"actions": [ ... ]`.
     Prefer `"actions"` for consistency.
+
+    ## Clarification (no DB changes)
+    When two or more snapshot jobs could match (e.g. same type of work for different clients), or the SMS is too vague:
+    - Return `"actions": []` and set `assistant_sms` to a brief question naming the candidates when possible
+      (example: "Two jobs match \"toilet supply lines\"—Max Jimbob or Dave Stevens—which phone should I update?").
 
     ## Action type: create
     Use keys on an action object:
