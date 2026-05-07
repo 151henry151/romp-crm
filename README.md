@@ -78,6 +78,7 @@ The trailing slash on **`proxy_pass`** makes nginx map `/romp-crm/foo` → `/foo
 | `TWILIO_MESSAGING_FROM` | E.164 sender for replies (default **`+18022780965`**) |
 | `TWILIO_SMS_REPLIES_ENABLED` | Set `false` to disable outbound SMS |
 | `TWILIO_WEBHOOK_PUBLIC_URL` | Optional; set to the **exact** public webhook URL Twilio signs |
+| `TWILIO_MESSAGING_SERVICE_SID` | Optional; used by **`mix twilio.messaging_service_inbound`** when the SMS number sits on a Messaging Service |
 | `ANTHROPIC_API_KEY` | SMS → job parsing |
 
 See **`deploy/README.md`** for systemd and env setup.
