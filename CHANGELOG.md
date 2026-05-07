@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-05-07
+
+### Added
+
+- Add **`docs/screencaps/`** PNG screenshots and MP4 screen recordings for the public UI
+- Document gallery and recording links in **`README.md`**
+
 ## [0.9.1] - 2026-05-07
 
 ### Changed
