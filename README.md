@@ -31,12 +31,14 @@ Captured from the live app. All assets live under **[`docs/screencaps/`](docs/sc
 
 ### Screen recording
 
+Full capture at **2× speed** (~32s playback for ~65s of screen time). **[Original real-time MP4](docs/screencaps/1000001495.mp4)** is linked if you prefer normal speed.
+
 <p align="center">
-  <img src="docs/screencaps/1000001495-preview.gif" alt="Romp CRM screencast preview" width="480" />
+  <img src="docs/screencaps/1000001495-preview.gif" alt="Romp CRM screencast (2× speed)" width="480" />
 </p>
 
 <p align="center">
-  <video src="docs/screencaps/1000001495.mp4" controls playsinline width="480"></video>
+  <video src="docs/screencaps/1000001495-fast.mp4" controls playsinline width="480"></video>
 </p>
 
 ## Deploying under a subpath (`https://hromp.com/romp-crm/`)
