@@ -6,8 +6,9 @@
 
 ### Changed
 
-- Extract and add new Romp CRM logo assets (main logo plus light/dark badge icons) and apply them to the app header and jobs page header
-- Set light/dark favicon badges using the new branding assets in the root layout
+- Extract and add Romp CRM branding assets (main logo, dark main logo, and light/dark badge icons) and apply rounded logo containers in app headers
+- Update the jobs page to respect dark/light theme tokens instead of fixed light palette classes
+- Add the theme toggle control to the jobs page header so users can switch between system, light, and dark modes there
 
 ## [0.8.2] - 2026-05-07
 

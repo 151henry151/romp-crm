@@ -37,11 +37,19 @@ defmodule RompCrmWeb.Layouts do
     ~H"""
     <header class="navbar px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href={~p"/"} class="flex w-fit items-center gap-3">
+        <a
+          href={~p"/"}
+          class="flex w-fit items-center gap-3 rounded-2xl border border-base-300 bg-base-100/80 p-2 shadow-sm"
+        >
           <img
             src={~p"/images/romp-crm-logo-main.png"}
             alt="Romp CRM"
-            class="h-10 w-auto sm:h-12"
+            class="h-10 w-auto rounded-lg sm:h-12 [[data-theme=dark]_&]:hidden"
+          />
+          <img
+            src={~p"/images/romp-crm-logo-main-dark.png"}
+            alt="Romp CRM"
+            class="hidden h-10 w-auto rounded-lg sm:h-12 [[data-theme=dark]_&]:block"
           />
         </a>
       </div>
