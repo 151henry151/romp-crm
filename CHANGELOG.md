@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-05-07
+
+### Changed
+
+- Suppress the login-required flash when unauthenticated users are redirected from root (`/`) to `/users/log-in`, while keeping the flash for protected non-root pages
+
 ## [0.8.1] - 2026-05-06
 
 ### Changed
