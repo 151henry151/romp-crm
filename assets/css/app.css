@@ -118,4 +118,9 @@ img.brand-logo-dark {
   background-color: transparent;
 }
 
+/* Clip baked-in PNG bezel; scale tuned to match source exports (~1164×493 / ~1143×486). */
+.brand-logo-crop img {
+  transform: scale(var(--brand-logo-clip-scale, 1.11));
+}
+
 /* This file is for your main application CSS */

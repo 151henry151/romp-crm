@@ -3,17 +3,19 @@
   <header class="bg-base-100 border-b border-base-300 px-4 sm:px-6 py-4">
     <div class="max-w-screen-xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="min-w-0">
-        <div class="inline-flex overflow-hidden rounded-2xl border border-base-300 bg-base-100 p-2 shadow-sm">
-          <img
-            src={~p"/images/romp-crm-logo-main.png"}
-            alt="Romp CRM"
-            class="brand-logo-light block h-12 w-auto sm:h-14"
-          />
-          <img
-            src={~p"/images/romp-crm-logo-main-dark.png"}
-            alt="Romp CRM"
-            class="brand-logo-dark block h-12 w-auto sm:h-14"
-          />
+        <div class="brand-logo-hitbox inline-flex">
+          <span class="brand-logo-crop block aspect-[1154/489] h-12 sm:h-14 overflow-hidden rounded-2xl">
+            <img
+              src={~p"/images/romp-crm-logo-main.png"}
+              alt="Romp CRM"
+              class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
+            />
+            <img
+              src={~p"/images/romp-crm-logo-main-dark.png"}
+              alt="Romp CRM"
+              class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
+            />
+          </span>
         </div>
         <p class="text-sm text-base-content/70 mt-1">Customer & Job Tracker</p>
         <p class="text-xs text-base-content/70 mt-1">
@@ -250,9 +252,7 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-base-content/80">{job.referred_by}</td>
-              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
-                {job.next_action}
-              </td>
+              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">{job.next_action}</td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <.link
@@ -287,17 +287,13 @@
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-base-content/90">Phone:</span> {display(
-                        job.phone
-                      )}
+                      <span class="font-medium text-base-content/90">Phone:</span> {display(job.phone)}
                     </p>
                     <p>
                       <span class="font-medium text-base-content/90">Priority:</span> {if job.priority ==
-                                                                                            :high,
-                                                                                          do:
-                                                                                            "High",
-                                                                                          else:
-                                                                                            "Normal"}
+                                                                                     :high,
+                                                                                   do: "High",
+                                                                                   else: "Normal"}
                     </p>
                     <p>
                       <span class="font-medium text-base-content/90">Status:</span> {status_label(
@@ -321,9 +317,7 @@
                       </span>
                     </p>
                     <p class="lg:col-span-2">
-                      <span class="font-medium text-base-content/90">Notes:</span> {display(
-                        job.notes
-                      )}
+                      <span class="font-medium text-base-content/90">Notes:</span> {display(job.notes)}
                     </p>
                   </div>
                 </td>

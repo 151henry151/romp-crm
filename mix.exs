@@ -4,7 +4,7 @@ defmodule RompCrm.MixProject do
   def project do
     [
       app: :romp_crm,
-      version: "0.8.6",
+      version: "0.8.7",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
