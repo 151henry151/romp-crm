@@ -102,4 +102,15 @@
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
+/* Theme-aware brand logo swap (explicit light/dark + system fallback). */
+.brand-logo-dark { display: none; }
+
+[data-theme="dark"] .brand-logo-light { display: none; }
+[data-theme="dark"] .brand-logo-dark { display: block; }
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .brand-logo-light { display: none; }
+  html:not([data-theme]) .brand-logo-dark { display: block; }
+}
+
 /* This file is for your main application CSS */

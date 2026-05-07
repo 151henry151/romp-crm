@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-05-07
+
+### Changed
+
+- Re-crop the dark-mode main logo from the inverted top-right source artwork and update theme switching to explicit CSS rules so dark mode reliably shows the dark logo variant
+
 ## [0.8.3] - 2026-05-07
 
 ### Changed

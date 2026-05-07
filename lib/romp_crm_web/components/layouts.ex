@@ -44,12 +44,12 @@ defmodule RompCrmWeb.Layouts do
           <img
             src={~p"/images/romp-crm-logo-main.png"}
             alt="Romp CRM"
-            class="h-10 w-auto rounded-lg sm:h-12 [[data-theme=dark]_&]:hidden"
+            class="brand-logo-light h-10 w-auto rounded-lg sm:h-12"
           />
           <img
             src={~p"/images/romp-crm-logo-main-dark.png"}
             alt="Romp CRM"
-            class="hidden h-10 w-auto rounded-lg sm:h-12 [[data-theme=dark]_&]:block"
+            class="brand-logo-dark h-10 w-auto rounded-lg sm:h-12"
           />
         </a>
       </div>
