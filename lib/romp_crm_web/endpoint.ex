@@ -7,7 +7,8 @@ defmodule RompCrmWeb.Endpoint do
   @session_options [
     store: :cookie,
     key: "_romp_crm_key",
-    signing_salt: "d2iJdfSu",
+    # Rotate alongside OTP rename so signed cookies do not deserialize old `JgsCrmWeb` atoms.
+    signing_salt: "rompSess08",
     same_site: "Lax"
   ]
 

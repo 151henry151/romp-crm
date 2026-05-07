@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-05-06
+
+### Changed
+
+- Rotate **Plug session `signing_salt`** (and **LiveView `signing_salt`**) so old signed cookies are discarded after the OTP/module rename; users sign in again instead of hitting crashes from deserialized `JgsCrmWeb` references in session
+
 ## [0.8.0] - 2026-05-06
 
 ### Changed
