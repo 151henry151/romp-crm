@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-05-07
+
+### Changed
+
+- Add **`1000001495-fast.mp4`** (**2×** playback of the full screencast, audio stripped) for README **`<video>`**; regenerate **`1000001495-preview.gif`** from that file so the GIF shows the full walkthrough at the same speed
+- Document link to the original **real-time** **`1000001495.mp4`**
+
 ## [0.9.4] - 2026-05-07
 
 ### Changed
