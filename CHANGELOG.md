@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-07
+
+### Added
+
+- Store **`users.selected_business_id`** as the preferred Jobs workspace; **`UserAuth.ensure_business_scope`** falls back to it when the session has no **`current_business_id`**, so the choice survives **log out / log in**
+- **`Accounts.put_jobs_workspace_selection/2`** to validate membership and persist that field
+
+### Changed
+
+- Set session and persist workspace when a user **accepts a business invitation** (**`InvitationController`**) and when they use the **business picker** (**`BusinessSwitchController`**)
+
 ## [0.8.9] - 2026-05-07
 
 ### Fixed

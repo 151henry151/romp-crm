@@ -14,6 +14,9 @@ defmodule RompCrm.Accounts.User do
 
     belongs_to :sms_business, RompCrm.Businesses.Business, foreign_key: :sms_business_id
 
+    belongs_to :selected_business, RompCrm.Businesses.Business,
+      foreign_key: :selected_business_id
+
     has_many :business_memberships, RompCrm.Businesses.BusinessMembership
 
     timestamps(type: :utc_datetime)

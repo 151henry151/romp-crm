@@ -6,6 +6,7 @@ defmodule RompCrmWeb.UserAuth do
 
   alias RompCrm.Accounts
   alias RompCrm.Accounts.Scope
+  alias RompCrm.Accounts.User
   alias RompCrm.Businesses
 
   # Make the remember me cookie valid for 14 days. This should match
@@ -232,7 +233,7 @@ defmodule RompCrmWeb.UserAuth do
          |> Phoenix.LiveView.redirect(to: ~p"/businesses")}
 
       true ->
-        bid = resolve_session_business_id(session, businesses)
+        bid = resolve_session_business_id(session, businesses, user)
 
         {:cont,
          socket
@@ -241,28 +242,32 @@ defmodule RompCrmWeb.UserAuth do
     end
   end
 
-  defp resolve_session_business_id(session, businesses) do
-    ids = Enum.map(businesses, & &1.id)
+  defp resolve_session_business_id(session, businesses, %User{} = user) do
+    allowed = Enum.map(businesses, & &1.id) |> MapSet.new()
 
-    sb =
-      case session["current_business_id"] do
-        nil ->
-          nil
+    session_business_id = parse_session_business_id(session["current_business_id"])
+    persisted_id = user.selected_business_id
 
-        id when is_integer(id) ->
-          id
+    cond do
+      session_business_id && MapSet.member?(allowed, session_business_id) ->
+        session_business_id
 
-        id when is_binary(id) ->
-          case Integer.parse(id) do
-            {n, _} -> n
-            :error -> nil
-          end
-      end
+      persisted_id && MapSet.member?(allowed, persisted_id) ->
+        persisted_id
 
-    if sb && sb in ids do
-      sb
-    else
-      hd(businesses).id
+      true ->
+        hd(businesses).id
+    end
+  end
+
+  defp parse_session_business_id(nil), do: nil
+
+  defp parse_session_business_id(id) when is_integer(id), do: id
+
+  defp parse_session_business_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, _} -> n
+      :error -> nil
     end
   end
 
