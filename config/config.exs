@@ -22,7 +22,8 @@ config :romp_crm, :scopes,
 
 config :romp_crm,
   ecto_repos: [RompCrm.Repo],
-  generators: [timestamp_type: :utc_datetime]
+  generators: [timestamp_type: :utc_datetime],
+  paypal_trial_days: 14
 
 # URL prefix for mounting the app (e.g. `/romp-crm` on hromp.com). Dev/test use `/`.
 config :romp_crm, :path_prefix, "/"

@@ -28,7 +28,7 @@ defmodule RompCrmWeb.SubscribeController do
         conn
         |> put_flash(
           :info,
-          "Subscription confirmed — check email for your sign-in link to access Romp CRM."
+          subscription_confirmed_flash(Billing.paypal_trial_days())
         )
         |> redirect(to: ~p"/users/log-in")
 
@@ -82,9 +82,18 @@ defmodule RompCrmWeb.SubscribeController do
   def show(conn, _params) do
     render(conn, :show,
       paywall: Billing.paywall_enabled?(),
-      pending_user: pending_paywall_user(conn)
+      pending_user: pending_paywall_user(conn),
+      paypal_trial_days: Billing.paypal_trial_days()
     )
   end
+
+  defp subscription_confirmed_flash(0),
+    do:
+      "Subscription confirmed — check email for your sign-in link to access Romp CRM."
+
+  defp subscription_confirmed_flash(days),
+    do:
+      "Subscription confirmed — your #{days}-day trial has started (no subscription charge until the trial ends). Check email for your sign-in link to access Romp CRM."
 
   @doc """
   Re-starts hosted PayPal checkout for the pending user referenced by the encrypted session cookie.

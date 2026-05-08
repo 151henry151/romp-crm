@@ -35,7 +35,9 @@ set -a && source .env.paypal.local && set +a   # or export manually
 PAYPAL_MODE=live mix paypal.provision
 ```
 
-Merge **`deploy/paypal-provision-result.env`** (and the client id/secret) into **`.env.production`**. Default webhook URL is **`https://rompcrm.com/romp-crm/webhooks/paypal`** — override with **`PAYPAL_WEBHOOK_URL`** if your public host differs.
+Merge **`deploy/paypal-provision-result.env`** (and the client id/secret) into **`.env.production`**. The file includes **`PAYPAL_TRIAL_DAYS`** (default **14** in the task) so the app’s copy matches the trial on the **PayPal billing plans**. Default webhook URL is **`https://rompcrm.com/romp-crm/webhooks/paypal`** — override with **`PAYPAL_WEBHOOK_URL`** if your public host differs.
+
+After changing trial length or prices, run **`mix paypal.provision`** again and update **`PAYPAL_PLAN_*`** IDs in **`.env.production`** — existing subscribers stay on old plans until PayPal migrates them (typically you leave old plans in place for legacy subscribers only).
 
 3. Build release on the server:
 

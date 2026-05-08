@@ -6,6 +6,31 @@
     </.header>
   </div>
 
+  <%= if @show_paypal_subscription_help do %>
+    <div class="mx-auto max-w-lg mb-6 rounded-lg border border-base-300 bg-base-200/40 p-4 text-left text-sm text-base-content">
+      <p class="font-semibold">Subscription billing (PayPal)</p>
+      <%= if @paypal_trial_days > 0 do %>
+        <p class="mt-2 text-base-content/80">
+          You have a {@paypal_trial_days}-day trial period before recurring billing begins. To cancel before you are
+          charged for the plan, turn off or cancel this agreement in PayPal before the trial ends.
+        </p>
+      <% end %>
+      <p class="mt-2 text-base-content/80">
+        Manage or cancel automatic payments in your PayPal account:
+      </p>
+      <p class="mt-2">
+        <a
+          href="https://www.paypal.com/myaccount/autopay/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold text-brand hover:underline"
+        >
+          Open PayPal automatic payments
+        </a>
+      </p>
+    </div>
+  <% end %>
+
   <.form :let={f} for={@profile_changeset} action={~p"/users/settings"} id="update_profile">
     <input type="hidden" name="action" value="update_profile" />
 

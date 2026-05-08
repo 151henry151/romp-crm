@@ -2,6 +2,7 @@ defmodule RompCrmWeb.UserSettingsController do
   use RompCrmWeb, :controller
 
   alias RompCrm.Accounts
+  alias RompCrm.Billing
   alias RompCrm.Businesses
   alias RompCrmWeb.UserAuth
 
@@ -86,10 +87,18 @@ defmodule RompCrmWeb.UserSettingsController do
   defp assign_email_and_password_changesets(conn, _opts) do
     user = conn.assigns.current_scope.user
 
+    paypal_sub_id = user.paypal_subscription_id
+
+    show_subscription_help =
+      RompCrm.ApplicationConfig.subscription_paywall_enabled?() and is_binary(paypal_sub_id) and
+        String.trim(paypal_sub_id) != ""
+
     conn
     |> assign(:email_changeset, Accounts.change_user_email(user))
     |> assign(:password_changeset, Accounts.change_user_password(user))
     |> assign(:profile_changeset, Accounts.change_user_profile(user))
     |> assign(:profile_businesses, Businesses.list_businesses_for_user(user))
+    |> assign(:show_paypal_subscription_help, show_subscription_help)
+    |> assign(:paypal_trial_days, Billing.paypal_trial_days())
   end
 end
