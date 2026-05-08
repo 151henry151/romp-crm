@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-05-08
+
+### Changed
+
+- **`Billing.paypal_return_subscription_id/1`**: accept **`subscriptionId`** (camelCase) and **`token`** / **`ba_token`** when the value matches subscription id shape (**`I-…`**), so PayPal return URLs are parsed reliably
+- **`Billing.finalize_subscription_active/3`**: treat **`APPROVED`** like **`ACTIVE`**; resolve **`plan_id`** from nested **`plan.id`** when needed; drop hard dependency on payer email when PayPal omits it (still enforce email match when PayPal sends one); broaden **`subscriber_email`** extraction paths
+- **`Billing.activate_from_paypal_subscription_id/1`**: return **`{:error, :unknown_subscription}`** when no user row matches (no silent **`nil`**); map PayPal API failures to **`{:error, {:paypal_subscription_fetch, reason}}`**
+- **`SubscribeController.paypal_return`**: redirect PayPal fetch failures to **log-in** with a retry-oriented flash instead of registration
+
+### Added
+
+- **`test/romp_crm/billing_test.exs`** for return-url parsing and **`finalize_subscription_active`**
+
 ## [0.9.14] - 2026-05-08
 
 ### Changed

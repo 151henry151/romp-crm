@@ -98,15 +98,13 @@ defmodule RompCrm.Billing do
       when is_binary(paypal_sub_id) and is_map(paypal_payload) do
     status = paypal_payload["status"]
     payer_email = subscriber_email(paypal_payload)
+    plan_id = paypal_plan_id_from_payload(paypal_payload, user)
 
     cond do
-      status not in ["ACTIVE", "active"] ->
+      not subscription_usable_status?(status) ->
         {:error, {:not_active, status}}
 
-      payer_email == "" ->
-        {:error, :missing_payer_email}
-
-      not email_matches_user?(user.email, payer_email) ->
+      payer_email != "" and not email_matches_user?(user.email, payer_email) ->
         {:error, :email_mismatch}
 
       true ->
@@ -114,21 +112,80 @@ defmodule RompCrm.Billing do
         |> Ecto.Changeset.change(
           subscription_status: "active",
           paypal_subscription_id: paypal_sub_id,
-          paypal_plan_id: paypal_payload["plan_id"] || user.paypal_plan_id
+          paypal_plan_id: plan_id
         )
         |> Repo.update()
     end
+  end
+
+  defp subscription_usable_status?(status) when status in [nil, ""] do
+    false
+  end
+
+  defp subscription_usable_status?(status) do
+    String.upcase(to_string(status)) in ["ACTIVE", "APPROVED"]
+  end
+
+  defp paypal_plan_id_from_payload(paypal_payload, %User{} = user) do
+    paypal_payload["plan_id"] ||
+      get_in(paypal_payload, ["plan", "id"]) ||
+      user.paypal_plan_id
+  end
+
+  @doc """
+  Reads subscription id from PayPal's browser return URL (query string).
+
+  PayPal may send **`subscription_id`**, **`subscriptionId`**, or (less often) **`token`** when it matches subscription id shape (**`I-…`**).
+  """
+  def paypal_return_subscription_id(params) when is_map(params) do
+    direct =
+      (params["subscription_id"] || params["subscriptionId"] || "")
+      |> to_string()
+      |> String.trim()
+
+    if direct != "" do
+      direct
+    else
+      token =
+        (params["token"] || params["ba_token"] || "")
+        |> to_string()
+        |> String.trim()
+
+      if token != "" and paypal_subscription_id_shape?(token) do
+        token
+      else
+        ""
+      end
+    end
+  end
+
+  defp paypal_subscription_id_shape?(id) when is_binary(id) do
+    String.match?(id, ~r/^I-[A-Z0-9]+$/i)
   end
 
   @doc """
   Sync subscription by id from PayPal and activate the matching user row if appropriate.
   """
   def activate_from_paypal_subscription_id(subscription_id) when is_binary(subscription_id) do
-    with {:ok, body} <- PaypalClient.get_subscription(subscription_id),
-         %User{} = user <- Repo.get_by(User, paypal_subscription_id: subscription_id),
-         {:ok, user} <- finalize_subscription_active(user, subscription_id, body) do
-      maybe_deliver_magic_link_once(user)
-      {:ok, user}
+    case PaypalClient.get_subscription(subscription_id) do
+      {:error, reason} ->
+        {:error, {:paypal_subscription_fetch, reason}}
+
+      {:ok, body} ->
+        case Repo.get_by(User, paypal_subscription_id: subscription_id) do
+          nil ->
+            {:error, :unknown_subscription}
+
+          user ->
+            case finalize_subscription_active(user, subscription_id, body) do
+              {:ok, user} ->
+                maybe_deliver_magic_link_once(user)
+                {:ok, user}
+
+              {:error, _} = err ->
+                err
+            end
+        end
     end
   end
 
@@ -168,10 +225,15 @@ defmodule RompCrm.Billing do
     :ok
   end
 
-  defp subscriber_email(body) do
+  defp subscriber_email(body) when is_map(body) do
     get_in(body, ["subscriber", "email_address"]) ||
-      get_in(body, ["subscriber", "email"]) || ""
+      get_in(body, ["subscriber", "email"]) ||
+      get_in(body, ["payer", "email_address"]) ||
+      get_in(body, ["payer", "payer_info", "email"]) ||
+      ""
   end
+
+  defp subscriber_email(_), do: ""
 
   defp email_matches_user?(user_email, payer_email)
        when is_binary(user_email) and is_binary(payer_email) do

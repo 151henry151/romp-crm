@@ -1,0 +1,84 @@
+defmodule RompCrm.BillingTest do
+  use RompCrm.DataCase
+
+  alias RompCrm.Billing
+  alias RompCrm.Repo
+
+  import RompCrm.AccountsFixtures
+
+  describe "paypal_return_subscription_id/1" do
+    test "reads subscription_id" do
+      assert Billing.paypal_return_subscription_id(%{"subscription_id" => " I-ABC123 \n"}) ==
+               "I-ABC123"
+    end
+
+    test "reads subscriptionId (camelCase)" do
+      assert Billing.paypal_return_subscription_id(%{"subscriptionId" => "I-XYZ9"}) == "I-XYZ9"
+    end
+
+    test "falls back to token when it looks like a subscription id" do
+      assert Billing.paypal_return_subscription_id(%{"token" => "I-SUB1"}) == "I-SUB1"
+    end
+
+    test "ignores token that does not look like a PayPal subscription id" do
+      assert Billing.paypal_return_subscription_id(%{"token" => "EC-123"}) == ""
+    end
+  end
+
+  describe "finalize_subscription_active/3" do
+    setup do
+      user = unconfirmed_user_fixture()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          paypal_subscription_id: "I-FIXTURE",
+          subscription_status: "pending_payment",
+          paypal_plan_id: "P-OLD"
+        )
+        |> Repo.update()
+
+      %{user: user}
+    end
+
+    test "activates when status is APPROVED and payer email is absent", %{user: user} do
+      payload = %{
+        "status" => "APPROVED",
+        "plan_id" => "P-NEW"
+      }
+
+      assert {:ok, updated} = Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+      assert updated.subscription_status == "active"
+      assert updated.paypal_plan_id == "P-NEW"
+    end
+
+    test "activates when status is ACTIVE", %{user: user} do
+      payload = %{
+        "status" => "ACTIVE",
+        "subscriber" => %{"email_address" => user.email}
+      }
+
+      assert {:ok, updated} = Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+      assert updated.subscription_status == "active"
+    end
+
+    test "rejects APPROVAL_PENDING", %{user: user} do
+      payload = %{"status" => "APPROVAL_PENDING"}
+
+      assert {:error, {:not_active, "APPROVAL_PENDING"}} =
+               Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+    end
+
+    test "rejects when payer email is present and does not match registration email", %{
+      user: user
+    } do
+      payload = %{
+        "status" => "ACTIVE",
+        "subscriber" => %{"email_address" => "other@example.com"}
+      }
+
+      assert {:error, :email_mismatch} =
+               Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+    end
+  end
+end
