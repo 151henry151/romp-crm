@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-05-08
+
+### Added
+
+- Add **`Layouts.support_contact`** (**Support** disclosure with **`tel:`** **802-458-7299** and “call to speak with a live person 24/7”) in **`Layouts.app`** and **`jobs_live`** header
+
 ## [0.9.12] - 2026-05-08
 
 ### Added
