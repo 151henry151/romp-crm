@@ -225,6 +225,44 @@ defmodule RompCrm.Billing do
   end
 
   @doc """
+  Cancels the signed-in subscriber's PayPal billing subscription and marks the user **`inactive`** locally.
+
+  Only available when the hosted paywall is enabled and the account is a paying **`active`** subscriber with a stored
+  **`paypal_subscription_id`** (not **`invited_member`**).
+
+  On success, clears PayPal ids on the user row so they match webhook **`CANCELLED`** handling.
+  """
+  def cancel_subscription_for_user(%User{} = user) do
+    cond do
+      not paywall_enabled?() ->
+        {:error, :not_cancellable}
+
+      user.subscription_status != "active" ->
+        {:error, :not_cancellable}
+
+      not is_binary(user.paypal_subscription_id) or String.trim(user.paypal_subscription_id) == "" ->
+        {:error, :not_cancellable}
+
+      true ->
+        sub_id = String.trim(user.paypal_subscription_id)
+
+        case PaypalClient.cancel_subscription(sub_id, "Customer cancelled via Romp CRM settings") do
+          {:ok, _} ->
+            user
+            |> Ecto.Changeset.change(
+              subscription_status: "inactive",
+              paypal_subscription_id: nil,
+              paypal_plan_id: nil
+            )
+            |> Repo.update()
+
+          {:error, reason} ->
+            {:error, {:paypal_cancel_failed, reason}}
+        end
+    end
+  end
+
+  @doc """
   Used by webhook controller to normalize PayPal headers (Plug lowercases keys).
   """
   def paypal_headers_for_verify(conn) do

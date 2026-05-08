@@ -28,6 +28,26 @@
           Open PayPal automatic payments
         </a>
       </p>
+      <%= if @show_cancel_subscription do %>
+        <div class="mt-4 border-t border-base-300 pt-4">
+          <p class="font-semibold text-base-content">Cancel from Romp CRM</p>
+          <p class="mt-1 text-base-content/80">
+            End recurring billing here — you don’t need to hunt through PayPal’s menus.
+          </p>
+          <form action={~p"/users/settings"} method="post" class="mt-3">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <input type="hidden" name="_method" value="put" />
+            <input type="hidden" name="action" value="cancel_subscription" />
+            <button
+              type="submit"
+              class="btn btn-outline btn-error btn-sm"
+              onclick="return confirm('Cancel your Romp CRM subscription in PayPal? You keep access through the end of the period PayPal shows for your plan. This cannot be undone from here.');"
+            >
+              Cancel subscription
+            </button>
+          </form>
+        </div>
+      <% end %>
     </div>
   <% end %>
 
