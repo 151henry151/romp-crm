@@ -44,6 +44,13 @@ defmodule RompCrm.Billing do
   end
 
   @doc """
+  Free-trial length in days (matches **`PAYPAL_TRIAL_DAYS`** / provisioned PayPal plan cycles).
+  """
+  def paypal_trial_days do
+    Application.get_env(:romp_crm, :paypal_trial_days, 14)
+  end
+
+  @doc """
   After creating a PayPal subscription, associate the approval-pending id and chosen plan on the user row.
   """
   def put_pending_paypal_subscription(%User{} = user, subscription_id, plan_key)

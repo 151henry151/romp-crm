@@ -27,16 +27,24 @@
       <%= if @subscription_paywall do %>
         <fieldset class="space-y-2 pt-2">
           <legend class="text-sm font-medium text-base-content">Billing plan</legend>
-          <p class="text-xs text-base-content/70">
-            PayPal subscription is required before you receive your sign-in link.
-          </p>
+          <%= if @paypal_trial_days > 0 do %>
+            <p class="text-xs text-base-content/70">
+              {@paypal_trial_days}-day free trial — you’ll approve a PayPal subscription with a card on file.
+              You are not charged the plan price until the trial ends. Cancel anytime during the trial in your PayPal
+              account (Automatic payments) to avoid being charged.
+            </p>
+          <% else %>
+            <p class="text-xs text-base-content/70">
+              PayPal subscription approval is required before you receive your sign-in link.
+            </p>
+          <% end %>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="radio" name="user[plan]" value="monthly" class="accent-brand" required />
-            <span>Monthly</span>
+            <span>Monthly ($25/mo after trial)</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
             <input type="radio" name="user[plan]" value="annual" class="accent-brand" />
-            <span>Annual</span>
+            <span>Annual ($240/yr after trial)</span>
           </label>
         </fieldset>
       <% end %>

@@ -129,6 +129,23 @@ if config_env() == :prod do
   paypal_skip_webhook_verify =
     System.get_env("PAYPAL_SKIP_WEBHOOK_VERIFY") == "true"
 
+  paypal_trial_days =
+    case System.get_env("PAYPAL_TRIAL_DAYS") |> to_string() |> String.trim() do
+      "" ->
+        14
+
+      s ->
+        case Integer.parse(s) do
+          {n, _} when n >= 0 and n <= 365 ->
+            n
+
+          _ ->
+            raise """
+            environment variable PAYPAL_TRIAL_DAYS must be an integer from 0 to 365 (default 14).
+            """
+        end
+    end
+
   {paypal_client_id, paypal_client_secret, paypal_webhook_id, paypal_plan_monthly_id,
    paypal_plan_annual_id} =
     if subscription_paywall_enabled do
@@ -203,7 +220,8 @@ if config_env() == :prod do
     paypal_plan_monthly_id: paypal_plan_monthly_id,
     paypal_plan_annual_id: paypal_plan_annual_id,
     paypal_skip_webhook_verify: paypal_skip_verify_effective,
-    paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name
+    paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name,
+    paypal_trial_days: paypal_trial_days
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
     "" ->

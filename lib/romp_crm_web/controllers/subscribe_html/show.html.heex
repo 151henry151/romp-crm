@@ -9,7 +9,12 @@
       </p>
     <% else %>
       <div class="space-y-2 text-sm text-gray-700">
-        <p>To use the hosted CRM you need an active PayPal subscription after you enter your email.</p>
+        <p>
+          To use the hosted CRM you need an approved PayPal subscription (card on file).
+          <%= if @paypal_trial_days > 0 do %>
+            Your first {@paypal_trial_days} days are a free trial — cancel in PayPal before the trial ends if you do not want to be charged.
+          <% end %>
+        </p>
         <p>
           Completed PayPal checkout but stuck?
           Resume here with the same browser session you used during sign-up, or

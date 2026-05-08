@@ -20,8 +20,7 @@ defmodule RompCrmWeb.UserRegistrationController do
     changeset = Accounts.change_user_email(%User{email: initial_email})
 
     render(conn, :new,
-      changeset: changeset,
-      subscription_paywall: Billing.paywall_enabled?()
+      registration_assigns(changeset: changeset)
     )
   end
 
@@ -53,8 +52,17 @@ defmodule RompCrmWeb.UserRegistrationController do
     changeset = %{cs | action: :insert}
 
     render(conn, :new,
-      changeset: changeset,
-      subscription_paywall: Billing.paywall_enabled?()
+      registration_assigns(changeset: changeset)
+    )
+  end
+
+  defp registration_assigns(extra) do
+    Keyword.merge(
+      [
+        subscription_paywall: Billing.paywall_enabled?(),
+        paypal_trial_days: Billing.paypal_trial_days()
+      ],
+      extra
     )
   end
 
@@ -99,8 +107,7 @@ defmodule RompCrmWeb.UserRegistrationController do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         render(conn, :new,
-          changeset: %{changeset | action: :insert},
-          subscription_paywall: Billing.paywall_enabled?()
+          registration_assigns(changeset: %{changeset | action: :insert})
         )
     end
   end

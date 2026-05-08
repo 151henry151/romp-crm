@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-05-08
+
+### Added
+
+- Document **14-day (configurable) PayPal free trial** on hosted registration (**`PAYPAL_TRIAL_DAYS`**); **`mix paypal.provision`** builds **`TRIAL`** + **`REGULAR`** billing cycles (\$0 trial, then monthly or annual price)
+
+### Changed
+
+- Extend **Account settings** with PayPal **Automatic payments** link and trial/cancel guidance when a stored subscription id exists
+
 ## [0.9.11] - 2026-05-08
 
 ### Added
