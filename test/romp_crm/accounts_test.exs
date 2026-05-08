@@ -86,6 +86,30 @@ defmodule RompCrm.AccountsTest do
       assert is_nil(user.confirmed_at)
       assert is_nil(user.password)
     end
+
+    test "rejects email when allowlist enforcement and email not listed" do
+      email = unique_user_email()
+
+      {:error, changeset} =
+        Accounts.register_user(valid_user_attributes(email: email),
+          enforce_allowlist: true,
+          allowlist: ["vip@example.com"]
+        )
+
+      assert "is not authorized for registration on this server" in errors_on(changeset).email
+    end
+
+    test "allows email when allowlist enforcement and email is listed" do
+      email = unique_user_email()
+
+      assert {:ok, user} =
+               Accounts.register_user(valid_user_attributes(email: email),
+                 enforce_allowlist: true,
+                 allowlist: [email]
+               )
+
+      assert user.email == email
+    end
   end
 
   describe "sudo_mode?/2" do

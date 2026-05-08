@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-05-08
+
+### Changed
+
+- Wire **`enforce_registration_allowlist`** to **`ENFORCE_REGISTRATION_ALLOWLIST`** (default **`false`**); **`Accounts.register_user/1`** honors the flag so open registration is explicit when disabled
+- Support **`register_user/2`** options (**`:enforce_allowlist`**, **`:allowlist`**) for tests
+- Set changeset **`action`** on failed registration so email validation errors show under the field
+
+### Fixed
+
+- **`registration_email_allowlist`** in config previously did not restrict sign-ups; behavior now matches intent when enforcement is enabled
+- Avoid **`Application.put_env`** in registration tests (**`register_user/2`** opts) so parallel ExUnit runs do not flake
+
 ## [0.9.9] - 2026-05-07
 
 ### Added

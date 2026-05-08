@@ -26,6 +26,8 @@ chmod 600 /home/henry/romp-crm/.env.production
 
 Fill in **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, SMTP, Twilio, Anthropic, etc.
 
+**Open registration:** leave **`ENFORCE_REGISTRATION_ALLOWLIST`** unset or **`false`** (default). Set **`ENFORCE_REGISTRATION_ALLOWLIST=true`** and **`ALLOWED_REGISTRATION_EMAILS`** only if you want to lock sign-ups to a fixed email list.
+
 3. Build release on the server:
 
 ```bash
