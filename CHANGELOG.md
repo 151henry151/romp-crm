@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.9.19] - 2026-05-08
+
+### Added
+
+- **`Billing.cancel_subscription_for_user/1`** and **`PaypalClient.cancel_subscription/2`**: cancel hosted PayPal billing subscriptions via API; clear PayPal subscription fields and set **`subscription_status`** **`inactive`** on success
+- **`UserSettingsController`**: **`cancel_subscription`** action redirects to **`/subscribe`** with confirmation flash after cancellation (or error flash on failure)
+- **`user_settings_html/edit`**: **Cancel subscription** button with browser confirm (shown for **`active`** subscribers when hosted paywall is enabled)
+
+### Added (tests)
+
+- **`BillingTest`** and **`UserSettingsControllerTest`** coverage for cancellation guards and failure handling
+
 ## [0.9.18] - 2026-05-08
 
 ### Added

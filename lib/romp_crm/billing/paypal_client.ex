@@ -127,6 +127,86 @@ defmodule RompCrm.Billing.PaypalClient do
   end
 
   @doc """
+  Cancels an active PayPal billing subscription (**`/v1/billing/subscriptions/{id}/cancel`**).
+
+  Returns **`{:ok, :cancelled}`** on HTTP **204**. If PayPal responds with an error but the subscription is already
+  terminated (**`CANCELLED`** / **`EXPIRED`**), returns **`{:ok, :already_cancelled}`**.
+  """
+  @spec cancel_subscription(String.t(), String.t()) :: {:ok, :cancelled | :already_cancelled} | {:error, term()}
+  def cancel_subscription(subscription_id, reason \\ "Customer requested cancellation")
+      when is_binary(subscription_id) and is_binary(reason) do
+    trimmed_reason =
+      reason
+      |> String.trim()
+      |> then(fn r ->
+        if r == "", do: "Customer requested cancellation", else: String.slice(r, 0, 127)
+      end)
+
+    with {:ok, tok} <- access_token() do
+      url = "#{base_url()}/v1/billing/subscriptions/#{subscription_id}/cancel"
+
+      case Req.post(url,
+             headers: [
+               {"authorization", "Bearer #{tok}"},
+               {"content-type", "application/json"}
+             ],
+             json: %{"reason" => trimmed_reason},
+             finch: @finch,
+             retry: false
+           ) do
+        {:ok, %{status: 204}} ->
+          {:ok, :cancelled}
+
+        {:ok, %{status: s, body: body}} when s in [400, 404, 422] ->
+          case subscription_already_inactive?(
+                 subscription_id,
+                 body
+               ) do
+            true -> {:ok, :already_cancelled}
+            false -> {:error, {:cancel_subscription, s, body}}
+          end
+
+        {:ok, %{status: s, body: b}} ->
+          {:error, {:cancel_subscription, s, b}}
+
+        {:error, _} = e ->
+          e
+      end
+    end
+  end
+
+  defp subscription_already_inactive?(subscription_id, error_body) do
+    text =
+      case error_body do
+        %{} = m -> Jason.encode!(m)
+        bin when is_binary(bin) -> bin
+        nil -> ""
+        other -> inspect(other)
+      end
+
+    body_hint_inactive?(text) or subscription_status_inactive?(subscription_id)
+  end
+
+  defp body_hint_inactive?(text) when is_binary(text) do
+    t = String.downcase(text)
+
+    String.contains?(t, "already cancelled") or String.contains?(t, "already canceled") or
+      String.contains?(t, "subscription has been cancelled") or
+      String.contains?(t, "subscription has been canceled") or
+      String.contains?(t, "status invalid") or String.contains?(t, "not active")
+  end
+
+  defp subscription_status_inactive?(subscription_id) do
+    case get_subscription(subscription_id) do
+      {:ok, %{"status" => st}} when is_binary(st) ->
+        String.upcase(st) in ["CANCELLED", "CANCELED", "EXPIRED", "SUSPENDED"]
+
+      _ ->
+        false
+    end
+  end
+
+  @doc """
   Verifies a webhook using PayPal's `/v1/notifications/verify-webhook-signature` API.
   `raw_body` must be the exact JSON string PayPal posted.
   """

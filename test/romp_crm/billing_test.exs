@@ -6,6 +6,58 @@ defmodule RompCrm.BillingTest do
 
   import RompCrm.AccountsFixtures
 
+  describe "cancel_subscription_for_user/1" do
+    test "returns not_cancellable when hosted paywall is disabled" do
+      user = user_fixture()
+
+      {:ok, user} =
+        Repo.update(Ecto.Changeset.change(user, paypal_subscription_id: "I-NOPAYWALL"))
+
+      assert {:error, :not_cancellable} = Billing.cancel_subscription_for_user(user)
+    end
+
+    test "returns not_cancellable when subscriber is invited_member" do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      user = user_fixture()
+
+      {:ok, user} =
+        Repo.update(
+          Ecto.Changeset.change(user,
+            subscription_status: "invited_member",
+            paypal_subscription_id: "I-INVITED",
+            may_create_business: false
+          )
+        )
+
+      assert {:error, :not_cancellable} = Billing.cancel_subscription_for_user(user)
+    end
+
+    test "returns not_cancellable when active but PayPal subscription id is absent" do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      user = user_fixture()
+
+      {:ok, user} =
+        Repo.update(
+          Ecto.Changeset.change(user,
+            subscription_status: "active",
+            paypal_subscription_id: nil
+          )
+        )
+
+      assert {:error, :not_cancellable} = Billing.cancel_subscription_for_user(user)
+    end
+  end
+
   describe "subscription_active?/1" do
     test "returns true for invited_member (team invitation access)" do
       user = user_fixture()

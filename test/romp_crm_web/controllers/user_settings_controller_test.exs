@@ -2,6 +2,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
   use RompCrmWeb.ConnCase, async: false
 
   alias RompCrm.Accounts
+  alias RompCrm.Repo
   import RompCrm.AccountsFixtures
 
   setup :register_and_log_in_user
@@ -143,6 +144,67 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       conn = build_conn()
       conn = get(conn, ~p"/users/settings/confirm-email/#{token}")
       assert redirected_to(conn) == ~p"/users/log-in"
+    end
+  end
+
+  describe "PUT /users/settings (cancel subscription)" do
+    test "returns error flash when hosted paywall is off", %{conn: conn} do
+      conn = put(conn, ~p"/users/settings", %{"action" => "cancel_subscription"})
+
+      assert redirected_to(conn) == ~p"/users/settings"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "no active hosted subscription"
+    end
+
+    test "shows cancel subscription button when paywall on and PayPal subscription stored", %{
+      conn: conn,
+      user: user
+    } do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      {:ok, _} =
+        Repo.update(
+          Ecto.Changeset.change(user,
+            subscription_status: "active",
+            paypal_subscription_id: "I-BUTTON"
+          )
+        )
+
+      conn = get(conn, ~p"/users/settings")
+      html = html_response(conn, 200)
+      assert html =~ "Cancel subscription"
+      assert html =~ "cancel_subscription"
+    end
+
+    test "handles PayPal API failure without clearing subscription", %{conn: conn, user: user} do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      {:ok, _} =
+        Repo.update(
+          Ecto.Changeset.change(user,
+            subscription_status: "active",
+            paypal_subscription_id: "I-NOCANCEL"
+          )
+        )
+
+      conn = put(conn, ~p"/users/settings", %{"action" => "cancel_subscription"})
+
+      assert redirected_to(conn) == ~p"/users/settings"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "PayPal could not cancel"
+
+      updated = Repo.get!(RompCrm.Accounts.User, user.id)
+      assert updated.subscription_status == "active"
+      assert updated.paypal_subscription_id == "I-NOCANCEL"
     end
   end
 end
