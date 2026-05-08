@@ -1,7 +1,7 @@
 defmodule RompCrmWeb.SubscribeController do
   use RompCrmWeb, :controller
 
-  alias RompCrm.Accounts.User
+  alias RompCrm.Accounts.{Scope, User}
   alias RompCrm.Billing
   alias RompCrm.Repo
 
@@ -48,14 +48,6 @@ defmodule RompCrmWeb.SubscribeController do
         )
         |> redirect(to: ~p"/users/register")
 
-      {:error, :email_mismatch} ->
-        conn
-        |> put_flash(
-          :error,
-          "The PayPal account email does not match the address you used to register. Use the same email or contact support."
-        )
-        |> redirect(to: ~p"/users/register")
-
       {:error, {:paypal_subscription_fetch, _}} ->
         conn
         |> put_flash(
@@ -84,13 +76,51 @@ defmodule RompCrmWeb.SubscribeController do
 
   @doc """
   Explains next steps and supports resuming checkout if the session still holds a pending user id.
+
+  If the viewer is logged in, has a stored PayPal subscription id, and the DB still shows a
+  non-active paywall state, attempts one activation sync against PayPal and redirects to **`/`**
+  when PayPal reports an active subscription (fixes users stuck after checkout when the browser
+  return path or webhook did not update the row yet).
   """
   def show(conn, _params) do
-    render(conn, :show,
-      paywall: Billing.paywall_enabled?(),
-      pending_user: pending_paywall_user(conn),
-      paypal_trial_days: Billing.paypal_trial_days()
-    )
+    case sync_subscription_with_paypal_if_needed(conn) do
+      {:redirect, conn} ->
+        conn
+
+      {:show, conn} ->
+        render(conn, :show,
+          paywall: Billing.paywall_enabled?(),
+          pending_user: pending_paywall_user(conn),
+          paypal_trial_days: Billing.paypal_trial_days()
+        )
+    end
+  end
+
+  defp sync_subscription_with_paypal_if_needed(conn) do
+    user = scope_logged_in_user(conn)
+
+    if Billing.paywall_enabled?() && user && is_binary(user.paypal_subscription_id) &&
+         not Billing.subscription_active?(user) do
+      case Billing.activate_from_paypal_subscription_id(user.paypal_subscription_id) do
+        {:ok, _} ->
+          {:redirect,
+           conn
+           |> put_flash(:info, "Your subscription is active — welcome to Romp CRM.")
+           |> redirect(to: ~p"/")}
+
+        {:error, _} ->
+          {:show, conn}
+      end
+    else
+      {:show, conn}
+    end
+  end
+
+  defp scope_logged_in_user(conn) do
+    case conn.assigns[:current_scope] do
+      %Scope{user: %User{} = user} -> user
+      _ -> nil
+    end
   end
 
   defp subscription_confirmed_flash(0),

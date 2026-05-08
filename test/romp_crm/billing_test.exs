@@ -69,16 +69,14 @@ defmodule RompCrm.BillingTest do
                Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
     end
 
-    test "rejects when payer email is present and does not match registration email", %{
-      user: user
-    } do
+    test "activates when PayPal payer email differs from registration email", %{user: user} do
       payload = %{
         "status" => "ACTIVE",
-        "subscriber" => %{"email_address" => "other@example.com"}
+        "subscriber" => %{"email_address" => "different-payer@example.com"}
       }
 
-      assert {:error, :email_mismatch} =
-               Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+      assert {:ok, updated} = Billing.finalize_subscription_active(user, "I-FIXTURE", payload)
+      assert updated.subscription_status == "active"
     end
   end
 end

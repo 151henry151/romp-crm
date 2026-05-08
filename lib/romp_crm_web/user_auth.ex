@@ -349,17 +349,48 @@ defmodule RompCrmWeb.UserAuth do
 
   @doc """
   Plug for authenticated routes when `SUBSCRIPTION_PAYWALL_ENABLED` is true — requires `subscription_status` active.
+
+  Before redirecting to **`/subscribe`**, if the user row still shows non-active but has a stored
+  **`paypal_subscription_id`**, calls PayPal once to sync activation (covers checkout completed while
+  the browser return path or webhook had not updated SQLite yet).
   """
   def require_active_subscription_user(conn, _opts) do
-    if not Billing.paywall_enabled?() or
-         (conn.assigns.current_scope.user &&
-            Billing.subscription_active?(conn.assigns.current_scope.user)) do
-      conn
-    else
-      conn
-      |> put_flash(:error, "An active subscription is required to continue.")
-      |> redirect(to: ~p"/subscribe")
-      |> halt()
+    cond do
+      not Billing.paywall_enabled?() ->
+        conn
+
+      Billing.subscription_active?(conn.assigns.current_scope.user) ->
+        conn
+
+      true ->
+        conn =
+          case conn.assigns.current_scope.user do
+            %User{paypal_subscription_id: sub_id} = u
+            when is_binary(sub_id) and sub_id != "" ->
+              if Billing.subscription_active?(u) do
+                conn
+              else
+                case Billing.activate_from_paypal_subscription_id(sub_id) do
+                  {:ok, refreshed} ->
+                    assign(conn, :current_scope, Scope.for_user(refreshed))
+
+                  {:error, _} ->
+                    conn
+                end
+              end
+
+            _ ->
+              conn
+          end
+
+        if Billing.subscription_active?(conn.assigns.current_scope.user) do
+          conn
+        else
+          conn
+          |> put_flash(:error, "An active subscription is required to continue.")
+          |> redirect(to: ~p"/subscribe")
+          |> halt()
+        end
     end
   end
 
