@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-05-08
+
+### Added
+
+- **`deploy/legal/`**: source copies of **`privacy-policy.html`** and **`terms-of-service.html`** for **[rompcrm.com](https://rompcrm.com)** static deployment
+- **`Layouts.legal_footer`**: footer links to Privacy Policy and Terms (hosted marketing domain); **`jobs_live`** includes same footer
+
 ## [0.9.17] - 2026-05-08
 
 ### Added
