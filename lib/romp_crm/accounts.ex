@@ -65,6 +65,11 @@ defmodule RompCrm.Accounts do
   @doc """
   Registers a user.
 
+  When **`subscription_paywall_enabled`** is true, if the email already belongs to an account
+  that never finished PayPal (**`subscription_status` `pending_payment`** and **`confirmed_at`**
+  still **`nil`**), returns **`{:ok, that user}`** so sign-up can restart checkout instead of failing
+  with “email has already been taken”.
+
   ## Options
 
     * `:enforce_allowlist` — override **`Application`** `enforce_registration_allowlist` (for tests).
@@ -82,19 +87,56 @@ defmodule RompCrm.Accounts do
   def register_user(attrs, opts \\ []) when is_list(opts) do
     changeset =
       %User{}
-      |> User.email_changeset(attrs)
+      |> User.email_changeset(attrs, validate_unique: false)
 
     cond do
       not changeset.valid? ->
-        {:error, changeset}
+        {:error, %{changeset | action: :insert}}
 
       not registration_email_allowed?(changeset, opts) ->
         {:error,
-         Ecto.Changeset.add_error(
-           changeset,
+         changeset
+         |> Ecto.Changeset.add_error(
            :email,
            "is not authorized for registration on this server"
-         )}
+         )
+         |> Map.put(:action, :insert)}
+
+      RompCrm.ApplicationConfig.subscription_paywall_enabled?() ->
+        email = Ecto.Changeset.get_field(changeset, :email)
+
+        case Repo.get_by(User, email: email) do
+          %User{} = existing ->
+            if resumable_paywall_signup?(existing) do
+              {:ok, existing}
+            else
+              {:error, duplicate_email_registration_changeset(attrs)}
+            end
+
+          nil ->
+            insert_new_registered_user(attrs, opts)
+        end
+
+      true ->
+        insert_new_registered_user(attrs, opts)
+    end
+  end
+
+  defp insert_new_registered_user(attrs, opts) when is_list(opts) do
+    changeset = %User{} |> User.email_changeset(attrs)
+
+    cond do
+      not changeset.valid? ->
+        {:error, %{changeset | action: :insert}}
+
+      not registration_email_allowed?(changeset, opts) ->
+        {:error,
+         changeset
+         |> Ecto.Changeset.add_error(
+           :email,
+           "is not authorized for registration on this server"
+         )
+         |> Map.put(:action, :insert)}
 
       true ->
         Repo.transact(fn ->
@@ -104,6 +146,19 @@ defmodule RompCrm.Accounts do
         end)
     end
   end
+
+  defp duplicate_email_registration_changeset(attrs) do
+    cs = %User{} |> User.email_changeset(attrs)
+    %{cs | action: :insert}
+  end
+
+  defp resumable_paywall_signup?(%User{
+         subscription_status: "pending_payment",
+         confirmed_at: nil
+       }),
+       do: true
+
+  defp resumable_paywall_signup?(_), do: false
 
   defp maybe_mark_pending_paywall(user) do
     if RompCrm.ApplicationConfig.subscription_paywall_enabled?() do

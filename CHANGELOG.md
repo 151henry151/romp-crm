@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-05-08
+
+### Changed
+
+- **`Accounts.register_user/2`**: when **`subscription_paywall_enabled`** is true, allow registering again with the same email if the prior row is still **`pending_payment`** and **`confirmed_at`** is **`nil`** (abandoned PayPal checkout), returning that user so **`UserRegistrationController`** can restart checkout instead of failing email uniqueness
+
+### Added
+
+- Tests for paywall resume vs active subscriber duplicate rejection
+
 ## [0.9.13] - 2026-05-08
 
 ### Added
