@@ -1,0 +1,45 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-lg space-y-6">
+    <.header>Romp CRM — subscription</.header>
+
+    <%= if !@paywall do %>
+      <p class="text-sm text-gray-700">
+        Billing is not enforced on this server (self-hosted or paywall disabled). You may
+        <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">log in</.link>.
+      </p>
+    <% else %>
+      <div class="space-y-2 text-sm text-gray-700">
+        <p>To use the hosted CRM you need an active PayPal subscription after you enter your email.</p>
+        <p>
+          Completed PayPal checkout but stuck?
+          Resume here with the same browser session you used during sign-up, or
+          <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
+            register again
+          </.link>
+          with the same email.
+        </p>
+      </div>
+
+      <%= if @pending_user && @pending_user.subscription_status == "pending_payment" do %>
+        <div class="rounded-lg border border-gray-200 p-4 shadow-sm space-y-3">
+          <p class="text-sm font-medium text-gray-900">Resume checkout for {@pending_user.email}</p>
+          <form action={~p"/subscribe/resume"} method="post" class="space-y-3">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <fieldset class="space-y-2">
+              <legend class="text-sm text-gray-600">Plan</legend>
+              <label class="flex cursor-pointer items-center gap-2">
+                <input type="radio" name="plan" value="monthly" class="accent-brand" required />
+                <span>Monthly</span>
+              </label>
+              <label class="flex cursor-pointer items-center gap-2">
+                <input type="radio" name="plan" value="annual" class="accent-brand" />
+                <span>Annual</span>
+              </label>
+            </fieldset>
+            <.button class="btn btn-primary w-full" type="submit">Continue to PayPal</.button>
+          </form>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+</Layouts.app>

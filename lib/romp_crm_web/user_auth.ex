@@ -7,6 +7,7 @@ defmodule RompCrmWeb.UserAuth do
   alias RompCrm.Accounts
   alias RompCrm.Accounts.Scope
   alias RompCrm.Accounts.User
+  alias RompCrm.Billing
   alias RompCrm.Businesses
 
   # Make the remember me cookie valid for 14 days. This should match
@@ -42,7 +43,7 @@ defmodule RompCrmWeb.UserAuth do
       |> create_or_extend_session(user, params)
 
     conn
-    |> redirect(to: user_return_to || signed_in_path(conn))
+    |> redirect(to: user_return_to || signed_in_path_for_user(user))
   end
 
   @doc """
@@ -190,16 +191,32 @@ defmodule RompCrmWeb.UserAuth do
   Plug for routes that require the user to not be authenticated.
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
-    if conn.assigns.current_scope do
+    user = scope_user(conn.assigns[:current_scope])
+
+    if user do
       conn
-      |> redirect(to: signed_in_path(conn))
+      |> redirect(to: signed_in_path_for_user(user))
       |> halt()
     else
       conn
     end
   end
 
-  defp signed_in_path(_conn), do: ~p"/"
+  defp scope_user(%Scope{user: %User{} = user}), do: user
+  defp scope_user(_), do: nil
+
+  defp signed_in_path_for_user(%User{} = user) do
+    cond do
+      not Billing.paywall_enabled?() ->
+        ~p"/"
+
+      Billing.subscription_active?(user) ->
+        ~p"/"
+
+      true ->
+        ~p"/subscribe"
+    end
+  end
 
   @doc """
   LiveView on_mount hook — halts and redirects if not logged in.
@@ -216,6 +233,28 @@ defmodule RompCrmWeb.UserAuth do
         |> Phoenix.LiveView.redirect(to: ~p"/users/log-in")
 
       {:halt, socket}
+    end
+  end
+
+  # Runs after `:require_authenticated`; blocks unpaid users when the subscription paywall is enabled.
+  def on_mount(:require_active_subscription, _params, _session, socket) do
+    user = socket.assigns.current_scope.user
+
+    cond do
+      not Billing.paywall_enabled?() ->
+        {:cont, socket}
+
+      Billing.subscription_active?(user) ->
+        {:cont, socket}
+
+      true ->
+        {:halt,
+         socket
+         |> Phoenix.LiveView.put_flash(
+           :error,
+           "An active subscription is required to access Romp CRM on this server."
+         )
+         |> Phoenix.LiveView.redirect(to: ~p"/subscribe")}
     end
   end
 
@@ -307,6 +346,22 @@ defmodule RompCrmWeb.UserAuth do
   end
 
   defp maybe_store_return_to(conn), do: conn
+
+  @doc """
+  Plug for authenticated routes when `SUBSCRIPTION_PAYWALL_ENABLED` is true — requires `subscription_status` active.
+  """
+  def require_active_subscription_user(conn, _opts) do
+    if not Billing.paywall_enabled?() or
+         (conn.assigns.current_scope.user &&
+            Billing.subscription_active?(conn.assigns.current_scope.user)) do
+      conn
+    else
+      conn
+      |> put_flash(:error, "An active subscription is required to continue.")
+      |> redirect(to: ~p"/subscribe")
+      |> halt()
+    end
+  end
 
   @doc false
   def put_auth_pages_no_store(conn) do

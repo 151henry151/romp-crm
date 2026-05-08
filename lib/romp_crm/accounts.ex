@@ -97,7 +97,25 @@ defmodule RompCrm.Accounts do
          )}
 
       true ->
-        Repo.insert(changeset)
+        Repo.transact(fn ->
+          with {:ok, user} <- Repo.insert(changeset),
+               {:ok, user} <- maybe_mark_pending_paywall(user),
+               do: {:ok, user}
+        end)
+    end
+  end
+
+  defp maybe_mark_pending_paywall(user) do
+    if RompCrm.ApplicationConfig.subscription_paywall_enabled?() do
+      user
+      |> Ecto.Changeset.change(
+        subscription_status: "pending_payment",
+        paypal_subscription_id: nil,
+        paypal_plan_id: nil
+      )
+      |> Repo.update()
+    else
+      {:ok, user}
     end
   end
 
