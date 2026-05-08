@@ -28,6 +28,15 @@ Fill in **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, SMTP, Twilio, Anthropic, etc
 
 **Open registration:** leave **`ENFORCE_REGISTRATION_ALLOWLIST`** unset or **`false`** (default). Set **`ENFORCE_REGISTRATION_ALLOWLIST=true`** and **`ALLOWED_REGISTRATION_EMAILS`** only if you want to lock sign-ups to a fixed email list.
 
+**PayPal subscription paywall (hosted product):** export **`PAYPAL_CLIENT_ID`** and **`PAYPAL_CLIENT_SECRET`** (Live app from developer.paypal.com), then:
+
+```bash
+set -a && source .env.paypal.local && set +a   # or export manually
+PAYPAL_MODE=live mix paypal.provision
+```
+
+Merge **`deploy/paypal-provision-result.env`** (and the client id/secret) into **`.env.production`**. Default webhook URL is **`https://rompcrm.com/romp-crm/webhooks/paypal`** — override with **`PAYPAL_WEBHOOK_URL`** if your public host differs.
+
 3. Build release on the server:
 
 ```bash

@@ -41,6 +41,13 @@ npm-debug.log
 
 # Production secrets (never commit real env files)
 /deploy/romp-crm.env
+/deploy/paypal-provision-result.env
 
 /.env.production
+
+# Local backups of env files (may contain secrets)
+.env.production.bak.*
+
+# PayPal / local secrets (never commit)
+.env.paypal.local
 

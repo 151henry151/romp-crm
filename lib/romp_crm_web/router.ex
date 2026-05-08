@@ -16,7 +16,15 @@ defmodule RompCrmWeb.Router do
   # CSRF tokens may embed the request host; behind nginx allow apex + www so occasional
   # Host variance does not reject valid posts with "Forbidden".
   defp protect_from_forgery_with_hosts(conn, _opts),
-    do: protect_from_forgery(conn, allow_hosts: ["hromp.com", "www.hromp.com"])
+    do:
+      protect_from_forgery(conn,
+        allow_hosts: [
+          "hromp.com",
+          "www.hromp.com",
+          "rompcrm.com",
+          "www.rompcrm.com"
+        ]
+      )
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -24,13 +32,31 @@ defmodule RompCrmWeb.Router do
 
   # Twilio sends POST form bodies; minimal pipeline without CSRF or session.
   pipeline :webhooks do
-    plug :accepts, ["html"]
+    plug :accepts, ["json", "html"]
+  end
+
+  pipeline :redirect_logged_in_visitor do
+    plug :redirect_if_user_is_authenticated
+  end
+
+  pipeline :require_logged_in_user do
+    plug :require_authenticated_user
+  end
+
+  pipeline :require_paid_subscription do
+    plug :require_active_subscription_user
   end
 
   scope "/webhooks/twilio", RompCrmWeb do
     pipe_through :webhooks
 
     post "/sms", TwilioWebhookController, :sms
+  end
+
+  scope "/webhooks/paypal", RompCrmWeb do
+    pipe_through :webhooks
+
+    post "/", PaypalWebhookController, :event
   end
 
   if Application.compile_env(:romp_crm, :dev_routes) do
@@ -45,7 +71,7 @@ defmodule RompCrmWeb.Router do
 
   # Redirect root to login if not authenticated
   scope "/", RompCrmWeb do
-    pipe_through [:browser, :redirect_if_user_is_authenticated]
+    pipe_through [:browser, :redirect_logged_in_visitor]
 
     get "/users/register", UserRegistrationController, :new
     post "/users/register", UserRegistrationController, :create
@@ -53,6 +79,11 @@ defmodule RompCrmWeb.Router do
 
   scope "/", RompCrmWeb do
     pipe_through [:browser]
+
+    get "/subscribe", SubscribeController, :show
+    post "/subscribe/resume", SubscribeController, :resume
+    get "/subscribe/paypal/return", SubscribeController, :paypal_return
+    get "/subscribe/paypal/cancel", SubscribeController, :paypal_cancel
 
     get "/invitations/:token", InvitationController, :show
 
@@ -64,7 +95,7 @@ defmodule RompCrmWeb.Router do
 
   # Authenticated routes
   scope "/", RompCrmWeb do
-    pipe_through [:browser, :require_authenticated_user]
+    pipe_through [:browser, :require_logged_in_user, :require_paid_subscription]
 
     get "/users/settings", UserSettingsController, :edit
     put "/users/settings", UserSettingsController, :update
@@ -73,13 +104,17 @@ defmodule RompCrmWeb.Router do
     post "/business/switch", BusinessSwitchController, :update
 
     live_session :authenticated_business_pages,
-      on_mount: [{RompCrmWeb.UserAuth, :require_authenticated}] do
+      on_mount: [
+        {RompCrmWeb.UserAuth, :require_authenticated},
+        {RompCrmWeb.UserAuth, :require_active_subscription}
+      ] do
       live "/businesses", BusinessesLive, :index
     end
 
     live_session :authenticated_jobs,
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},
+        {RompCrmWeb.UserAuth, :require_active_subscription},
         {RompCrmWeb.UserAuth, :ensure_business_scope}
       ] do
       live "/", JobsLive, :index

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-05-08
+
+### Added
+
+- Add **`mix paypal.provision`** to create a PayPal catalog product, **`monthly`** / **`annual`** subscription plans, and a **`BILLING.SUBSCRIPTION.*`** webhook via the REST API (**`deploy/paypal-provision-result.env`** output, gitignored)
+- Gate sign-up and CRM access behind an optional **`SUBSCRIPTION_PAYWALL_ENABLED`** PayPal Billing flow (**`monthly`** / **`annual`** plans via **`PAYPAL_PLAN_*_ID`**)
+- Add **`POST /webhooks/paypal`** with PayPal webhook signature verification (**`PAYPAL_WEBHOOK_ID`**) plus **`GET /subscribe`**, **`GET /subscribe/paypal/return`** / **`cancel`**, **`POST /subscribe/resume`**
+- Add subscription columns on **`users`** (**`paypal_subscription_id`**, **`paypal_plan_id`**, **`subscription_status`**) defaulting **`active`** for existing installs
+
+### Changed
+
+- When the paywall is enabled, **`POST /users/register`** skips the magic link email until **`BILLING.SUBSCRIPTION.ACTIVATED`** (return URL sync or webhook); extend CSRF **`allow_hosts`** for **`rompcrm.com`** and **`www.rompcrm.com`**
+
 ## [0.9.10] - 2026-05-08
 
 ### Changed

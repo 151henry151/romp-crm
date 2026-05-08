@@ -24,7 +24,24 @@
         phx-mounted={JS.focus()}
       />
 
-      <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
+      <%= if @subscription_paywall do %>
+        <fieldset class="space-y-2 pt-2">
+          <legend class="text-sm font-medium text-base-content">Billing plan</legend>
+          <p class="text-xs text-base-content/70">
+            PayPal subscription is required before you receive your sign-in link.
+          </p>
+          <label class="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="user[plan]" value="monthly" class="accent-brand" required />
+            <span>Monthly</span>
+          </label>
+          <label class="flex cursor-pointer items-center gap-2">
+            <input type="radio" name="user[plan]" value="annual" class="accent-brand" />
+            <span>Annual</span>
+          </label>
+        </fieldset>
+      <% end %>
+
+      <.button phx-disable-with="Creating account..." class="btn btn-primary mt-4 w-full">
         Create an account
       </.button>
     </.form>

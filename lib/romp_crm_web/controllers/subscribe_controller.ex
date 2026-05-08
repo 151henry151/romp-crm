@@ -1,0 +1,151 @@
+defmodule RompCrmWeb.SubscribeController do
+  use RompCrmWeb, :controller
+
+  alias RompCrm.Accounts.User
+  alias RompCrm.Billing
+  alias RompCrm.Repo
+
+  @doc """
+  Browser return after PayPal approves subscription approval.
+  """
+  def paypal_return(conn, params) do
+    subscription_id = params["subscription_id"] || ""
+
+    conn = clear_paywall_session(conn)
+
+    if subscription_id == "" do
+      conn
+      |> put_flash(:error, "Missing subscription reference from PayPal. Try subscribing again.")
+      |> redirect(to: ~p"/users/register")
+    else
+      handle_activation(conn, subscription_id)
+    end
+  end
+
+  defp handle_activation(conn, subscription_id) do
+    case Billing.activate_from_paypal_subscription_id(subscription_id) do
+      {:ok, _user} ->
+        conn
+        |> put_flash(
+          :info,
+          "Subscription confirmed — check email for your sign-in link to access Romp CRM."
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      {:error, :unknown_subscription} ->
+        conn
+        |> put_flash(
+          :error,
+          "We could not match that payment to your sign-up yet. Wait a minute and try signing in — or subscribe again."
+        )
+        |> redirect(to: ~p"/users/register")
+
+      {:error, {:not_active, _status}} ->
+        conn
+        |> put_flash(:error, "PayPal has not activated the subscription yet. Try again in a moment.")
+        |> redirect(to: ~p"/users/register")
+
+      {:error, :email_mismatch} ->
+        conn
+        |> put_flash(
+          :error,
+          "The PayPal account email does not match the address you used to register. Use the same email or contact support."
+        )
+        |> redirect(to: ~p"/users/register")
+
+      {:error, :missing_payer_email} ->
+        conn
+        |> put_flash(:error, "PayPal did not return a payer email yet. Wait a minute and open your sign-in link from email if it arrives.")
+        |> redirect(to: ~p"/users/log-in")
+
+      {:error, _} ->
+        conn
+        |> put_flash(:error, "Could not confirm your subscription. Try again or contact support.")
+        |> redirect(to: ~p"/users/register")
+    end
+  end
+
+  @doc """
+  Browser return when the buyer cancels on PayPal.
+  """
+  def paypal_cancel(conn, _params) do
+    conn = clear_paywall_session(conn)
+
+    conn
+    |> put_flash(:info, "Checkout was cancelled. You can choose a plan and try again when ready.")
+    |> redirect(to: ~p"/subscribe")
+  end
+
+  @doc """
+  Explains next steps and supports resuming checkout if the session still holds a pending user id.
+  """
+  def show(conn, _params) do
+    render(conn, :show,
+      paywall: Billing.paywall_enabled?(),
+      pending_user: pending_paywall_user(conn)
+    )
+  end
+
+  @doc """
+  Re-starts hosted PayPal checkout for the pending user referenced by the encrypted session cookie.
+  """
+  def resume(conn, %{"plan" => plan} = _) do
+    user = pending_paywall_user(conn)
+
+    cond do
+      not Billing.paywall_enabled?() ->
+        conn |> put_flash(:info, "Subscription checkout is optional on this server.") |> redirect(to: ~p"/users/log-in")
+
+      user == nil ->
+        conn
+        |> put_flash(:error, "Session expired — register again or sign in if you already paid.")
+        |> redirect(to: ~p"/users/register")
+
+      not Billing.valid_plan?(plan) or not Billing.plan_configured?(plan) ->
+        conn
+        |> put_flash(:error, "Choose a valid plan.")
+        |> redirect(to: ~p"/subscribe")
+
+      true ->
+        case Billing.start_paypal_checkout(user, plan, paypal_return_fun(conn),
+               paypal_cancel_fun(conn)
+             ) do
+          {:ok, %{approve_url: approve}} ->
+            conn
+            |> redirect(external: approve)
+
+          {:error, _} ->
+            conn
+            |> put_flash(:error, "Could not reach PayPal. Try again shortly.")
+            |> redirect(to: ~p"/subscribe")
+        end
+    end
+  end
+
+  def resume(conn, _) do
+    conn
+    |> put_flash(:error, "Pick monthly or yearly billing.")
+    |> redirect(to: ~p"/subscribe")
+  end
+
+  defp paypal_return_fun(conn),
+    do: fn -> url(conn, ~p"/subscribe/paypal/return") end
+
+  defp paypal_cancel_fun(conn),
+    do: fn -> url(conn, ~p"/subscribe/paypal/cancel") end
+
+  defp pending_paywall_user(conn) do
+    case get_session(conn, :pending_paywall_user_id) do
+      id when is_integer(id) ->
+        Repo.get(User, id)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp clear_paywall_session(conn) do
+    conn
+    |> configure_session(drop: [:pending_paywall_user_id, :pending_paywall_plan])
+  end
+end

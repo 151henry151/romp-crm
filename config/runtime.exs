@@ -117,6 +117,70 @@ if config_env() == :prod do
   twilio_sms_replies_enabled =
     System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false"
 
+  subscription_paywall_enabled =
+    System.get_env("SUBSCRIPTION_PAYWALL_ENABLED") == "true"
+
+  paypal_mode =
+    case System.get_env("PAYPAL_MODE") |> to_string() |> String.downcase() do
+      "live" -> "live"
+      _ -> "sandbox"
+    end
+
+  paypal_skip_webhook_verify =
+    System.get_env("PAYPAL_SKIP_WEBHOOK_VERIFY") == "true"
+
+  {paypal_client_id, paypal_client_secret, paypal_webhook_id, paypal_plan_monthly_id,
+   paypal_plan_annual_id} =
+    if subscription_paywall_enabled do
+      id =
+        System.get_env("PAYPAL_CLIENT_ID") ||
+          raise """
+          environment variable PAYPAL_CLIENT_ID is missing while SUBSCRIPTION_PAYWALL_ENABLED=true.
+          Use an app from developer.paypal.com (Sandbox or Live) and set PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET.
+          """
+
+      secret =
+        System.get_env("PAYPAL_CLIENT_SECRET") ||
+          raise """
+          environment variable PAYPAL_CLIENT_SECRET is missing while SUBSCRIPTION_PAYWALL_ENABLED=true.
+          """
+
+      webhook_id =
+        if paypal_skip_webhook_verify do
+          System.get_env("PAYPAL_WEBHOOK_ID")
+        else
+          System.get_env("PAYPAL_WEBHOOK_ID") ||
+            raise """
+            environment variable PAYPAL_WEBHOOK_ID is missing while SUBSCRIPTION_PAYWALL_ENABLED=true and PAYPAL_SKIP_WEBHOOK_VERIFY is not true.
+
+            Register a webhook pointing at https://YOUR_HOST/romp-crm/webhooks/paypal (path must match your PHX_PUBLIC_URL / nginx mount).
+            Include billing subscription events such as ACTIVATED, CANCELLED, SUSPENDED, EXPIRED.
+            """
+        end
+
+      monthly =
+        System.get_env("PAYPAL_PLAN_MONTHLY_ID") ||
+          raise """
+          environment variable PAYPAL_PLAN_MONTHLY_ID is missing while SUBSCRIPTION_PAYWALL_ENABLED=true.
+          Create subscription plans under PayPal (Products & Billing → Subscription plans) and paste the Plan ID (begins with `P-`).
+          """
+
+      annual =
+        System.get_env("PAYPAL_PLAN_ANNUAL_ID") ||
+          raise """
+          environment variable PAYPAL_PLAN_ANNUAL_ID is missing while SUBSCRIPTION_PAYWALL_ENABLED=true.
+          Create an annual plan in PayPal and paste its Plan ID (`P-...`).
+          """
+
+      {id, secret, webhook_id, monthly, annual}
+    else
+      {nil, nil, System.get_env("PAYPAL_WEBHOOK_ID"), System.get_env("PAYPAL_PLAN_MONTHLY_ID"),
+       System.get_env("PAYPAL_PLAN_ANNUAL_ID")}
+    end
+
+  paypal_skip_verify_effective =
+    not subscription_paywall_enabled or paypal_skip_webhook_verify
+
   config :romp_crm,
     twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
@@ -130,7 +194,16 @@ if config_env() == :prod do
     mail_from_address: mail_from_address,
     registration_email_allowlist: registration_allowlist,
     enforce_registration_allowlist: enforce_registration_allowlist,
-    twilio_sms_allowed_from_normalized: twilio_allow_norm
+    twilio_sms_allowed_from_normalized: twilio_allow_norm,
+    subscription_paywall_enabled: subscription_paywall_enabled,
+    paypal_mode: paypal_mode,
+    paypal_client_id: paypal_client_id,
+    paypal_client_secret: paypal_client_secret,
+    paypal_webhook_id: paypal_webhook_id,
+    paypal_plan_monthly_id: paypal_plan_monthly_id,
+    paypal_plan_annual_id: paypal_plan_annual_id,
+    paypal_skip_webhook_verify: paypal_skip_verify_effective,
+    paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
     "" ->
