@@ -110,6 +110,46 @@ defmodule RompCrm.AccountsTest do
 
       assert user.email == email
     end
+
+    test "when paywall enabled, returns same pending user on repeat register instead of uniqueness error" do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      email = unique_user_email()
+      attrs = valid_user_attributes(email: email)
+
+      assert {:ok, user1} = Accounts.register_user(attrs)
+      assert user1.subscription_status == "pending_payment"
+      assert is_nil(user1.confirmed_at)
+
+      assert {:ok, user2} = Accounts.register_user(attrs)
+      assert user2.id == user1.id
+      assert user2.email == email
+    end
+
+    test "when paywall enabled, still rejects email taken by an active subscriber" do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      email = unique_user_email()
+      attrs = valid_user_attributes(email: email)
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+
+      {:ok, _} =
+        user
+        |> Ecto.Changeset.change(subscription_status: "active")
+        |> Repo.update()
+
+      {:error, changeset} = Accounts.register_user(attrs)
+      assert "has already been taken" in errors_on(changeset).email
+    end
   end
 
   describe "sudo_mode?/2" do
