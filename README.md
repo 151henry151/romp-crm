@@ -83,6 +83,8 @@ The trailing slash on **`proxy_pass`** makes nginx map `/romp-crm/foo` → `/foo
 
 See **`deploy/README.md`** for systemd and env setup.
 
+**Sign-ups:** By default **any** email can register (`ENFORCE_REGISTRATION_ALLOWLIST` is off). Set **`ENFORCE_REGISTRATION_ALLOWLIST=true`** and **`ALLOWED_REGISTRATION_EMAILS`** in production only if you need a private allowlist.
+
 ## License
 
 Romp CRM is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either **version 3** of the License, or (at your option) any later version. See the file **[`LICENSE`](LICENSE)** in this repository for the full license text.

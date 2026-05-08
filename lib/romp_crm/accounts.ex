@@ -65,6 +65,11 @@ defmodule RompCrm.Accounts do
   @doc """
   Registers a user.
 
+  ## Options
+
+    * `:enforce_allowlist` — override **`Application`** `enforce_registration_allowlist` (for tests).
+    * `:allowlist` — override **`Application`** `registration_email_allowlist` (list of downcased emails).
+
   ## Examples
 
       iex> register_user(%{field: value})
@@ -74,10 +79,54 @@ defmodule RompCrm.Accounts do
       {:error, %Ecto.Changeset{}}
 
   """
-  def register_user(attrs) do
-    %User{}
-    |> User.email_changeset(attrs)
-    |> Repo.insert()
+  def register_user(attrs, opts \\ []) when is_list(opts) do
+    changeset =
+      %User{}
+      |> User.email_changeset(attrs)
+
+    cond do
+      not changeset.valid? ->
+        {:error, changeset}
+
+      not registration_email_allowed?(changeset, opts) ->
+        {:error,
+         Ecto.Changeset.add_error(
+           changeset,
+           :email,
+           "is not authorized for registration on this server"
+         )}
+
+      true ->
+        Repo.insert(changeset)
+    end
+  end
+
+  defp registration_email_allowed?(%Ecto.Changeset{} = cs, opts) when is_list(opts) do
+    enforce? =
+      Keyword.get(
+        opts,
+        :enforce_allowlist,
+        Application.get_env(:romp_crm, :enforce_registration_allowlist, false)
+      )
+
+    unless enforce? do
+      true
+    else
+      email =
+        cs
+        |> Ecto.Changeset.get_field(:email)
+        |> to_string()
+        |> String.downcase()
+
+      allow =
+        Keyword.get(
+          opts,
+          :allowlist,
+          Application.get_env(:romp_crm, :registration_email_allowlist, [])
+        )
+
+      email != "" and email in allow
+    end
   end
 
   def get_user_by_phone_normalized(nil), do: nil

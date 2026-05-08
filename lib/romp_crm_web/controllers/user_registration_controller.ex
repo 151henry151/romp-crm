@@ -37,7 +37,7 @@ defmodule RompCrmWeb.UserRegistrationController do
         |> redirect(to: ~p"/users/log-in")
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new, changeset: changeset)
+        render(conn, :new, changeset: %{changeset | action: :insert})
     end
   end
 end

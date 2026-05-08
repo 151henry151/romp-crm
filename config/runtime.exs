@@ -87,6 +87,11 @@ if config_env() == :prod do
     |> Enum.map(&String.downcase/1)
     |> Enum.reject(&(&1 == ""))
 
+  # Only **true** restricts sign-ups to `registration_email_allowlist` / `ALLOWED_REGISTRATION_EMAILS`.
+  # Default is open registration for self-hosted / public demos.
+  enforce_registration_allowlist =
+    System.get_env("ENFORCE_REGISTRATION_ALLOWLIST") == "true"
+
   default_twilio_from = "+18024587299,+18024582710,+18022780965"
 
   twilio_from_raw =
@@ -124,7 +129,7 @@ if config_env() == :prod do
     mail_from_name: mail_from_name,
     mail_from_address: mail_from_address,
     registration_email_allowlist: registration_allowlist,
-    enforce_registration_allowlist: false,
+    enforce_registration_allowlist: enforce_registration_allowlist,
     twilio_sms_allowed_from_normalized: twilio_allow_norm
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
