@@ -9,7 +9,7 @@ defmodule RompCrmWeb.SubscribeController do
   Browser return after PayPal approves subscription approval.
   """
   def paypal_return(conn, params) do
-    subscription_id = params["subscription_id"] || ""
+    subscription_id = Billing.paypal_return_subscription_id(params)
 
     conn = clear_paywall_session(conn)
 
@@ -42,7 +42,10 @@ defmodule RompCrmWeb.SubscribeController do
 
       {:error, {:not_active, _status}} ->
         conn
-        |> put_flash(:error, "PayPal has not activated the subscription yet. Try again in a moment.")
+        |> put_flash(
+          :error,
+          "PayPal has not activated the subscription yet. Try again in a moment."
+        )
         |> redirect(to: ~p"/users/register")
 
       {:error, :email_mismatch} ->
@@ -53,9 +56,12 @@ defmodule RompCrmWeb.SubscribeController do
         )
         |> redirect(to: ~p"/users/register")
 
-      {:error, :missing_payer_email} ->
+      {:error, {:paypal_subscription_fetch, _}} ->
         conn
-        |> put_flash(:error, "PayPal did not return a payer email yet. Wait a minute and open your sign-in link from email if it arrives.")
+        |> put_flash(
+          :error,
+          "Could not verify your subscription with PayPal yet. Wait a minute and try signing in — confirmation may still be processing."
+        )
         |> redirect(to: ~p"/users/log-in")
 
       {:error, _} ->
@@ -88,8 +94,7 @@ defmodule RompCrmWeb.SubscribeController do
   end
 
   defp subscription_confirmed_flash(0),
-    do:
-      "Subscription confirmed — check email for your sign-in link to access Romp CRM."
+    do: "Subscription confirmed — check email for your sign-in link to access Romp CRM."
 
   defp subscription_confirmed_flash(days),
     do:
@@ -103,7 +108,9 @@ defmodule RompCrmWeb.SubscribeController do
 
     cond do
       not Billing.paywall_enabled?() ->
-        conn |> put_flash(:info, "Subscription checkout is optional on this server.") |> redirect(to: ~p"/users/log-in")
+        conn
+        |> put_flash(:info, "Subscription checkout is optional on this server.")
+        |> redirect(to: ~p"/users/log-in")
 
       user == nil ->
         conn
@@ -116,7 +123,10 @@ defmodule RompCrmWeb.SubscribeController do
         |> redirect(to: ~p"/subscribe")
 
       true ->
-        case Billing.start_paypal_checkout(user, plan, paypal_return_fun(conn),
+        case Billing.start_paypal_checkout(
+               user,
+               plan,
+               paypal_return_fun(conn),
                paypal_cancel_fun(conn)
              ) do
           {:ok, %{approve_url: approve}} ->
