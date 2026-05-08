@@ -81,6 +81,8 @@ defmodule RompCrmWeb.Layouts do
       </div>
     </main>
 
+    <.legal_footer />
+
     <.flash_group flash={@flash} />
     """
   end
@@ -125,6 +127,36 @@ defmodule RompCrmWeb.Layouts do
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
     </div>
+    """
+  end
+
+  @doc """
+  Footer links to published Privacy Policy and Terms of Service on rompcrm.com.
+  """
+  def legal_footer(assigns) do
+    ~H"""
+    <footer class="border-t border-base-300/80 mt-auto px-4 py-8 text-center text-xs text-base-content/65">
+      <nav class="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        <a
+          href="https://rompcrm.com/privacy-policy.html"
+          class="link link-hover"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Privacy Policy
+        </a>
+        <span aria-hidden="true">·</span>
+        <a
+          href="https://rompcrm.com/terms-of-service.html"
+          class="link link-hover"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Terms of Service
+        </a>
+      </nav>
+      <p class="mt-2 tabular-nums">© {Date.utc_today().year} Romp CRM</p>
+    </footer>
     """
   end
 
