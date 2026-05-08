@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-05-08
+
+### Changed
+
+- **`Billing.finalize_subscription_active/3`**: stop requiring PayPal payer email to match registration email
+- **`UserAuth.require_active_subscription_user`**: before paywall redirect, if the user has a stored **`paypal_subscription_id`**, call PayPal and activate the row when the subscription is usable (unblocks home / jobs after payment when the return URL or webhook was late)
+- **`SubscribeController.show`**: same one-shot PayPal sync for logged-in visitors on **`/subscribe`**, then redirect to **`/`** with a welcome flash when activation succeeds
+- **`subscribe_html/show`**: use theme text colors (**`text-base-content`**) for readable copy on dark mode; add a short note about auto-sync on load
+
 ## [0.9.15] - 2026-05-08
 
 ### Changed

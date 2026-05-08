@@ -97,15 +97,11 @@ defmodule RompCrm.Billing do
   def finalize_subscription_active(%User{} = user, paypal_sub_id, paypal_payload)
       when is_binary(paypal_sub_id) and is_map(paypal_payload) do
     status = paypal_payload["status"]
-    payer_email = subscriber_email(paypal_payload)
     plan_id = paypal_plan_id_from_payload(paypal_payload, user)
 
     cond do
       not subscription_usable_status?(status) ->
         {:error, {:not_active, status}}
-
-      payer_email != "" and not email_matches_user?(user.email, payer_email) ->
-        {:error, :email_mismatch}
 
       true ->
         user
@@ -224,23 +220,6 @@ defmodule RompCrm.Billing do
 
     :ok
   end
-
-  defp subscriber_email(body) when is_map(body) do
-    get_in(body, ["subscriber", "email_address"]) ||
-      get_in(body, ["subscriber", "email"]) ||
-      get_in(body, ["payer", "email_address"]) ||
-      get_in(body, ["payer", "payer_info", "email"]) ||
-      ""
-  end
-
-  defp subscriber_email(_), do: ""
-
-  defp email_matches_user?(user_email, payer_email)
-       when is_binary(user_email) and is_binary(payer_email) do
-    String.downcase(String.trim(user_email)) == String.downcase(String.trim(payer_email))
-  end
-
-  defp email_matches_user?(_, _), do: false
 
   @doc """
   Used by webhook controller to normalize PayPal headers (Plug lowercases keys).
