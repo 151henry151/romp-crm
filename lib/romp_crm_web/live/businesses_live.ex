@@ -1,6 +1,7 @@
 defmodule RompCrmWeb.BusinessesLive do
   use RompCrmWeb, :live_view
 
+  alias RompCrm.Accounts.User
   alias RompCrm.Businesses
 
   @impl true
@@ -8,12 +9,15 @@ defmodule RompCrmWeb.BusinessesLive do
     user = socket.assigns.current_scope.user
     businesses = Businesses.list_businesses_for_user(user)
 
+    may_create? = User.may_create_business?(user)
+
     {:ok,
      socket
      |> assign(:businesses, businesses)
      |> assign(:invitation_lists, invitation_lists_for(businesses))
      |> assign(:invite_forms, invite_forms_init(businesses))
      |> assign(:user, user)
+     |> assign(:may_create_business, may_create?)
      |> assign_new(:form, fn -> to_form(%{"name" => ""}, as: :business) end)
      |> assign(:page_title, "Businesses")}
   end
@@ -70,6 +74,22 @@ defmodule RompCrmWeb.BusinessesLive do
          |> assign(:form, to_form(%{"name" => ""}, as: :business))
          |> put_flash(:info, "Created #{business.name}.")}
 
+      {:error, :cannot_create_business} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Your account can’t create a business. Use the invitation from your organization to join their workspace."
+         )}
+
+      {:error, :business_limit_reached} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You can create up to #{Businesses.owned_business_creation_limit()} businesses per account."
+         )}
+
       {:error, %Ecto.Changeset{} = cs} ->
         {:noreply, assign(socket, :form, to_form(cs, as: :business))}
     end
@@ -80,7 +100,8 @@ defmodule RompCrmWeb.BusinessesLive do
       {bid, _} ->
         form = to_form(params, as: :invite)
 
-        {:noreply, assign(socket, :invite_forms, Map.put(socket.assigns.invite_forms, bid, form))}
+        {:noreply,
+         assign(socket, :invite_forms, Map.put(socket.assigns.invite_forms, bid, form))}
 
       :error ->
         {:noreply, socket}

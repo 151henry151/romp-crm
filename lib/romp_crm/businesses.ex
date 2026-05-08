@@ -9,6 +9,13 @@ defmodule RompCrm.Businesses do
   alias RompCrm.Accounts.User
   alias RompCrm.Businesses.{Business, BusinessInvitation, BusinessMembership}
 
+  @max_owned_businesses_per_account 3
+
+  @doc """
+  Maximum businesses one account may create (`owner` memberships). Invited team members do not consume this quota.
+  """
+  def owned_business_creation_limit, do: @max_owned_businesses_per_account
+
   ## Businesses
 
   def get_business!(id), do: Repo.get!(Business, id)
@@ -43,7 +50,19 @@ defmodule RompCrm.Businesses do
     )
   end
 
+  def create_business(%User{may_create_business: false}, _attrs) do
+    {:error, :cannot_create_business}
+  end
+
   def create_business(%User{} = user, attrs) when is_map(attrs) do
+    if owned_business_count(user) >= @max_owned_businesses_per_account do
+      {:error, :business_limit_reached}
+    else
+      create_business_transaction(user, attrs)
+    end
+  end
+
+  defp create_business_transaction(%User{} = user, attrs) when is_map(attrs) do
     Repo.transaction(fn ->
       with {:ok, business} <-
              %Business{}
@@ -66,6 +85,14 @@ defmodule RompCrm.Businesses do
         {:error, cs} -> Repo.rollback(cs)
       end
     end)
+  end
+
+  defp owned_business_count(%User{id: uid}) do
+    Repo.one(
+      from m in BusinessMembership,
+        where: m.user_id == ^uid and m.role == :owner,
+        select: count(m.id)
+    )
   end
 
   @doc """

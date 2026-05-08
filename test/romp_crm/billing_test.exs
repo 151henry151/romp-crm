@@ -6,6 +6,18 @@ defmodule RompCrm.BillingTest do
 
   import RompCrm.AccountsFixtures
 
+  describe "subscription_active?/1" do
+    test "returns true for invited_member (team invitation access)" do
+      user = user_fixture()
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(subscription_status: "invited_member")
+        |> Repo.update()
+
+      assert Billing.subscription_active?(user)
+    end
+  end
+
   describe "paypal_return_subscription_id/1" do
     test "reads subscription_id" do
       assert Billing.paypal_return_subscription_id(%{"subscription_id" => " I-ABC123 \n"}) ==

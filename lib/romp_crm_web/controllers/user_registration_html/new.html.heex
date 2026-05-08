@@ -4,14 +4,24 @@
       <.header>
         Register for an account
         <:subtitle>
-          Already registered?
-          <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
-            Log in
-          </.link>
-          to your account now.
+          <%= if @invitation_registration do %>
+            You’re joining via a team invitation — no subscription needed.
+          <% else %>
+            Already registered?
+            <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
+              Log in
+            </.link>
+            to your account now.
+          <% end %>
         </:subtitle>
       </.header>
     </div>
+
+    <%= if @invitation_registration do %>
+      <div class="alert alert-info mb-4 text-sm" role="status">
+        After you create your account, check your email for a sign-in link. Then you’ll finish joining the business you were invited to.
+      </div>
+    <% end %>
 
     <.form :let={f} for={@changeset} action={~p"/users/register"}>
       <.input

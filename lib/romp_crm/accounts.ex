@@ -7,6 +7,7 @@ defmodule RompCrm.Accounts do
   alias RompCrm.Repo
 
   alias RompCrm.Accounts.{User, UserToken, UserNotifier}
+  alias RompCrm.Businesses.BusinessInvitation
 
   ## Database getters
 
@@ -74,6 +75,8 @@ defmodule RompCrm.Accounts do
 
     * `:enforce_allowlist` — override **`Application`** `enforce_registration_allowlist` (for tests).
     * `:allowlist` — override **`Application`** `registration_email_allowlist` (list of downcased emails).
+    * `:invitation` — pass **`%BusinessInvitation{}`** when registering from an invite link; skips hosted
+      PayPal paywall and creates an **`invited_member`** account that **`may_create_business`** **`false`**.
 
   ## Examples
 
@@ -85,6 +88,98 @@ defmodule RompCrm.Accounts do
 
   """
   def register_user(attrs, opts \\ []) when is_list(opts) do
+    case Keyword.get(opts, :invitation) do
+      %BusinessInvitation{} = inv ->
+        register_user_via_invitation(attrs, inv, opts)
+
+      _ ->
+        register_user_standard(attrs, opts)
+    end
+  end
+
+  defp register_user_via_invitation(attrs, %BusinessInvitation{} = inv, opts) when is_list(opts) do
+    changeset =
+      %User{}
+      |> User.email_changeset(attrs, validate_unique: false)
+
+    cond do
+      not changeset.valid? ->
+        {:error, %{changeset | action: :insert}}
+
+      not invitation_email_matches_changeset?(inv, changeset) ->
+        {:error,
+         changeset
+         |> Ecto.Changeset.add_error(
+           :email,
+           "must match the invitation (use the email address the invitation was sent to)"
+         )
+         |> Map.put(:action, :insert)}
+
+      not registration_email_allowed?(changeset, opts) ->
+        {:error,
+         changeset
+         |> Ecto.Changeset.add_error(
+           :email,
+           "is not authorized for registration on this server"
+         )
+         |> Map.put(:action, :insert)}
+
+      true ->
+        insert_invited_member_user(attrs, opts)
+    end
+  end
+
+  defp invitation_email_matches_changeset?(%BusinessInvitation{} = inv, changeset) do
+    reg =
+      changeset
+      |> Ecto.Changeset.get_field(:email)
+      |> to_string()
+      |> String.trim()
+      |> String.downcase()
+
+    inv_email =
+      inv.email
+      |> String.trim()
+      |> String.downcase()
+
+    reg != "" and reg == inv_email
+  end
+
+  defp insert_invited_member_user(attrs, opts) when is_list(opts) do
+    changeset = %User{} |> User.email_changeset(attrs)
+
+    cond do
+      not changeset.valid? ->
+        {:error, %{changeset | action: :insert}}
+
+      not registration_email_allowed?(changeset, opts) ->
+        {:error,
+         changeset
+         |> Ecto.Changeset.add_error(
+           :email,
+           "is not authorized for registration on this server"
+         )
+         |> Map.put(:action, :insert)}
+
+      true ->
+        Repo.transact(fn ->
+          with {:ok, user} <- Repo.insert(changeset),
+               {:ok, user} <- mark_invited_member_profile(user),
+               do: {:ok, user}
+        end)
+    end
+  end
+
+  defp mark_invited_member_profile(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(
+      subscription_status: "invited_member",
+      may_create_business: false
+    )
+    |> Repo.update()
+  end
+
+  defp register_user_standard(attrs, opts) when is_list(opts) do
     changeset =
       %User{}
       |> User.email_changeset(attrs, validate_unique: false)
