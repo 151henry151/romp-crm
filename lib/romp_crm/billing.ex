@@ -20,7 +20,10 @@ defmodule RompCrm.Billing do
     RompCrm.ApplicationConfig.subscription_paywall_enabled?()
   end
 
-  def subscription_active?(%User{subscription_status: "active"}), do: true
+  def subscription_active?(%User{subscription_status: status})
+      when status in ["active", "invited_member"],
+      do: true
+
   def subscription_active?(_), do: false
 
   @doc """

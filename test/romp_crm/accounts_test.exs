@@ -152,6 +152,61 @@ defmodule RompCrm.AccountsTest do
     end
   end
 
+  describe "register_user/2 with invitation" do
+    @tag :capture_log
+    test "creates invited_member with may_create_business false" do
+      inviter = user_fixture()
+      {:ok, business} = Businesses.create_business(inviter, %{name: "Invitation Co"})
+      email = unique_user_email()
+      {:ok, invitation} = Businesses.invite_user(business, inviter, email)
+
+      assert {:ok, user} =
+               Accounts.register_user(valid_user_attributes(email: email),
+                 invitation: invitation
+               )
+
+      assert user.subscription_status == "invited_member"
+      refute User.may_create_business?(user)
+    end
+
+    @tag :capture_log
+    test "invitation path succeeds while subscription paywall is enabled" do
+      Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+      on_exit(fn ->
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, false)
+      end)
+
+      inviter = user_fixture()
+      {:ok, business} = Businesses.create_business(inviter, %{name: "Paywall Invite Co"})
+      email = unique_user_email()
+      {:ok, invitation} = Businesses.invite_user(business, inviter, email)
+
+      assert {:ok, user} =
+               Accounts.register_user(valid_user_attributes(email: email),
+                 invitation: invitation
+               )
+
+      assert user.subscription_status == "invited_member"
+      refute User.may_create_business?(user)
+    end
+
+    @tag :capture_log
+    test "rejects email that does not match the invitation" do
+      inviter = user_fixture()
+      {:ok, business} = Businesses.create_business(inviter, %{name: "Mismatch Co"})
+      email = unique_user_email()
+      {:ok, invitation} = Businesses.invite_user(business, inviter, email)
+
+      {:error, changeset} =
+        Accounts.register_user(valid_user_attributes(email: unique_user_email()),
+          invitation: invitation
+        )
+
+      assert Enum.any?(errors_on(changeset).email, &String.starts_with?(&1, "must match the invitation"))
+    end
+  end
+
   describe "sudo_mode?/2" do
     test "validates the authenticated_at time" do
       now = DateTime.utc_now()

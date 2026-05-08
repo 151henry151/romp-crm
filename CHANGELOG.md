@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-05-08
+
+### Added
+
+- **`users.may_create_business`** column (default true): invite-only accounts register with **`may_create_business` false** and **`subscription_status` `invited_member`**
+- **`User.may_create_business?/1`**, **`Billing.subscription_active?/1`** for **`invited_member`**, **`Businesses.create_business/2`** guard returning **`{:error, :cannot_create_business}`**
+- **`Accounts.register_user/2`** option **`invitation:`** for **`BusinessInvitation`** (skips hosted PayPal path; marks invited member profile)
+- **`UserRegistrationController`**: session **`pending_invitation_token`** suppresses billing UI; **`finish_invite_create`** sends magic link without PayPal
+- **`businesses_live`**: hide “Create a business” for users who may not create one; flash on blocked **`create_business`** and on **`business_limit_reached`**
+- **`user_registration_html/new`**: invitation-specific subtitle and info alert
+- **`Businesses.create_business/2`**: cap at **`3`** owner businesses per account (**`owned_business_creation_limit/0`**); return **`{:error, :business_limit_reached}`**
+- Tests for invitation registration, paywall bypass for **`invited_member`**, UI, and business creation limit
+
 ## [0.9.16] - 2026-05-08
 
 ### Changed

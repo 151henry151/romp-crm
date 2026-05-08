@@ -22,10 +22,19 @@ defmodule RompCrm.Accounts.User do
     # `active`: allowed to use the app when paywall is enabled. Others block at the plug/LiveView layer.
     field :subscription_status, :string, default: "active"
 
+    # Hosted paywall: invite-only members (`subscription_status` `invited_member`) cannot create businesses.
+    field :may_create_business, :boolean, default: true
+
     has_many :business_memberships, RompCrm.Businesses.BusinessMembership
 
     timestamps(type: :utc_datetime)
   end
+
+  @doc """
+  Returns false for invite-only accounts that must not create an organization (`may_create_business` false).
+  """
+  def may_create_business?(%__MODULE__{may_create_business: false}), do: false
+  def may_create_business?(%__MODULE__{}), do: true
 
   @doc """
   A user changeset for registering or changing the email.

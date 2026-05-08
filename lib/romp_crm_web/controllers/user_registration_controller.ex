@@ -4,6 +4,7 @@ defmodule RompCrmWeb.UserRegistrationController do
   alias RompCrm.Accounts
   alias RompCrm.Accounts.User
   alias RompCrm.Billing
+  alias RompCrm.Businesses
   alias RompCrmWeb.UserAuth
 
   plug :auth_pages_no_store when action in [:new]
@@ -19,8 +20,13 @@ defmodule RompCrmWeb.UserRegistrationController do
 
     changeset = Accounts.change_user_email(%User{email: initial_email})
 
+    {invitation_registration?, _inv} = invitation_context(conn)
+
     render(conn, :new,
-      registration_assigns(changeset: changeset)
+      registration_assigns(
+        changeset: changeset,
+        invitation_registration: invitation_registration?
+      )
     )
   end
 
@@ -28,42 +34,154 @@ defmodule RompCrmWeb.UserRegistrationController do
     plan = user_params |> Map.get("plan", "monthly") |> to_string()
     attrs = Map.drop(user_params, ["plan"])
 
-    cond do
-      Billing.paywall_enabled?() and not Billing.valid_plan?(plan) ->
-        conn
-        |> put_flash(:error, "Choose monthly or annual billing.")
-        |> render_register_form(attrs)
+    case classify_registration(conn, attrs) do
+      {:via_invitation, invitation} ->
+        finish_invite_create(conn, attrs, invitation)
 
-      Billing.paywall_enabled?() and not Billing.plan_configured?(plan) ->
+      {:invitation_expired, conn} ->
         conn
-        |> put_flash(
-          :error,
-          "This server is not configured for that plan yet. Try the other option or contact support."
+
+      {:invitation_email_mismatch, expected, conn} ->
+        cs = Accounts.change_user_email(%User{}, attrs)
+        flash = "This invitation is for #{expected}. Use that email address or ask for a new invite."
+
+        conn
+        |> put_flash(:error, flash)
+        |> render(:new,
+          registration_assigns(
+            changeset: %{cs | action: :insert},
+            invitation_registration: true
+          )
         )
-        |> render_register_form(attrs)
+
+      :standard_paywall ->
+        cond do
+          Billing.paywall_enabled?() and not Billing.valid_plan?(plan) ->
+            conn
+            |> put_flash(:error, "Choose monthly or annual billing.")
+            |> render_register_form(attrs)
+
+          Billing.paywall_enabled?() and not Billing.plan_configured?(plan) ->
+            conn
+            |> put_flash(
+              :error,
+              "This server is not configured for that plan yet. Try the other option or contact support."
+            )
+            |> render_register_form(attrs)
+
+          true ->
+            finish_create(conn, attrs, plan)
+        end
+    end
+  end
+
+  defp classify_registration(conn, attrs) do
+    token = get_session(conn, "pending_invitation_token")
+
+    cond do
+      not is_binary(token) ->
+        :standard_paywall
 
       true ->
-        finish_create(conn, attrs, plan)
+        case Businesses.get_invitation_by_raw_token(token) do
+          nil ->
+            {:invitation_expired,
+             conn
+             |> delete_session("pending_invitation_token")
+             |> put_flash(
+               :error,
+               "That invitation link is no longer valid. Ask the business owner for a new invitation, or register below if you are subscribing yourself."
+             )
+             |> redirect(to: ~p"/users/register")}
+
+          invitation ->
+            email =
+              attrs
+              |> Map.get("email", "")
+              |> to_string()
+              |> String.trim()
+              |> String.downcase()
+
+            inv_email =
+              invitation.email
+              |> String.trim()
+              |> String.downcase()
+
+            cond do
+              email != inv_email ->
+                {:invitation_email_mismatch, invitation.email, conn}
+
+              true ->
+                {:via_invitation, invitation}
+            end
+        end
+    end
+  end
+
+  defp finish_invite_create(conn, attrs, invitation) do
+    case Accounts.register_user(attrs, invitation: invitation) do
+      {:ok, user} ->
+        {:ok, _} =
+          Accounts.deliver_login_instructions(
+            user,
+            &url(~p"/users/log-in/#{&1}")
+          )
+
+        conn
+        |> put_flash(
+          :info,
+          "Check #{user.email} for your sign-in link. After signing in, you’ll finish joining the business — no PayPal subscription needed for invited members."
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        render(conn, :new,
+          registration_assigns(
+            changeset: %{changeset | action: :insert},
+            invitation_registration: true
+          )
+        )
     end
   end
 
   defp render_register_form(conn, attrs) do
     cs = Accounts.change_user_email(%User{}, attrs)
     changeset = %{cs | action: :insert}
+    {_inv?, invitation_registration?} = invitation_context(conn)
 
     render(conn, :new,
-      registration_assigns(changeset: changeset)
+      registration_assigns(
+        changeset: changeset,
+        invitation_registration: invitation_registration?
+      )
     )
   end
 
   defp registration_assigns(extra) do
+    invitation_registration =
+      Keyword.get(extra, :invitation_registration, false)
+
     Keyword.merge(
       [
-        subscription_paywall: Billing.paywall_enabled?(),
-        paypal_trial_days: Billing.paypal_trial_days()
+        subscription_paywall: Billing.paywall_enabled?() && !invitation_registration,
+        paypal_trial_days: Billing.paypal_trial_days(),
+        invitation_registration: invitation_registration
       ],
       extra
     )
+  end
+
+  defp invitation_context(conn) do
+    token = get_session(conn, "pending_invitation_token")
+
+    if is_binary(token) do
+      case Businesses.get_invitation_by_raw_token(token) do
+        nil -> {false, nil}
+        %_{} = inv -> {true, inv}
+      end
+    else
+      {false, nil}
+    end
   end
 
   defp finish_create(conn, attrs, plan) do
@@ -106,8 +224,13 @@ defmodule RompCrmWeb.UserRegistrationController do
         end
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        {invitation_registration?, _} = invitation_context(conn)
+
         render(conn, :new,
-          registration_assigns(changeset: %{changeset | action: :insert})
+          registration_assigns(
+            changeset: %{changeset | action: :insert},
+            invitation_registration: invitation_registration?
+          )
         )
     end
   end

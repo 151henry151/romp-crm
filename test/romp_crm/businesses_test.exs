@@ -7,6 +7,30 @@ defmodule RompCrm.BusinessesTest do
   alias RompCrm.Businesses
   alias RompCrm.Accounts.User
 
+  describe "create_business/2" do
+    test "returns cannot_create_business when may_create_business is false" do
+      user = user_fixture()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(may_create_business: false)
+        |> Repo.update()
+
+      assert {:error, :cannot_create_business} =
+               Businesses.create_business(user, %{name: "Should not exist"})
+    end
+
+    test "returns business_limit_reached when user already owns three businesses" do
+      user = user_fixture()
+      assert {:ok, _} = Businesses.create_business(user, %{name: "One"})
+      assert {:ok, _} = Businesses.create_business(user, %{name: "Two"})
+      assert {:ok, _} = Businesses.create_business(user, %{name: "Three"})
+
+      assert {:error, :business_limit_reached} =
+               Businesses.create_business(user, %{name: "Four"})
+    end
+  end
+
   describe "resolve_sms_business_id/1" do
     test "prefers selected_business_id over sms_business_id when both are set" do
       user = user_fixture()
@@ -18,8 +42,7 @@ defmodule RompCrm.BusinessesTest do
         |> Ecto.Changeset.change(sms_business_id: biz_a.id)
         |> Repo.update()
 
-      assert {:ok, _} =
-               Accounts.put_jobs_workspace_selection(Accounts.get_user!(user.id), biz_b.id)
+      assert {:ok, _} = Accounts.put_jobs_workspace_selection(Accounts.get_user!(user.id), biz_b.id)
 
       assert {:ok, biz_b.id} ==
                Businesses.resolve_sms_business_id(Accounts.get_user!(user.id))
