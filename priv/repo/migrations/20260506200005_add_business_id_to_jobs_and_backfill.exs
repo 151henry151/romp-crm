@@ -21,7 +21,7 @@ defmodule RompCrm.Repo.Migrations.AddBusinessIdToJobsAndBackfill do
 
     repo.update_all(from(j in RompCrm.Jobs.Job), set: [business_id: bid])
 
-    users = repo.all(RompCrm.Accounts.User)
+    users = repo.query!("SELECT id FROM users").rows |> Enum.map(fn [id] -> %{id: id} end)
 
     Enum.each(users, fn user ->
       %RompCrm.Businesses.BusinessMembership{}

@@ -17,7 +17,9 @@ defmodule RompCrmWeb.SubscriptionPaywallTest do
 
     test "redirects a logged-in user without an active subscription away from jobs", %{conn: conn} do
       user = user_fixture()
-      {:ok, user} = RompCrm.Repo.update(Ecto.Changeset.change(user, subscription_status: "pending_payment"))
+
+      {:ok, user} =
+        RompCrm.Repo.update(Ecto.Changeset.change(user, subscription_status: "pending_payment"))
 
       conn =
         conn

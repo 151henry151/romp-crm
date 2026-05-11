@@ -1,0 +1,96 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold">Employees</h1>
+      <div class="flex items-center gap-4">
+        <.link navigate={~p"/"} class="text-sm font-medium text-blue-600 hover:text-blue-800">
+          Jobs
+        </.link>
+        <.link
+          navigate={~p"/time-log"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Time Log
+        </.link>
+        <.link
+          patch={~p"/employees/new"}
+          class="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white no-underline shadow-sm hover:bg-blue-500"
+        >
+          + New Employee
+        </.link>
+      </div>
+    </div>
+
+    <div class="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
+      <table class="w-full text-sm" id="employees-table">
+        <thead>
+          <tr class="border-b border-base-300 bg-base-200/40">
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Name</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Title</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Phone</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Email</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-base-300">
+          <%= if @employees == [] do %>
+            <tr id="employees-empty">
+              <td colspan="5" class="px-4 py-12 text-center text-base-content/60">
+                No employees yet. Add team members to track their time.
+              </td>
+            </tr>
+          <% end %>
+          <%= for emp <- @employees do %>
+            <tr id={"employee-row-#{emp.id}"} class="hover:bg-base-200/40 group">
+              <td class="px-4 py-3 font-medium text-base-content">
+                <.link
+                  navigate={~p"/employees/#{emp.id}"}
+                  class="text-blue-600 hover:text-blue-800"
+                >
+                  {emp.name}
+                </.link>
+              </td>
+              <td class="px-4 py-3 text-base-content/80">{emp.title}</td>
+              <td class="px-4 py-3 text-base-content/80">{emp.phone}</td>
+              <td class="px-4 py-3 text-base-content/80">{emp.email}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <.link
+                    patch={~p"/employees/#{emp.id}/edit"}
+                    class="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Edit
+                  </.link>
+                  <button
+                    id={"delete-employee-#{emp.id}"}
+                    phx-click="delete"
+                    phx-value-id={emp.id}
+                    data-confirm="Delete this employee?"
+                    class="text-red-500 hover:text-red-700 font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layouts.app>
+
+<%!-- Modal for new/edit employee --%>
+<%= if @live_action in [:new, :edit] do %>
+  <.modal id="employee-modal" show on_cancel={JS.patch(~p"/employees")}>
+    <.live_component
+      module={RompCrmWeb.EmployeeFormComponent}
+      id={(@employee && @employee.id) || :new}
+      title={if @live_action == :new, do: "New Employee", else: "Edit Employee"}
+      action={@live_action}
+      employee={@employee}
+      current_business_id={@current_business_id}
+      patch={~p"/employees"}
+    />
+  </.modal>
+<% end %>

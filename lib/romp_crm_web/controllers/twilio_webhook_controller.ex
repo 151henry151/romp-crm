@@ -5,9 +5,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   alias RompCrm.Accounts
   alias RompCrm.Ai.SmsJobExtractor
+  alias RompCrm.Ai.SmsTimeExtractor
+  alias RompCrm.Ai.SmsEmployeeTimeExtractor
   alias RompCrm.Businesses
+  alias RompCrm.Employees
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
+  alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
   alias RompCrm.Twilio.Signature
@@ -99,64 +103,89 @@ defmodule RompCrmWeb.TwilioWebhookController do
       "Twilio SMS inbound: sid=#{message_sid} to=#{inspect(to_num)} user_id=#{user.id} business_id=#{business_id} from=#{from} body=#{inspect(body_text)}"
     )
 
+    # Build snapshots for all extractors
     jobs_snapshot = Jobs.snapshot_for_sms_ai(business_id)
     allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
 
-    case SmsJobExtractor.extract(body_text, jobs_snapshot) do
-      {:ok, %{assistant_sms: assistant, operations: ops}} when ops == [] ->
-        if is_binary(assistant) and String.trim(assistant) != "" do
-          _ = Messages.send_sms(from, String.trim(assistant))
-        end
+    open_time_entries = TimeTracking.snapshot_for_sms_ai(business_id)
+    employees_snapshot = Employees.snapshot_for_sms_ai(business_id)
+    allowed_employee_ids = MapSet.new(Enum.map(employees_snapshot, fn row -> row["id"] end))
 
-        twiml_ok(conn)
+    # Run all three extractors
+    job_result = SmsJobExtractor.extract(body_text, jobs_snapshot)
+    time_result = SmsTimeExtractor.extract(body_text, jobs_snapshot, open_time_entries)
+    emp_result = SmsEmployeeTimeExtractor.extract(body_text, employees_snapshot)
 
-      {:ok, %{assistant_sms: assistant, operations: ops}} ->
-        Logger.info(
-          "Twilio SMS parsed operations: sid=#{message_sid} count=#{length(ops)} from=#{from}"
-        )
+    # Process each extractor's results
+    {job_assistant, job_ops} = unwrap_extract(job_result, message_sid, from, "job")
+    {time_assistant, time_ops} = unwrap_extract(time_result, message_sid, from, "time")
+    {emp_assistant, emp_ops} = unwrap_extract(emp_result, message_sid, from, "employee")
 
-        case run_operations(ops, message_sid, from, business_id, allowed_job_ids) do
-          {:clarify, msg} ->
-            _ = Messages.send_sms(from, msg)
-            twiml_ok(conn)
+    all_ops = job_ops ++ time_ops ++ emp_ops
 
-          {:ok, results} ->
-            reply = SmsReplyBuilder.compose(assistant, results)
-            _ = Messages.send_sms(from, reply)
-            twiml_ok(conn)
-        end
+    if all_ops == [] do
+      # No operations — send any clarification message from AI
+      msg = first_nonempty([job_assistant, time_assistant, emp_assistant])
 
-      {:error, :missing_api_key} ->
-        Logger.error(
-          "Twilio SMS extraction failed: sid=#{message_sid} from=#{from} reason=:missing_api_key body=#{inspect(body_text)}"
-        )
+      if msg do
+        _ = Messages.send_sms(from, msg)
+      end
 
-        twiml_ok(conn)
+      twiml_ok(conn)
+    else
+      Logger.info(
+        "Twilio SMS parsed operations: sid=#{message_sid} count=#{length(all_ops)} from=#{from}"
+      )
 
-      {:error, reason} ->
-        Logger.warning(
-          "Twilio SMS extraction failed: sid=#{message_sid} from=#{from} reason=#{inspect(reason)} body=#{inspect(body_text)}"
-        )
+      job_ctx = %{
+        message_sid: message_sid,
+        from: from,
+        business_id: business_id,
+        allowed_job_ids: allowed_job_ids
+      }
 
-        _ =
-          Messages.send_sms(
-            from,
-            parse_error_user_message(reason)
-          )
+      case run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
+        {:clarify, msg} ->
+          _ = Messages.send_sms(from, msg)
+          twiml_ok(conn)
 
-        twiml_ok(conn)
+        {:ok, all_results} ->
+          combined_assistant = first_nonempty([job_assistant, time_assistant, emp_assistant])
+          reply = SmsReplyBuilder.compose(combined_assistant, all_results)
+          _ = Messages.send_sms(from, reply)
+          twiml_ok(conn)
+      end
     end
   end
 
-  defp parse_error_user_message(:empty_extract),
-    do: "Not sure what to change—name the client or paste more detail."
+  # Runs all operation lists and collects results. Job fuzzy-match errors trigger clarification.
+  defp run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
+    with {:ok, job_results} <- run_job_operations(job_ops, job_ctx),
+         {:ok, time_results} <- run_time_operations(time_ops, job_ctx),
+         {:ok, emp_results} <-
+           run_emp_operations(
+             emp_ops,
+             job_ctx.message_sid,
+             job_ctx.from,
+             job_ctx.business_id,
+             allowed_employee_ids
+           ) do
+      {:ok, job_results ++ time_results ++ emp_results}
+    end
+  end
 
-  defp parse_error_user_message(_),
-    do: "Couldn't parse that—try naming the client or job."
+  # ── Job operations (existing) ────────────────────────────────────────────
 
-  defp run_operations(ops, message_sid, from, business_id, allowed_job_ids) do
+  defp run_job_operations(ops, ctx) do
     Enum.reduce_while(Enum.with_index(ops, 1), [], fn {op, idx}, acc ->
-      case apply_sms_operation_ret(op, idx, message_sid, from, business_id, allowed_job_ids) do
+      case apply_sms_operation_ret(
+             op,
+             idx,
+             ctx.message_sid,
+             ctx.from,
+             ctx.business_id,
+             ctx.allowed_job_ids
+           ) do
         {:clarify_match, msg} ->
           {:halt, {:clarify, msg}}
 
@@ -165,13 +194,488 @@ defmodule RompCrmWeb.TwilioWebhookController do
       end
     end)
     |> case do
-      {:clarify, msg} ->
-        {:clarify, msg}
-
-      rev when is_list(rev) ->
-        {:ok, Enum.reverse(rev)}
+      {:clarify, msg} -> {:clarify, msg}
+      rev when is_list(rev) -> {:ok, Enum.reverse(rev)}
     end
   end
+
+  # ── Time tracking operations ──────────────────────────────────────────────
+
+  defp run_time_operations(ops, ctx) do
+    results =
+      ops
+      |> Enum.with_index(1)
+      |> Enum.map(fn {op, idx} ->
+        apply_time_operation(
+          op,
+          idx,
+          ctx.message_sid,
+          ctx.from,
+          ctx.business_id,
+          ctx.allowed_job_ids
+        )
+      end)
+
+    {:ok, results}
+  end
+
+  defp apply_time_operation(
+         {:clock_in_by_id, job_id, started_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS time clock_in: sid=#{sid} from=#{from} op_index=#{idx} job_id=#{job_id} started_at=#{started_at}"
+    )
+
+    if not MapSet.member?(allowed_ids, job_id) do
+      Logger.info(
+        "Twilio SMS time_clock_in skipped: sid=#{sid} op_index=#{idx} reason=:invalid_job_id job_id=#{job_id}"
+      )
+
+      {:skipped, :invalid_job_id}
+    else
+      case Jobs.get_job(job_id, business_id) do
+        nil ->
+          Logger.info(
+            "Twilio SMS time_clock_in skipped: sid=#{sid} op_index=#{idx} reason=:job_not_found job_id=#{job_id}"
+          )
+
+          {:skipped, :job_not_found}
+
+        job ->
+          case TimeTracking.create_time_entry(%{
+                 business_id: business_id,
+                 job_id: job.id,
+                 started_at: started_at
+               }) do
+            {:ok, entry} ->
+              Logger.info(
+                "Twilio SMS time_clock_in applied: sid=#{sid} op_index=#{idx} job_id=#{job.id} entry_id=#{entry.id}"
+              )
+
+              {:time_clocked_in, job.client_name, started_at}
+
+            {:error, cs} ->
+              Logger.warning(
+                "Twilio SMS time_clock_in failed: sid=#{sid} op_index=#{idx} job_id=#{job.id} errors=#{inspect(cs.errors)}"
+              )
+
+              {:error, :clock_in_failed}
+          end
+      end
+    end
+  end
+
+  defp apply_time_operation(
+         {:clock_out_by_id, job_id, ended_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS time clock_out: sid=#{sid} from=#{from} op_index=#{idx} job_id=#{job_id} ended_at=#{ended_at}"
+    )
+
+    if not MapSet.member?(allowed_ids, job_id) do
+      Logger.info(
+        "Twilio SMS time_clock_out skipped: sid=#{sid} op_index=#{idx} reason=:invalid_job_id job_id=#{job_id}"
+      )
+
+      {:skipped, :invalid_job_id}
+    else
+      case TimeTracking.get_open_entry_for_job(job_id, business_id) do
+        nil ->
+          Logger.info(
+            "Twilio SMS time_clock_out skipped: sid=#{sid} op_index=#{idx} reason=:no_open_entry job_id=#{job_id}"
+          )
+
+          {:skipped, :no_open_entry}
+
+        entry ->
+          case TimeTracking.update_time_entry(entry, %{ended_at: ended_at}) do
+            {:ok, updated} ->
+              Logger.info(
+                "Twilio SMS time_clock_out applied: sid=#{sid} op_index=#{idx} job_id=#{job_id} entry_id=#{updated.id}"
+              )
+
+              job = Jobs.get_job(job_id, business_id)
+              {:time_clocked_out, job && job.client_name, updated.started_at, ended_at}
+
+            {:error, cs} ->
+              Logger.warning(
+                "Twilio SMS time_clock_out failed: sid=#{sid} op_index=#{idx} job_id=#{job_id} errors=#{inspect(cs.errors)}"
+              )
+
+              {:error, :clock_out_failed}
+          end
+      end
+    end
+  end
+
+  defp apply_time_operation(
+         {:clock_in, match, started_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         _allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS time clock_in (match): sid=#{sid} from=#{from} op_index=#{idx} match=#{inspect(match)}"
+    )
+
+    case Jobs.find_job_for_sms_update(match, business_id) do
+      {:ok, job} ->
+        case TimeTracking.create_time_entry(%{
+               business_id: business_id,
+               job_id: job.id,
+               started_at: started_at
+             }) do
+          {:ok, entry} ->
+            Logger.info(
+              "Twilio SMS time_clock_in applied: sid=#{sid} op_index=#{idx} job_id=#{job.id} entry_id=#{entry.id}"
+            )
+
+            {:time_clocked_in, job.client_name, started_at}
+
+          {:error, cs} ->
+            Logger.warning("Twilio SMS time_clock_in failed: #{inspect(cs.errors)}")
+            {:error, :clock_in_failed}
+        end
+
+      {:error, reason} ->
+        Logger.info(
+          "Twilio SMS time_clock_in skipped: sid=#{sid} op_index=#{idx} reason=#{inspect(reason)}"
+        )
+
+        {:skipped, reason}
+    end
+  end
+
+  defp apply_time_operation(
+         {:clock_out, match, ended_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         _allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS time clock_out (match): sid=#{sid} from=#{from} op_index=#{idx} match=#{inspect(match)}"
+    )
+
+    case Jobs.find_job_for_sms_update(match, business_id) do
+      {:ok, job} ->
+        case TimeTracking.get_open_entry_for_job(job.id, business_id) do
+          nil ->
+            Logger.info(
+              "Twilio SMS time_clock_out skipped: sid=#{sid} op_index=#{idx} reason=:no_open_entry job_id=#{job.id}"
+            )
+
+            {:skipped, :no_open_entry}
+
+          entry ->
+            case TimeTracking.update_time_entry(entry, %{ended_at: ended_at}) do
+              {:ok, _updated} ->
+                Logger.info(
+                  "Twilio SMS time_clock_out applied: sid=#{sid} op_index=#{idx} job_id=#{job.id}"
+                )
+
+                {:time_clocked_out, job.client_name, entry.started_at, ended_at}
+
+              {:error, cs} ->
+                Logger.warning("Twilio SMS time_clock_out failed: #{inspect(cs.errors)}")
+                {:error, :clock_out_failed}
+            end
+        end
+
+      {:error, reason} ->
+        Logger.info(
+          "Twilio SMS time_clock_out skipped: sid=#{sid} op_index=#{idx} reason=#{inspect(reason)}"
+        )
+
+        {:skipped, reason}
+    end
+  end
+
+  # ── Employee time operations ──────────────────────────────────────────────
+
+  defp run_emp_operations(ops, sid, from, business_id, allowed_ids) do
+    results =
+      ops
+      |> Enum.with_index(1)
+      |> Enum.map(fn {op, idx} ->
+        apply_emp_operation(op, idx, sid, from, business_id, allowed_ids)
+      end)
+
+    {:ok, results}
+  end
+
+  defp apply_emp_operation(
+         {:emp_clock_in_by_id, emp_id, clocked_in_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp clock_in: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
+    )
+
+    if not MapSet.member?(allowed_ids, emp_id) do
+      Logger.info(
+        "Twilio SMS emp_clock_in skipped: sid=#{sid} op_index=#{idx} reason=:invalid_employee_id employee_id=#{emp_id}"
+      )
+
+      {:skipped, :invalid_employee_id}
+    else
+      case Employees.get_employee(emp_id, business_id) do
+        nil ->
+          Logger.info(
+            "Twilio SMS emp_clock_in skipped: sid=#{sid} reason=:employee_not_found employee_id=#{emp_id}"
+          )
+
+          {:skipped, :employee_not_found}
+
+        emp ->
+          case Employees.create_time_entry(%{
+                 business_id: business_id,
+                 employee_id: emp.id,
+                 clocked_in_at: clocked_in_at
+               }) do
+            {:ok, entry} ->
+              Logger.info(
+                "Twilio SMS emp_clock_in applied: sid=#{sid} employee_id=#{emp.id} entry_id=#{entry.id}"
+              )
+
+              {:emp_clocked_in, emp.name, clocked_in_at}
+
+            {:error, cs} ->
+              Logger.warning("Twilio SMS emp_clock_in failed: #{inspect(cs.errors)}")
+              {:error, :emp_clock_in_failed}
+          end
+      end
+    end
+  end
+
+  defp apply_emp_operation(
+         {:emp_clock_out_by_id, emp_id, clocked_out_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp clock_out: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
+    )
+
+    if not MapSet.member?(allowed_ids, emp_id) do
+      Logger.info(
+        "Twilio SMS emp_clock_out skipped: sid=#{sid} reason=:invalid_employee_id employee_id=#{emp_id}"
+      )
+
+      {:skipped, :invalid_employee_id}
+    else
+      case Employees.get_open_entry(emp_id, business_id) do
+        nil ->
+          Logger.info(
+            "Twilio SMS emp_clock_out skipped: sid=#{sid} reason=:no_open_entry employee_id=#{emp_id}"
+          )
+
+          {:skipped, :no_open_entry}
+
+        entry ->
+          case Employees.update_time_entry(entry, %{clocked_out_at: clocked_out_at}) do
+            {:ok, updated} ->
+              Logger.info(
+                "Twilio SMS emp_clock_out applied: sid=#{sid} employee_id=#{emp_id} entry_id=#{updated.id}"
+              )
+
+              emp = Employees.get_employee(emp_id, business_id)
+              {:emp_clocked_out, emp && emp.name, updated.clocked_in_at, clocked_out_at}
+
+            {:error, cs} ->
+              Logger.warning("Twilio SMS emp_clock_out failed: #{inspect(cs.errors)}")
+              {:error, :emp_clock_out_failed}
+          end
+      end
+    end
+  end
+
+  defp apply_emp_operation(
+         {:emp_lunch_by_id, emp_id, lunch_start, lunch_end},
+         idx,
+         sid,
+         from,
+         business_id,
+         allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp lunch: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
+    )
+
+    if not MapSet.member?(allowed_ids, emp_id) do
+      Logger.info(
+        "Twilio SMS emp_lunch skipped: sid=#{sid} reason=:invalid_employee_id employee_id=#{emp_id}"
+      )
+
+      {:skipped, :invalid_employee_id}
+    else
+      case Employees.get_open_entry(emp_id, business_id) do
+        nil ->
+          Logger.info(
+            "Twilio SMS emp_lunch skipped: sid=#{sid} reason=:no_open_entry employee_id=#{emp_id}"
+          )
+
+          {:skipped, :no_open_entry}
+
+        entry ->
+          case Employees.update_time_entry(entry, %{
+                 lunch_start_at: lunch_start,
+                 lunch_end_at: lunch_end
+               }) do
+            {:ok, _updated} ->
+              Logger.info("Twilio SMS emp_lunch applied: sid=#{sid} employee_id=#{emp_id}")
+              emp = Employees.get_employee(emp_id, business_id)
+              {:emp_lunched, emp && emp.name, lunch_start, lunch_end}
+
+            {:error, cs} ->
+              Logger.warning("Twilio SMS emp_lunch failed: #{inspect(cs.errors)}")
+              {:error, :emp_lunch_failed}
+          end
+      end
+    end
+  end
+
+  # Match-based employee operations (fuzzy name matching)
+  defp apply_emp_operation(
+         {:emp_clock_in, match, clocked_in_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         _allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp clock_in (match): sid=#{sid} from=#{from} op_index=#{idx} match=#{inspect(match)}"
+    )
+
+    case find_employee_for_sms(match, business_id) do
+      {:ok, emp} ->
+        case Employees.create_time_entry(%{
+               business_id: business_id,
+               employee_id: emp.id,
+               clocked_in_at: clocked_in_at
+             }) do
+          {:ok, _} -> {:emp_clocked_in, emp.name, clocked_in_at}
+          {:error, _} -> {:error, :emp_clock_in_failed}
+        end
+
+      {:error, reason} ->
+        Logger.info("Twilio SMS emp_clock_in skipped: sid=#{sid} reason=#{inspect(reason)}")
+        {:skipped, reason}
+    end
+  end
+
+  defp apply_emp_operation(
+         {:emp_clock_out, match, clocked_out_at},
+         idx,
+         sid,
+         from,
+         business_id,
+         _allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp clock_out (match): sid=#{sid} from=#{from} op_index=#{idx} match=#{inspect(match)}"
+    )
+
+    case find_employee_for_sms(match, business_id) do
+      {:ok, emp} ->
+        case Employees.get_open_entry(emp.id, business_id) do
+          nil ->
+            {:skipped, :no_open_entry}
+
+          entry ->
+            case Employees.update_time_entry(entry, %{clocked_out_at: clocked_out_at}) do
+              {:ok, updated} ->
+                {:emp_clocked_out, emp.name, updated.clocked_in_at, clocked_out_at}
+
+              {:error, _} ->
+                {:error, :emp_clock_out_failed}
+            end
+        end
+
+      {:error, reason} ->
+        Logger.info("Twilio SMS emp_clock_out skipped: sid=#{sid} reason=#{inspect(reason)}")
+        {:skipped, reason}
+    end
+  end
+
+  defp apply_emp_operation(
+         {:emp_lunch, match, lunch_start, lunch_end},
+         idx,
+         sid,
+         from,
+         business_id,
+         _allowed_ids
+       ) do
+    Logger.info(
+      "Twilio SMS emp lunch (match): sid=#{sid} from=#{from} op_index=#{idx} match=#{inspect(match)}"
+    )
+
+    case find_employee_for_sms(match, business_id) do
+      {:ok, emp} ->
+        case Employees.get_open_entry(emp.id, business_id) do
+          nil ->
+            {:skipped, :no_open_entry}
+
+          entry ->
+            case Employees.update_time_entry(entry, %{
+                   lunch_start_at: lunch_start,
+                   lunch_end_at: lunch_end
+                 }) do
+              {:ok, _} -> {:emp_lunched, emp.name, lunch_start, lunch_end}
+              {:error, _} -> {:error, :emp_lunch_failed}
+            end
+        end
+
+      {:error, reason} ->
+        Logger.info("Twilio SMS emp_lunch skipped: sid=#{sid} reason=#{inspect(reason)}")
+        {:skipped, reason}
+    end
+  end
+
+  # Name-based fuzzy match for employees
+  defp find_employee_for_sms(%{"name" => name} = _match, business_id) when is_binary(name) do
+    name_lower = String.downcase(name)
+    employees = Employees.list_employees(business_id)
+
+    matches =
+      Enum.filter(employees, fn emp ->
+        emp_lower = String.downcase(emp.name)
+
+        emp_lower == name_lower or String.contains?(emp_lower, name_lower) or
+          String.contains?(name_lower, emp_lower)
+      end)
+
+    case matches do
+      [emp] -> {:ok, emp}
+      [] -> {:error, :no_match}
+      _ -> {:error, :ambiguous}
+    end
+  end
+
+  defp find_employee_for_sms(_match, _business_id), do: {:error, :no_match}
+
+  # ── Existing job operation (kept as-is) ──────────────────────────────────
 
   defp apply_sms_operation_ret(
          {:create, attrs},
@@ -301,6 +805,32 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
         {:skipped, reason}
     end
+  end
+
+  # ── Helpers ──────────────────────────────────────────────────────────────
+
+  defp unwrap_extract({:ok, %{assistant_sms: assistant, operations: ops}}, _sid, _from, _type) do
+    {assistant, ops}
+  end
+
+  defp unwrap_extract({:error, :missing_api_key}, sid, from, type) do
+    Logger.error(
+      "Twilio SMS #{type} extraction failed: sid=#{sid} from=#{from} reason=:missing_api_key"
+    )
+
+    {nil, []}
+  end
+
+  defp unwrap_extract({:error, reason}, sid, from, type) do
+    Logger.warning(
+      "Twilio SMS #{type} extraction failed: sid=#{sid} from=#{from} reason=#{inspect(reason)}"
+    )
+
+    {nil, []}
+  end
+
+  defp first_nonempty(list) do
+    Enum.find(list, fn s -> is_binary(s) and String.trim(s) != "" end)
   end
 
   defp twiml_ok(conn) do

@@ -121,7 +121,8 @@ defmodule RompCrmWeb.UserSettingsController do
         String.trim(paypal_sub_id) != ""
 
     show_cancel_subscription =
-      RompCrm.ApplicationConfig.subscription_paywall_enabled?() and user.subscription_status == "active" and
+      RompCrm.ApplicationConfig.subscription_paywall_enabled?() and
+        user.subscription_status == "active" and
         is_binary(paypal_sub_id) and String.trim(paypal_sub_id) != ""
 
     conn

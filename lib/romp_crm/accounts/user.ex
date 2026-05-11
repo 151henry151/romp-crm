@@ -14,11 +14,11 @@ defmodule RompCrm.Accounts.User do
 
     belongs_to :sms_business, RompCrm.Businesses.Business, foreign_key: :sms_business_id
 
-    belongs_to :selected_business, RompCrm.Businesses.Business,
-      foreign_key: :selected_business_id
+    belongs_to :selected_business, RompCrm.Businesses.Business, foreign_key: :selected_business_id
 
     field :paypal_subscription_id, :string
     field :paypal_plan_id, :string
+
     # `active`: allowed to use the app when paywall is enabled. Others block at the plug/LiveView layer.
     field :subscription_status, :string, default: "active"
 

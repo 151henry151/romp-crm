@@ -132,7 +132,8 @@ defmodule RompCrm.Billing.PaypalClient do
   Returns **`{:ok, :cancelled}`** on HTTP **204**. If PayPal responds with an error but the subscription is already
   terminated (**`CANCELLED`** / **`EXPIRED`**), returns **`{:ok, :already_cancelled}`**.
   """
-  @spec cancel_subscription(String.t(), String.t()) :: {:ok, :cancelled | :already_cancelled} | {:error, term()}
+  @spec cancel_subscription(String.t(), String.t()) ::
+          {:ok, :cancelled | :already_cancelled} | {:error, term()}
   def cancel_subscription(subscription_id, reason \\ "Customer requested cancellation")
       when is_binary(subscription_id) and is_binary(reason) do
     trimmed_reason =

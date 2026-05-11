@@ -66,7 +66,11 @@ defmodule RompCrmWeb.InvitationControllerTest do
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ invitee_email
   end
 
-  test "accepts invitation for logged in matching user", %{conn: conn, inviter: inviter, business: business} do
+  test "accepts invitation for logged in matching user", %{
+    conn: conn,
+    inviter: inviter,
+    business: business
+  } do
     invitee = user_fixture(%{email: "joiner@example.com"})
     invitation = create_invitation!(business, inviter, invitee.email)
 

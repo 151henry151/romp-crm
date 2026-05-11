@@ -1,0 +1,74 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
+    <div class="mb-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold">Time Log</h1>
+      <div class="flex items-center gap-4">
+        <.link navigate={~p"/"} class="text-sm font-medium text-blue-600 hover:text-blue-800">
+          Jobs
+        </.link>
+        <.link
+          navigate={~p"/employees"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Employees
+        </.link>
+      </div>
+    </div>
+
+    <div class="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
+      <table class="w-full text-sm" id="time-log-table">
+        <thead>
+          <tr class="border-b border-base-300 bg-base-200/40">
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Client</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Date</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Start</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">End</th>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Duration</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-base-300">
+          <%= if @entries == [] do %>
+            <tr id="time-log-empty">
+              <td colspan="5" class="px-4 py-12 text-center text-base-content/60">
+                No time entries yet. Text in when you start and finish a job.
+              </td>
+            </tr>
+          <% end %>
+          <%= for entry <- @entries do %>
+            <tr id={"time-entry-#{entry.id}"} class="hover:bg-base-200/40">
+              <td class="px-4 py-3 font-medium text-base-content">
+                {entry.job && entry.job.client_name}
+              </td>
+              <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                {format_date(entry.started_at)}
+              </td>
+              <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                {format_time(entry.started_at)}
+              </td>
+              <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                <%= if entry.ended_at do %>
+                  {format_time(entry.ended_at)}
+                <% else %>
+                  <span
+                    id={"time-entry-open-#{entry.id}"}
+                    class="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                  >
+                    In progress
+                  </span>
+                <% end %>
+              </td>
+              <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                <%= case TimeEntry.format_duration(entry) do %>
+                  <% nil -> %>
+                    <span class="text-base-content/40">—</span>
+                  <% dur -> %>
+                    <span id={"time-entry-dur-#{entry.id}"}>{dur}</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layouts.app>

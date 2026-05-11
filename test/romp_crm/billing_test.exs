@@ -61,6 +61,7 @@ defmodule RompCrm.BillingTest do
   describe "subscription_active?/1" do
     test "returns true for invited_member (team invitation access)" do
       user = user_fixture()
+
       {:ok, user} =
         user
         |> Ecto.Changeset.change(subscription_status: "invited_member")
