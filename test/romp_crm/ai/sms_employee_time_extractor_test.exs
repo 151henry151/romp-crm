@@ -74,7 +74,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractorTest do
                SmsEmployeeTimeExtractor.extract(raw, [])
     end
 
-    test "returns emp_clock_in with match when employee_id absent" do
+    test "returns error when clock_in has match but no employee_id" do
       raw =
         "STUB_JSON " <>
           Jason.encode!(%{
@@ -87,12 +87,8 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractorTest do
             ]
           })
 
-      assert {:ok,
-              %{
-                operations: [
-                  {:emp_clock_in, %{"name" => "Henry"}, ~N[2026-05-11 08:00:00]}
-                ]
-              }} = SmsEmployeeTimeExtractor.extract(raw, [])
+      assert {:error, {:invalid_action, 1, :missing_employee_id}} =
+               SmsEmployeeTimeExtractor.extract(raw, [])
     end
 
     test "returns emp_lunch_by_id from actions" do

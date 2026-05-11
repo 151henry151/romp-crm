@@ -1,4 +1,11 @@
 defmodule RompCrm.TimeTracking.TimeEntry do
+  @moduledoc """
+  Job-level clock in/out rows.
+
+  **`started_at`** and **`ended_at`** are **naive** datetimes: treat them as the contractor's local
+  wall-clock times (the app does not perform timezone conversion).
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -17,6 +24,9 @@ defmodule RompCrm.TimeTracking.TimeEntry do
     entry
     |> cast(attrs, [:business_id, :job_id, :started_at, :ended_at, :notes])
     |> validate_required([:business_id, :job_id, :started_at])
+    |> unique_constraint([:business_id, :job_id],
+          name: :time_entries_one_open_clock_per_job
+        )
   end
 
   @doc "Duration in minutes between started_at and ended_at. nil if entry is still open."

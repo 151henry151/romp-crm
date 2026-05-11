@@ -102,6 +102,10 @@ defmodule RompCrm.Ai.SmsJobExtractor do
 
   defp parse_actions(_), do: {:error, :invalid_actions}
 
+  @doc false
+  def parse_actions_list(actions) when is_list(actions), do: parse_actions(actions)
+  def parse_actions_list(_), do: {:error, :invalid_actions}
+
   defp parse_single_action(map) when is_map(map) do
     map = stringify_top_level_keys(map)
 

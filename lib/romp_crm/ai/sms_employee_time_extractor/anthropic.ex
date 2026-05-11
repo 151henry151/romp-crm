@@ -2,6 +2,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
   @moduledoc false
 
   @api "https://api.anthropic.com/v1/messages"
+  @finch RompCrm.Finch
 
   def extract(raw_message, employees_snapshot \\ []) when is_binary(raw_message) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
@@ -29,6 +30,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
              {"content-type", "application/json"}
            ],
            json: body,
+           finch: @finch,
            receive_timeout: 120_000
          ) do
       {:ok, %{status: 200, body: resp}} ->

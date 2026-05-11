@@ -4,11 +4,11 @@ defmodule RompCrm.Ai.SmsTimeExtractor do
 
   Operations returned in `operations`:
     - `{:clock_in_by_id, job_id, started_at}` — start a time entry for job by database ID.
-    - `{:clock_in, match, started_at}` — start a time entry matched by job attributes.
     - `{:clock_out_by_id, job_id, ended_at}` — close the open entry for job by ID.
-    - `{:clock_out, match, ended_at}` — close the open entry matched by job attributes.
 
-  Times are `NaiveDateTime` values.
+  **`job_id`** must come from the jobs snapshot (model-chosen); there is no server-side fuzzy match fallback.
+
+  Datetimes are interpreted as **naive local wall-clock** values (same as stored in `time_entries`).
   """
 
   @doc """
@@ -84,6 +84,10 @@ defmodule RompCrm.Ai.SmsTimeExtractor do
 
   defp parse_actions(_), do: {:error, :invalid_actions}
 
+  @doc false
+  def parse_actions_list(actions) when is_list(actions), do: parse_actions(actions)
+  def parse_actions_list(_), do: {:error, :invalid_actions}
+
   defp parse_single_action(map) when is_map(map) do
     map = stringify_keys(map)
     intent = map |> Map.get("intent", "") |> to_string() |> String.trim() |> String.downcase()
@@ -99,7 +103,7 @@ defmodule RompCrm.Ai.SmsTimeExtractor do
     with {:ok, started_at} <- parse_naive_dt(Map.get(map, "started_at")) do
       case coerce_job_id(Map.get(map, "job_id")) do
         {:ok, job_id} -> {:ok, {:clock_in_by_id, job_id, started_at}}
-        :missing -> resolve_clock_via_match(map, :clock_in, started_at)
+        :missing -> {:error, :missing_job_id}
         {:error, _} -> {:error, :invalid_job_id}
       end
     end
@@ -109,25 +113,9 @@ defmodule RompCrm.Ai.SmsTimeExtractor do
     with {:ok, ended_at} <- parse_naive_dt(Map.get(map, "ended_at")) do
       case coerce_job_id(Map.get(map, "job_id")) do
         {:ok, job_id} -> {:ok, {:clock_out_by_id, job_id, ended_at}}
-        :missing -> resolve_clock_via_match(map, :clock_out, ended_at)
+        :missing -> {:error, :missing_job_id}
         {:error, _} -> {:error, :invalid_job_id}
       end
-    end
-  end
-
-  defp resolve_clock_via_match(map, intent, dt) do
-    match =
-      map
-      |> Map.get("match", %{})
-      |> stringify_keys()
-      |> Map.new(fn {k, v} -> {k, nilify_blank(v)} end)
-      |> Enum.reject(fn {_, v} -> is_nil(v) end)
-      |> Map.new()
-
-    if map_size(match) == 0 do
-      {:error, :missing_job_id_or_match}
-    else
-      {:ok, {intent, match, dt}}
     end
   end
 
@@ -160,12 +148,4 @@ defmodule RompCrm.Ai.SmsTimeExtractor do
   def parse_naive_dt(_), do: {:error, :invalid_datetime_type}
 
   defp stringify_keys(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
-
-  defp nilify_blank(nil), do: nil
-  defp nilify_blank(""), do: nil
-
-  defp nilify_blank(v) when is_binary(v),
-    do: if(String.trim(v) == "", do: nil, else: String.trim(v))
-
-  defp nilify_blank(v), do: v
 end
