@@ -31,52 +31,61 @@ defmodule RompCrmWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :content_width, :atom,
+    default: :narrow,
+    doc: "`:narrow` (~672px) for forms; `:wide` (~1280px) to match the Jobs list layout"
+
   slot :inner_block, required: true
 
   def app(assigns) do
+    assigns =
+      assigns
+      |> assign(:main_inner_class, main_inner_max(assigns.content_width))
+      |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
+
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
-      <div class="flex-1">
-        <a
-          href={~p"/"}
-          class="brand-logo-hitbox inline-flex focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-        >
-          <span class="brand-logo-crop block aspect-[1154/489] h-10 sm:h-12 overflow-hidden rounded-2xl">
-            <img
-              src={~p"/images/romp-crm-logo-main.png"}
-              alt="Romp CRM"
-              class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
-            />
-            <img
-              src={~p"/images/romp-crm-logo-main-dark.png"}
-              alt="Romp CRM"
-              class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
-            />
-          </span>
-        </a>
-      </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
+    <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-4">
+      <div class="mx-auto flex max-w-screen-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0 shrink">
+          <a
+            href={~p"/"}
+            class="brand-logo-hitbox inline-flex focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+          >
+            <span class="brand-logo-crop block aspect-[1154/489] h-10 sm:h-12 overflow-hidden rounded-2xl">
+              <img
+                src={~p"/images/romp-crm-logo-main.png"}
+                alt="Romp CRM"
+                class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
+              />
+              <img
+                src={~p"/images/romp-crm-logo-main-dark.png"}
+                alt="Romp CRM"
+                class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
+              />
+            </span>
+          </a>
+        </div>
+        <nav class="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:justify-end">
           <%= if @current_scope && @current_scope.user do %>
-            <li>
-              <a href={~p"/businesses"} class="link link-hover text-sm">Businesses</a>
-            </li>
-            <li>
-              <a href={~p"/users/settings"} class="link link-hover text-sm">Settings</a>
-            </li>
+            <a href={~p"/businesses"} class="link link-hover shrink-0 text-sm whitespace-nowrap">
+              Businesses
+            </a>
+            <a href={~p"/users/settings"} class="link link-hover shrink-0 text-sm whitespace-nowrap">
+              Settings
+            </a>
           <% end %>
-          <li class="flex items-center">
+          <div class="shrink-0 [&_details]:max-w-[calc(100vw-2rem)]">
             <.support_contact />
-          </li>
-          <li>
+          </div>
+          <div class="shrink-0">
             <.theme_toggle />
-          </li>
-        </ul>
+          </div>
+        </nav>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
+    <main class={["px-4 sm:px-6 lg:px-8", @main_py_class]}>
+      <div class={["mx-auto w-full space-y-4", @main_inner_class]}>
         {render_slot(@inner_block)}
       </div>
     </main>
@@ -86,6 +95,12 @@ defmodule RompCrmWeb.Layouts do
     <.flash_group flash={@flash} />
     """
   end
+
+  defp main_inner_max(:wide), do: "max-w-screen-xl"
+  defp main_inner_max(:narrow), do: "max-w-2xl"
+
+  defp main_vertical_padding(:wide), do: "py-6"
+  defp main_vertical_padding(:narrow), do: "py-12 sm:py-20"
 
   @doc """
   Shows the flash group with standard titles and content.

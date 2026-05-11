@@ -35,8 +35,8 @@ defmodule RompCrm.Employees.EmployeeTimeEntry do
     ])
     |> validate_required([:business_id, :employee_id, :clocked_in_at])
     |> unique_constraint([:business_id, :employee_id],
-          name: :employee_time_entries_one_open_clock_per_employee
-        )
+      name: :employee_time_entries_one_open_clock_per_employee
+    )
   end
 
   @doc "Worked minutes excluding lunch. nil if not yet clocked out."

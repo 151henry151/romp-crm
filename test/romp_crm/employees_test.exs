@@ -127,19 +127,22 @@ defmodule RompCrm.EmployeesTest do
         employee_time_entry_fixture(%{
           employee_id: emp.id,
           business_id: biz.id,
-          clocked_in_at: ~N[2026-05-11 08:00:00]
+          clocked_in_at: ~N[2026-05-11 08:00:00],
+          clocked_out_at: ~N[2026-05-11 12:00:00]
         })
 
       e2 =
         employee_time_entry_fixture(%{
           employee_id: emp.id,
           business_id: biz.id,
-          clocked_in_at: ~N[2026-05-12 08:00:00]
+          clocked_in_at: ~N[2026-05-12 08:00:00],
+          clocked_out_at: ~N[2026-05-12 17:00:00]
         })
 
       entries = Employees.list_time_entries(emp.id, biz.id)
       assert length(entries) == 2
       assert hd(entries).id == e2.id
+      assert List.last(entries).id == e1.id
     end
 
     test "does not return entries from other employees", %{biz: biz} do

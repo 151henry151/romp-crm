@@ -5,6 +5,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
   One Anthropic request receives **jobs**, **open job time entries**, and **employees** snapshots so the model
   can align the SMS with live rows (same judgment-based matching as job updates — **no** server-side fuzzy name scripts).
 
+  Optionally receives **`prior_turns`** — **`[{role, text}]`** with **`role`** **`:contractor`** or **`:assistant`**,
+  oldest first — so follow-up SMS can reference the ongoing thread.
+
   Configure **`sms_unified_inbound_adapter`** (tests use **`DeterministicStub`**).
   """
 
@@ -18,10 +21,20 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
     * **`{:ok, %{assistant_sms, job_operations, time_operations, emp_operations}}`**
     * **`{:error, reason}`**
 
+  **`prior_turns`** — list of **`{:contractor | :assistant, String.t()}`** oldest-first (same phone / business);
+  pass **`[]`** when there is no prior thread.
+
   """
-  def extract(raw_message, jobs_snapshot, open_time_entries_snapshot, employees_snapshot)
-      when is_binary(raw_message) and is_list(jobs_snapshot) and is_list(open_time_entries_snapshot) and
-             is_list(employees_snapshot) do
+  def extract(
+        raw_message,
+        jobs_snapshot,
+        open_time_entries_snapshot,
+        employees_snapshot,
+        prior_turns \\ []
+      )
+      when is_binary(raw_message) and is_list(jobs_snapshot) and
+             is_list(open_time_entries_snapshot) and
+             is_list(employees_snapshot) and is_list(prior_turns) do
     mod =
       Application.get_env(
         :romp_crm,
@@ -29,7 +42,13 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
         __MODULE__.Anthropic
       )
 
-    case mod.extract(raw_message, jobs_snapshot, open_time_entries_snapshot, employees_snapshot) do
+    case mod.extract(
+           raw_message,
+           jobs_snapshot,
+           open_time_entries_snapshot,
+           employees_snapshot,
+           prior_turns
+         ) do
       {:ok, %{} = attrs} -> parse_combined_payload(attrs)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}

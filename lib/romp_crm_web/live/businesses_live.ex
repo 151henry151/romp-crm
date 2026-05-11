@@ -100,8 +100,7 @@ defmodule RompCrmWeb.BusinessesLive do
       {bid, _} ->
         form = to_form(params, as: :invite)
 
-        {:noreply,
-         assign(socket, :invite_forms, Map.put(socket.assigns.invite_forms, bid, form))}
+        {:noreply, assign(socket, :invite_forms, Map.put(socket.assigns.invite_forms, bid, form))}
 
       :error ->
         {:noreply, socket}

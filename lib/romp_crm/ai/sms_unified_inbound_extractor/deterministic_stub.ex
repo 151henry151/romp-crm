@@ -13,9 +13,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
   * **`STUB_CLARIFY`** → empty ops + clarification text
   * default → single job **create** (mirrors job deterministic stub default)
 
-  Snapshots passed into **`extract/4`** are ignored (tests vary snapshots externally).
+  Snapshots and **`prior_turns`** passed into **`extract/5`** are ignored (tests vary snapshots externally).
   """
-  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [])
+  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [], _prior \\ [])
       when is_binary(raw_message) do
     trimmed = String.trim(raw_message)
 
@@ -222,16 +222,27 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
   defp stub_json(json) do
     case Jason.decode(json) do
       {:ok, %{} = map} ->
-        {:ok,
-         map
-         |> Map.put_new("job_actions", [])
-         |> Map.put_new("time_actions", [])
-         |> Map.put_new("employee_actions", [])}
+        map =
+          map
+          |> lift_legacy_actions_key()
+          |> Map.put_new("job_actions", [])
+          |> Map.put_new("time_actions", [])
+          |> Map.put_new("employee_actions", [])
+
+        {:ok, map}
 
       {:error, _} ->
         {:error, :stub_bad_json}
     end
   end
+
+  defp lift_legacy_actions_key(%{"job_actions" => _} = m), do: m
+
+  defp lift_legacy_actions_key(%{"actions" => actions} = m) when is_list(actions) do
+    Map.put(m, "job_actions", actions)
+  end
+
+  defp lift_legacy_actions_key(m), do: m
 
   defp default_create(trimmed) do
     %{

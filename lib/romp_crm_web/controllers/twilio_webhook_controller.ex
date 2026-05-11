@@ -9,6 +9,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Employees
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
+  alias RompCrm.SmsConversations
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -96,6 +97,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
     from = conn.body_params["From"] |> to_string()
     to_num = conn.body_params["To"] |> to_string()
     message_sid = conn.body_params["MessageSid"] |> to_string()
+    phone_norm = Phone.normalize_us(from)
 
     Logger.info(
       "Twilio SMS inbound: sid=#{message_sid} to=#{inspect(to_num)} user_id=#{user.id} business_id=#{business_id} from=#{from} body=#{inspect(body_text)}"
@@ -108,11 +110,19 @@ defmodule RompCrmWeb.TwilioWebhookController do
     employees_snapshot = Employees.snapshot_for_sms_ai(business_id)
     allowed_employee_ids = MapSet.new(Enum.map(employees_snapshot, fn row -> row["id"] end))
 
+    prior_turns =
+      if phone_norm != "" do
+        SmsConversations.list_prior_turns_for_ai(business_id, phone_norm)
+      else
+        []
+      end
+
     case SmsUnifiedInboundExtractor.extract(
            body_text,
            jobs_snapshot,
            open_time_entries,
-           employees_snapshot
+           employees_snapshot,
+           prior_turns
          ) do
       {:ok,
        %{
@@ -131,8 +141,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               msg ||
                 "No changes applied. Open Romp CRM or include clearer job/time details."
 
-            _ = Messages.send_sms(from, reply)
-            twiml_ok(conn)
+            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
 
           true ->
             Logger.info(
@@ -148,14 +157,12 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
             case run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
               {:clarify, msg} ->
-                _ = Messages.send_sms(from, msg)
-                twiml_ok(conn)
+                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg)
 
               {:ok, all_results} ->
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
-                _ = Messages.send_sms(from, reply)
-                twiml_ok(conn)
+                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
             end
         end
 
@@ -164,10 +171,38 @@ defmodule RompCrmWeb.TwilioWebhookController do
           "Twilio SMS unified extraction failed: sid=#{message_sid} from=#{from} reason=#{inspect(reason)}"
         )
 
-        _ = Messages.send_sms(from, sms_extraction_failed_reply(reason))
-        twiml_ok(conn)
+        reply = sms_extraction_failed_reply(reason)
+        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
     end
   end
+
+  defp sms_reply_and_log(conn, from, user, business_id, phone_norm, inbound_body, reply_text)
+       when is_binary(reply_text) do
+    _ = Messages.send_sms(from, reply_text)
+    maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, reply_text)
+    twiml_ok(conn)
+  end
+
+  defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)
+       when is_binary(phone_norm) and phone_norm != "" do
+    case SmsConversations.record_exchange(
+           business_id,
+           user.id,
+           phone_norm,
+           inbound_body,
+           outbound_body
+         ) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Twilio SMS: could not persist conversation log business_id=#{business_id} reason=#{inspect(reason)}"
+        )
+    end
+  end
+
+  defp maybe_record_sms_exchange(_, _, "", _, _), do: :ok
 
   # Runs all operation lists and collects results. Job fuzzy-match errors trigger clarification.
   defp run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
