@@ -4,19 +4,41 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
   @api "https://api.anthropic.com/v1/messages"
   @finch RompCrm.Finch
 
-  def extract(raw_message, jobs_snapshot \\ [], open_te_snapshot \\ [], employees_snapshot \\ [])
-      when is_binary(raw_message) do
+  def extract(
+        raw_message,
+        jobs_snapshot \\ [],
+        open_te_snapshot \\ [],
+        employees_snapshot \\ [],
+        prior_turns \\ []
+      )
+      when is_binary(raw_message) and is_list(prior_turns) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
     model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}
     else
-      call_claude(api_key, model, raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot)
+      call_claude(
+        api_key,
+        model,
+        raw_message,
+        jobs_snapshot,
+        open_te_snapshot,
+        employees_snapshot,
+        prior_turns
+      )
     end
   end
 
-  defp call_claude(api_key, model, raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot) do
+  defp call_claude(
+         api_key,
+         model,
+         raw_message,
+         jobs_snapshot,
+         open_te_snapshot,
+         employees_snapshot,
+         prior_turns
+       ) do
     body = %{
       model: model,
       max_tokens: 8192,
@@ -25,7 +47,13 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         %{
           role: "user",
           content:
-            user_content(raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot)
+            user_content(
+              raw_message,
+              jobs_snapshot,
+              open_te_snapshot,
+              employees_snapshot,
+              prior_turns
+            )
         }
       ]
     }
@@ -86,15 +114,26 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     end
   end
 
-  defp user_content(raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot) do
+  defp user_content(
+         raw_message,
+         jobs_snapshot,
+         open_te_snapshot,
+         employees_snapshot,
+         prior_turns
+       ) do
     jobs_json = encode_json(jobs_snapshot)
     open_json = encode_json(open_te_snapshot)
     emp_json = encode_json(employees_snapshot)
 
-    """
-    Parse the following SMS for Romp CRM: job creates/updates, per-job time clock-in/out, and employee clock-in/out/lunch.
+    thread_block = format_prior_turns(prior_turns)
 
-    SMS text:
+    """
+    Parse the **latest** inbound SMS for Romp CRM: job creates/updates, per-job time clock-in/out, and employee clock-in/out/lunch.
+
+    #{thread_block}
+
+    Latest inbound SMS only (extract operations from this message — use the thread above only for resolving references like "that job", "Bob", "those hours", pronouns, or corrections):
+
     ---
     #{raw_message}
     ---
@@ -119,6 +158,35 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     """
   end
 
+  defp format_prior_turns([]) do
+    """
+    Prior SMS thread with this contractor phone: *(none stored yet — first message in thread)*
+
+    ---
+    """
+  end
+
+  defp format_prior_turns(turns) when is_list(turns) do
+    lines =
+      Enum.map(turns, fn {role, text} ->
+        label = if role == :assistant, do: "Assistant", else: "Contractor"
+        "#{label}: #{text}"
+      end)
+
+    body =
+      lines
+      |> Enum.join("\n")
+
+    """
+    Prior SMS thread with this contractor phone (oldest first — same numbers as below). Use this so follow-ups stay coherent (who did the work, which job was meant, time ranges you already confirmed).
+
+    ---
+    #{body}
+    ---
+
+    """
+  end
+
   defp encode_json(data) do
     case Jason.encode(data) do
       {:ok, bin} -> bin
@@ -130,9 +198,10 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     today = Date.utc_today() |> Date.to_iso8601()
 
     """
-    You extract structured operations for a plumbing/mechanical contractor from one inbound SMS.
+    You extract structured operations for a plumbing/mechanical contractor from the **latest** inbound SMS.
 
-    The user message includes JSON snapshots: **jobs**, **open job time entries**, and **employees**, plus the SMS.
+    The user message may include a **prior SMS thread** (Contractor / Assistant lines) for the same phone number, then JSON snapshots: **jobs**, **open job time entries**, and **employees**, then the latest SMS.
+    **Always** use the prior thread to resolve follow-ups: e.g. attributing hours to the correct **employee** or **job** when the latest message only says "That was Bob" or "same as before" or corrects a name. The thread is authoritative for "what we already established" in this chat.
     Use semantic judgment (typos, informal references, nicknames) to decide which snapshot **`id`** values apply — the same way you match jobs for updates. **Never** invent database ids; every `job_id` and `employee_id` must appear in the provided snapshots.
 
     Respond with **one JSON object only** (no markdown fences, no commentary).

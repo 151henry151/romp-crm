@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.21] - 2026-05-12
+
+### Added
+
+- **`sms_conversation_messages`** table and **`SmsConversations`** context: persist inbound/outbound SMS per business + normalized phone so the unified extractor receives a **prior thread** (follow-ups like attributing hours to an employee resolve correctly)
+- **`SmsUnifiedInboundExtractor`**: optional **`prior_turns`** passed through to Anthropic user prompt and documented in the system prompt
+
+### Changed
+
+- **`TwilioWebhookController`**: load prior turns before extraction; after each assistant reply, **`record_exchange/5`** stores the inbound/outbound pair
+- **`SmsUnifiedInboundExtractor.DeterministicStub`**: legacy **`STUB_JSON`** payloads with **`actions`** (instead of **`job_actions`**) lift into **`job_actions`** for tests
+- **`Layouts.app`**: add **`content_width`** (**`:wide`** vs **`:narrow`**); use **`max-w-screen-xl`** for wide pages; stack and wrap header nav on small viewports to avoid horizontal overflow
+- **`employees_live`**, **`time_log_live`**, **`employee_detail_live`**: use wide layout; stack page titles and actions on narrow screens; wrap tables in horizontal scroll where needed
+- **`TimeTrackingTest`** / **`EmployeesTest`**: close the first time entry in ordering tests so fixtures respect partial unique indexes on open clocks
+
 ## [0.9.20] - 2026-05-08
 
 ### Changed

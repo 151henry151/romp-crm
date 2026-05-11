@@ -25,8 +25,8 @@ defmodule RompCrm.TimeTracking.TimeEntry do
     |> cast(attrs, [:business_id, :job_id, :started_at, :ended_at, :notes])
     |> validate_required([:business_id, :job_id, :started_at])
     |> unique_constraint([:business_id, :job_id],
-          name: :time_entries_one_open_clock_per_job
-        )
+      name: :time_entries_one_open_clock_per_job
+    )
   end
 
   @doc "Duration in minutes between started_at and ended_at. nil if entry is still open."

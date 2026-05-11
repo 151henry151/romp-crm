@@ -19,14 +19,16 @@ defmodule RompCrm.TimeTrackingTest do
         time_entry_fixture(%{
           job_id: job.id,
           business_id: biz.id,
-          started_at: ~N[2026-05-11 08:00:00]
+          started_at: ~N[2026-05-11 08:00:00],
+          ended_at: ~N[2026-05-11 12:00:00]
         })
 
       e2 =
         time_entry_fixture(%{
           job_id: job.id,
           business_id: biz.id,
-          started_at: ~N[2026-05-11 13:00:00]
+          started_at: ~N[2026-05-11 13:00:00],
+          ended_at: ~N[2026-05-11 17:00:00]
         })
 
       entries = TimeTracking.list_time_entries(biz.id)
