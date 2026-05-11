@@ -3,14 +3,13 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
   Turns free-form SMS text into employee time-tracking operations via the configured adapter.
 
   Operations returned in `operations`:
-    - `{:emp_clock_in_by_id, employee_id, clocked_in_at}` — clock employee in by ID.
-    - `{:emp_clock_in, match, clocked_in_at}` — clock in matched by employee name.
-    - `{:emp_clock_out_by_id, employee_id, clocked_out_at}` — clock employee out by ID.
-    - `{:emp_clock_out, match, clocked_out_at}` — clock out matched by name.
-    - `{:emp_lunch_by_id, employee_id, lunch_start_at, lunch_end_at}` — record lunch by ID.
-    - `{:emp_lunch, match, lunch_start_at, lunch_end_at}` — record lunch matched by name.
+    - `{:emp_clock_in_by_id, employee_id, clocked_in_at}`
+    - `{:emp_clock_out_by_id, employee_id, clocked_out_at}`
+    - `{:emp_lunch_by_id, employee_id, lunch_start_at, lunch_end_at}`
 
-  Times are `NaiveDateTime` values.
+  **`employee_id`** must come from the employees snapshot (model-chosen); there is no server-side name match fallback.
+
+  Datetimes are **naive local wall-clock** values (same as stored in `employee_time_entries`).
   """
 
   @doc """
@@ -81,6 +80,10 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
 
   defp parse_actions(_), do: {:error, :invalid_actions}
 
+  @doc false
+  def parse_actions_list(actions) when is_list(actions), do: parse_actions(actions)
+  def parse_actions_list(_), do: {:error, :invalid_actions}
+
   defp parse_single_action(map) when is_map(map) do
     map = stringify_keys(map)
     intent = map |> Map.get("intent", "") |> to_string() |> String.trim() |> String.downcase()
@@ -97,7 +100,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
     with {:ok, clocked_in_at} <- parse_naive_dt(Map.get(map, "clocked_in_at")) do
       case coerce_employee_id(Map.get(map, "employee_id")) do
         {:ok, emp_id} -> {:ok, {:emp_clock_in_by_id, emp_id, clocked_in_at}}
-        :missing -> resolve_via_match(map, :emp_clock_in, [clocked_in_at])
+        :missing -> {:error, :missing_employee_id}
         {:error, _} -> {:error, :invalid_employee_id}
       end
     end
@@ -107,7 +110,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
     with {:ok, clocked_out_at} <- parse_naive_dt(Map.get(map, "clocked_out_at")) do
       case coerce_employee_id(Map.get(map, "employee_id")) do
         {:ok, emp_id} -> {:ok, {:emp_clock_out_by_id, emp_id, clocked_out_at}}
-        :missing -> resolve_via_match(map, :emp_clock_out, [clocked_out_at])
+        :missing -> {:error, :missing_employee_id}
         {:error, _} -> {:error, :invalid_employee_id}
       end
     end
@@ -118,25 +121,9 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
          {:ok, lunch_end} <- parse_naive_dt(Map.get(map, "lunch_end_at")) do
       case coerce_employee_id(Map.get(map, "employee_id")) do
         {:ok, emp_id} -> {:ok, {:emp_lunch_by_id, emp_id, lunch_start, lunch_end}}
-        :missing -> resolve_via_match(map, :emp_lunch, [lunch_start, lunch_end])
+        :missing -> {:error, :missing_employee_id}
         {:error, _} -> {:error, :invalid_employee_id}
       end
-    end
-  end
-
-  defp resolve_via_match(map, intent, extra_args) do
-    match =
-      map
-      |> Map.get("match", %{})
-      |> stringify_keys()
-      |> Map.new(fn {k, v} -> {k, nilify_blank(v)} end)
-      |> Enum.reject(fn {_, v} -> is_nil(v) end)
-      |> Map.new()
-
-    if map_size(match) == 0 do
-      {:error, :missing_employee_id_or_match}
-    else
-      {:ok, List.to_tuple([intent, match | extra_args])}
     end
   end
 
@@ -167,12 +154,4 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
   def parse_naive_dt(_), do: {:error, :invalid_datetime_type}
 
   defp stringify_keys(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
-
-  defp nilify_blank(nil), do: nil
-  defp nilify_blank(""), do: nil
-
-  defp nilify_blank(v) when is_binary(v),
-    do: if(String.trim(v) == "", do: nil, else: String.trim(v))
-
-  defp nilify_blank(v), do: v
 end

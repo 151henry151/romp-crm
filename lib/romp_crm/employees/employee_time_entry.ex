@@ -1,4 +1,11 @@
 defmodule RompCrm.Employees.EmployeeTimeEntry do
+  @moduledoc """
+  Per-employee clock and lunch intervals.
+
+  Clock and lunch fields are **naive** datetimes: interpret them as local wall-clock times for the business
+  (no timezone conversion in the app).
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -27,6 +34,9 @@ defmodule RompCrm.Employees.EmployeeTimeEntry do
       :notes
     ])
     |> validate_required([:business_id, :employee_id, :clocked_in_at])
+    |> unique_constraint([:business_id, :employee_id],
+          name: :employee_time_entries_one_open_clock_per_employee
+        )
   end
 
   @doc "Worked minutes excluding lunch. nil if not yet clocked out."

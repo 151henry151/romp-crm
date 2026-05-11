@@ -2,6 +2,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
   @moduledoc false
 
   @api "https://api.anthropic.com/v1/messages"
+  @finch RompCrm.Finch
 
   def extract(raw_message, jobs_snapshot \\ [])
       when is_binary(raw_message) and is_list(jobs_snapshot) do
@@ -30,6 +31,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
              {"content-type", "application/json"}
            ],
            json: body,
+           finch: @finch,
            receive_timeout: 120_000
          ) do
       {:ok, %{status: 200, body: resp}} ->

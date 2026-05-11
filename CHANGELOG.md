@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-05-08
+
+### Changed
+
+- **`TwilioWebhookController`**: route inbound SMS through **`SmsUnifiedInboundExtractor`** (single adapter call) instead of three separate Anthropic extractions; reply with user-visible SMS when unified extraction or parsing fails
+- **`SmsTimeExtractor`** / **`SmsEmployeeTimeExtractor`**: require **`job_id`** / **`employee_id`** from model output; remove server-side **`match`** tuple operations for job and employee time (alignment with snapshot-based AI matching)
+- **`SmsJobExtractor.Anthropic`**, **`SmsTimeExtractor.Anthropic`**, **`SmsEmployeeTimeExtractor.Anthropic`**: pass **`finch: RompCrm.Finch`** on Anthropic **`Req.post`** calls
+
+### Added
+
+- **`SmsUnifiedInboundExtractor.DeterministicStub`** for tests; **`config/test.exs`** **`sms_unified_inbound_adapter`**
+- Migration **`partial_unique_open_time_entries`**: SQLite partial unique indexes so at most one open **`time_entries`** row per **`(business_id, job_id)`** and one open **`employee_time_entries`** row per **`(business_id, employee_id)`**; **`unique_constraint`** on related changesets
+- **`SmsUnifiedInboundExtractorTest`**
+
+### Removed
+
+- **`TwilioWebhookController`** fuzzy **`find_employee_for_sms`** / **`apply_*`** **`match`** branches for job time and employee time
+
 ## [0.9.19] - 2026-05-08
 
 ### Added

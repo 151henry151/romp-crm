@@ -4,10 +4,8 @@
 
     <%= if !@paywall do %>
       <p class="text-sm text-base-content/90">
-        Billing is not enforced on this server (self-hosted or paywall disabled). You may <.link
-          navigate={~p"/users/log-in"}
-          class="font-semibold text-brand hover:underline"
-        >log in</.link>.
+        Billing is not enforced on this server (self-hosted or paywall disabled). You may
+        <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">log in</.link>.
       </p>
     <% else %>
       <div class="space-y-2 text-sm text-base-content/90">
@@ -32,9 +30,7 @@
 
       <%= if @pending_user && @pending_user.subscription_status == "pending_payment" do %>
         <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm space-y-3">
-          <p class="text-sm font-medium text-base-content">
-            Resume checkout for {@pending_user.email}
-          </p>
+          <p class="text-sm font-medium text-base-content">Resume checkout for {@pending_user.email}</p>
           <form action={~p"/subscribe/resume"} method="post" class="space-y-3">
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
             <fieldset class="space-y-2">
