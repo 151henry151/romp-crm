@@ -51,6 +51,12 @@ defmodule RompCrm.Ai.SmsJobExtractor.DeterministicStub do
             {:error, :stub_bad_json}
         end
 
+      <<"STUB_TIME_", _rest::binary>> ->
+        {:ok, %{"assistant_sms" => nil, "actions" => []}}
+
+      <<"STUB_EMP_", _rest::binary>> ->
+        {:ok, %{"assistant_sms" => nil, "actions" => []}}
+
       <<"STUB_CLARIFY ", rest::binary>> ->
         msg = String.trim(rest)
 

@@ -1,0 +1,118 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <%!-- Back nav + title --%>
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <.link
+          navigate={~p"/employees"}
+          class="text-blue-600 hover:text-blue-800 text-sm font-medium shrink-0"
+        >
+          ← Employees
+        </.link>
+        <h1 class="text-xl font-semibold truncate">{@employee.name}</h1>
+        <%= if @employee.title do %>
+          <span class="text-base-content/60 text-sm">{@employee.title}</span>
+        <% end %>
+      </div>
+      <.link
+        navigate={~p"/employees/#{@employee.id}/edit"}
+        class="text-sm font-medium text-blue-600 hover:text-blue-800 shrink-0"
+      >
+        Edit
+      </.link>
+    </div>
+
+    <%!-- Employee info card --%>
+    <div id="employee-info" class="bg-base-100 rounded-lg border border-base-300 px-6 py-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+        <%= if @employee.phone do %>
+          <div>
+            <p class="font-medium text-base-content/70">Phone</p>
+            <p class="text-base-content">{@employee.phone}</p>
+          </div>
+        <% end %>
+        <%= if @employee.email do %>
+          <div>
+            <p class="font-medium text-base-content/70">Email</p>
+            <p class="text-base-content">{@employee.email}</p>
+          </div>
+        <% end %>
+        <div>
+          <p class="font-medium text-base-content/70">Total Logged</p>
+          <p id="employee-total" class="text-base-content font-semibold">
+            {total_label(@entries)}
+          </p>
+        </div>
+      </div>
+      <%= if @employee.notes && String.trim(@employee.notes) != "" do %>
+        <p class="mt-3 text-sm text-base-content/80">
+          <span class="font-medium">Notes:</span> {@employee.notes}
+        </p>
+      <% end %>
+    </div>
+
+    <%!-- Time log --%>
+    <div>
+      <h2 class="text-base font-semibold text-base-content/80 mb-3">Time Entries</h2>
+      <div class="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
+        <table class="w-full text-sm" id="employee-time-table">
+          <thead>
+            <tr class="border-b border-base-300 bg-base-200/40">
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Date</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">In</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Out</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Lunch</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Hours</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-base-300">
+            <%= if @entries == [] do %>
+              <tr id="employee-time-empty">
+                <td colspan="5" class="px-4 py-12 text-center text-base-content/60">
+                  No time entries yet for this employee.
+                </td>
+              </tr>
+            <% end %>
+            <%= for entry <- @entries do %>
+              <tr id={"emp-entry-#{entry.id}"} class="hover:bg-base-200/40">
+                <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                  {format_date(entry.clocked_in_at)}
+                </td>
+                <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                  {format_time(entry.clocked_in_at)}
+                </td>
+                <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                  <%= if entry.clocked_out_at do %>
+                    {format_time(entry.clocked_out_at)}
+                  <% else %>
+                    <span
+                      id={"emp-entry-open-#{entry.id}"}
+                      class="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                    >
+                      In progress
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                  <%= if entry.lunch_start_at && entry.lunch_end_at do %>
+                    {format_time(entry.lunch_start_at)} – {format_time(entry.lunch_end_at)}
+                  <% else %>
+                    <span class="text-base-content/40">—</span>
+                  <% end %>
+                </td>
+                <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">
+                  <%= case EmployeeTimeEntry.format_duration(entry) do %>
+                    <% nil -> %>
+                      <span class="text-base-content/40">—</span>
+                    <% dur -> %>
+                      <span id={"emp-entry-dur-#{entry.id}"}>{dur}</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</Layouts.app>

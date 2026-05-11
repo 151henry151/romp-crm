@@ -48,6 +48,18 @@
           </form>
         <% end %>
         <.link
+          navigate={~p"/time-log"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Time Log
+        </.link>
+        <.link
+          navigate={~p"/employees"}
+          class="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          Employees
+        </.link>
+        <.link
           navigate={~p"/businesses"}
           class="text-sm font-medium text-blue-600 hover:text-blue-800"
         >
@@ -176,6 +188,42 @@
                 <span class="font-medium text-base-content/90">Next Action:</span>
                 <span class="break-words text-base-content">{display(job.next_action)}</span>
               </p>
+              <%!-- Time entries for this job --%>
+              <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
+              <% total = TimeTracking.format_total_for_job(job.id, @current_business_id) %>
+              <div class="pt-2 border-t border-base-300">
+                <p class="font-medium text-base-content/90 mb-1">
+                  Time Logged: <span class="font-semibold">{total}</span>
+                </p>
+                <%= if te_list != [] do %>
+                  <table class="w-full text-xs mt-1">
+                    <thead>
+                      <tr class="text-base-content/60">
+                        <th class="text-left pr-3 pb-1">Date</th>
+                        <th class="text-left pr-3 pb-1">Start</th>
+                        <th class="text-left pr-3 pb-1">End</th>
+                        <th class="text-left pb-1">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <%= for te <- te_list do %>
+                        <tr class="text-base-content/80">
+                          <td class="pr-3 py-0.5">{format_time_entry_date(te.started_at)}</td>
+                          <td class="pr-3 py-0.5">{format_time_entry_time(te.started_at)}</td>
+                          <td class="pr-3 py-0.5">
+                            <%= if te.ended_at do %>
+                              {format_time_entry_time(te.ended_at)}
+                            <% else %>
+                              <span class="text-green-600 font-medium">In progress</span>
+                            <% end %>
+                          </td>
+                          <td class="py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                <% end %>
+              </div>
               <div class="pt-2 flex items-center gap-4">
                 <.link
                   patch={~p"/jobs/#{job.id}/edit"}
@@ -253,7 +301,9 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-base-content/80">{job.referred_by}</td>
-              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">{job.next_action}</td>
+              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
+                {job.next_action}
+              </td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <.link
@@ -288,13 +338,17 @@
                       )}
                     </p>
                     <p>
-                      <span class="font-medium text-base-content/90">Phone:</span> {display(job.phone)}
+                      <span class="font-medium text-base-content/90">Phone:</span> {display(
+                        job.phone
+                      )}
                     </p>
                     <p>
                       <span class="font-medium text-base-content/90">Priority:</span> {if job.priority ==
-                                                                                     :high,
-                                                                                   do: "High",
-                                                                                   else: "Normal"}
+                                                                                            :high,
+                                                                                          do:
+                                                                                            "High",
+                                                                                          else:
+                                                                                            "Normal"}
                     </p>
                     <p>
                       <span class="font-medium text-base-content/90">Status:</span> {status_label(
@@ -318,8 +372,58 @@
                       </span>
                     </p>
                     <p class="lg:col-span-2">
-                      <span class="font-medium text-base-content/90">Notes:</span> {display(job.notes)}
+                      <span class="font-medium text-base-content/90">Notes:</span> {display(
+                        job.notes
+                      )}
                     </p>
+                    <%!-- Time entries --%>
+                    <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
+                    <div class="lg:col-span-2 pt-2 border-t border-base-300">
+                      <p class="font-medium text-base-content/90 mb-1">
+                        Time Logged:
+                        <span class="font-semibold">
+                          {TimeTracking.format_total_for_job(job.id, @current_business_id)}
+                        </span>
+                        <.link
+                          navigate={~p"/time-log"}
+                          class="ml-2 text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          View all →
+                        </.link>
+                      </p>
+                      <%= if te_list != [] do %>
+                        <table class="w-full text-xs mt-1">
+                          <thead>
+                            <tr class="text-base-content/60">
+                              <th class="text-left pr-4 pb-1">Date</th>
+                              <th class="text-left pr-4 pb-1">Start</th>
+                              <th class="text-left pr-4 pb-1">End</th>
+                              <th class="text-left pb-1">Duration</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <%= for te <- te_list do %>
+                              <tr class="text-base-content/80">
+                                <td class="pr-4 py-0.5">
+                                  {format_time_entry_date(te.started_at)}
+                                </td>
+                                <td class="pr-4 py-0.5">
+                                  {format_time_entry_time(te.started_at)}
+                                </td>
+                                <td class="pr-4 py-0.5">
+                                  <%= if te.ended_at do %>
+                                    {format_time_entry_time(te.ended_at)}
+                                  <% else %>
+                                    <span class="text-green-600 font-medium">In progress</span>
+                                  <% end %>
+                                </td>
+                                <td class="py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                              </tr>
+                            <% end %>
+                          </tbody>
+                        </table>
+                      <% end %>
+                    </div>
                   </div>
                 </td>
               </tr>

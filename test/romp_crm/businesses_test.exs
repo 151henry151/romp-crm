@@ -42,7 +42,8 @@ defmodule RompCrm.BusinessesTest do
         |> Ecto.Changeset.change(sms_business_id: biz_a.id)
         |> Repo.update()
 
-      assert {:ok, _} = Accounts.put_jobs_workspace_selection(Accounts.get_user!(user.id), biz_b.id)
+      assert {:ok, _} =
+               Accounts.put_jobs_workspace_selection(Accounts.get_user!(user.id), biz_b.id)
 
       assert {:ok, biz_b.id} ==
                Businesses.resolve_sms_business_id(Accounts.get_user!(user.id))

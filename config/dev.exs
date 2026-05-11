@@ -90,10 +90,10 @@ config :romp_crm,
   twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
   twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
   twilio_messaging_from_number:
-    case System.get_env("TWILIO_MESSAGING_FROM") |> to_string() |> String.trim() do
-      "" -> "+18022780965"
-      s -> s
-    end,
+    (case System.get_env("TWILIO_MESSAGING_FROM") |> to_string() |> String.trim() do
+       "" -> "+18022780965"
+       s -> s
+     end),
   twilio_sms_replies_enabled: System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false",
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",

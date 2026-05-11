@@ -203,7 +203,10 @@ defmodule RompCrm.AccountsTest do
           invitation: invitation
         )
 
-      assert Enum.any?(errors_on(changeset).email, &String.starts_with?(&1, "must match the invitation"))
+      assert Enum.any?(
+               errors_on(changeset).email,
+               &String.starts_with?(&1, "must match the invitation")
+             )
     end
   end
 

@@ -3,13 +3,18 @@ defmodule RompCrmWeb.JobsLive do
 
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
+  alias RompCrm.TimeTracking
+  alias RompCrm.TimeTracking.TimeEntry
   alias RompCrm.Twilio.Phone
 
   @impl true
   def mount(_params, _session, socket) do
     bid = socket.assigns.current_business_id
 
-    if connected?(socket), do: Jobs.subscribe(bid)
+    if connected?(socket) do
+      Jobs.subscribe(bid)
+      TimeTracking.subscribe(bid)
+    end
 
     sms_from =
       case Application.get_env(:romp_crm, :twilio_messaging_from_number) do
@@ -27,6 +32,7 @@ defmodule RompCrmWeb.JobsLive do
      socket
      |> assign(:filter, :all)
      |> assign(:expanded_job_id, nil)
+     |> assign(:expanded_time_entries, %{})
      |> assign(:jobs, Jobs.list_jobs(bid))
      |> assign(:sms_intake_href, Phone.sms_uri(sms_from))
      |> assign(:sms_intake_display, Phone.format_us_display(sms_from))}
@@ -64,6 +70,18 @@ defmodule RompCrmWeb.JobsLive do
     {:noreply, refresh_jobs(socket)}
   end
 
+  def handle_info({:time_entry_created, _entry}, socket) do
+    {:noreply, refresh_time_entries(socket)}
+  end
+
+  def handle_info({:time_entry_updated, _entry}, socket) do
+    {:noreply, refresh_time_entries(socket)}
+  end
+
+  def handle_info({:time_entry_deleted, _entry}, socket) do
+    {:noreply, refresh_time_entries(socket)}
+  end
+
   def handle_info({RompCrmWeb.JobFormComponent, {:saved, _job}}, socket) do
     {:noreply, refresh_jobs(socket)}
   end
@@ -71,6 +89,23 @@ defmodule RompCrmWeb.JobsLive do
   defp refresh_jobs(socket) do
     bid = socket.assigns.current_business_id
     assign(socket, :jobs, Jobs.list_jobs(bid))
+  end
+
+  defp refresh_time_entries(socket) do
+    expanded_id = socket.assigns.expanded_job_id
+
+    if expanded_id do
+      bid = socket.assigns.current_business_id
+      entries = TimeTracking.list_time_entries_for_job(expanded_id, bid)
+
+      assign(
+        socket,
+        :expanded_time_entries,
+        Map.put(socket.assigns.expanded_time_entries, expanded_id, entries)
+      )
+    else
+      socket
+    end
   end
 
   @impl true
@@ -90,6 +125,7 @@ defmodule RompCrmWeb.JobsLive do
 
   def handle_event("toggle_row", %{"id" => id}, socket) do
     id = String.to_integer(id)
+    bid = socket.assigns.current_business_id
 
     expanded =
       if socket.assigns.expanded_job_id == id do
@@ -98,9 +134,18 @@ defmodule RompCrmWeb.JobsLive do
         id
       end
 
+    entries_map =
+      if expanded do
+        entries = TimeTracking.list_time_entries_for_job(expanded, bid)
+        Map.put(socket.assigns.expanded_time_entries, expanded, entries)
+      else
+        socket.assigns.expanded_time_entries
+      end
+
     {:noreply,
      socket
      |> assign(:expanded_job_id, expanded)
+     |> assign(:expanded_time_entries, entries_map)
      |> refresh_jobs()}
   end
 
@@ -128,4 +173,24 @@ defmodule RompCrmWeb.JobsLive do
   defp display(nil), do: "—"
   defp display(""), do: "—"
   defp display(value), do: value
+
+  defp time_entries_for(expanded_map, job_id) do
+    Map.get(expanded_map, job_id, [])
+  end
+
+  defp format_time_entry_date(%NaiveDateTime{} = dt) do
+    "#{dt.month}/#{dt.day}/#{rem(dt.year, 100)}"
+  end
+
+  defp format_time_entry_time(%NaiveDateTime{} = dt) do
+    hour = dt.hour
+    min = String.pad_leading(to_string(dt.minute), 2, "0")
+
+    {h12, ampm} =
+      if hour >= 12,
+        do: {rem(hour, 12) |> then(&if &1 == 0, do: 12, else: &1), "PM"},
+        else: {if(hour == 0, do: 12, else: hour), "AM"}
+
+    "#{h12}:#{min} #{ampm}"
+  end
 end

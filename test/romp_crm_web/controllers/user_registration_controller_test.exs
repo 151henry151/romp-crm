@@ -57,7 +57,9 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
 
   describe "POST /users/register" do
     @tag :capture_log
-    test "with pending invitation registers invited_member without subscription billing", %{conn: conn} do
+    test "with pending invitation registers invited_member without subscription billing", %{
+      conn: conn
+    } do
       inviter = user_fixture()
       {:ok, business} = Businesses.create_business(inviter, %{name: "Post Invite Biz"})
       email = "invite-register@example.com"

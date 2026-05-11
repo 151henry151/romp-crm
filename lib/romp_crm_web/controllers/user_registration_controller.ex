@@ -22,7 +22,9 @@ defmodule RompCrmWeb.UserRegistrationController do
 
     {invitation_registration?, _inv} = invitation_context(conn)
 
-    render(conn, :new,
+    render(
+      conn,
+      :new,
       registration_assigns(
         changeset: changeset,
         invitation_registration: invitation_registration?
@@ -43,11 +45,14 @@ defmodule RompCrmWeb.UserRegistrationController do
 
       {:invitation_email_mismatch, expected, conn} ->
         cs = Accounts.change_user_email(%User{}, attrs)
-        flash = "This invitation is for #{expected}. Use that email address or ask for a new invite."
+
+        flash =
+          "This invitation is for #{expected}. Use that email address or ask for a new invite."
 
         conn
         |> put_flash(:error, flash)
-        |> render(:new,
+        |> render(
+          :new,
           registration_assigns(
             changeset: %{cs | action: :insert},
             invitation_registration: true
@@ -135,7 +140,9 @@ defmodule RompCrmWeb.UserRegistrationController do
         |> redirect(to: ~p"/users/log-in")
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        render(conn, :new,
+        render(
+          conn,
+          :new,
           registration_assigns(
             changeset: %{changeset | action: :insert},
             invitation_registration: true
@@ -149,7 +156,9 @@ defmodule RompCrmWeb.UserRegistrationController do
     changeset = %{cs | action: :insert}
     {_inv?, invitation_registration?} = invitation_context(conn)
 
-    render(conn, :new,
+    render(
+      conn,
+      :new,
       registration_assigns(
         changeset: changeset,
         invitation_registration: invitation_registration?
@@ -226,7 +235,9 @@ defmodule RompCrmWeb.UserRegistrationController do
       {:error, %Ecto.Changeset{} = changeset} ->
         {invitation_registration?, _} = invitation_context(conn)
 
-        render(conn, :new,
+        render(
+          conn,
+          :new,
           registration_assigns(
             changeset: %{changeset | action: :insert},
             invitation_registration: invitation_registration?

@@ -27,7 +27,11 @@ defmodule RompCrmWeb.BusinessesLiveTest do
     assert html =~ "can’t create a new organization"
   end
 
-  test "typing invite email updates only that business's field", %{conn: conn, biz_a: b1, biz_b: b2} do
+  test "typing invite email updates only that business's field", %{
+    conn: conn,
+    biz_a: b1,
+    biz_b: b2
+  } do
     {:ok, view, _html} = live(conn, ~p"/businesses")
 
     render_change(view, "validate_invite", %{

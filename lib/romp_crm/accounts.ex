@@ -97,7 +97,8 @@ defmodule RompCrm.Accounts do
     end
   end
 
-  defp register_user_via_invitation(attrs, %BusinessInvitation{} = inv, opts) when is_list(opts) do
+  defp register_user_via_invitation(attrs, %BusinessInvitation{} = inv, opts)
+       when is_list(opts) do
     changeset =
       %User{}
       |> User.email_changeset(attrs, validate_unique: false)

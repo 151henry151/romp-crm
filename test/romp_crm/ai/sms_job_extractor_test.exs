@@ -13,7 +13,11 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
             "updates" => %{"address" => "99 Oak"}
           })
 
-      assert {:ok, %{assistant_sms: "Stub: applied.", operations: [{:update_by_id, 44, %{address: "99 Oak"}}]}} =
+      assert {:ok,
+              %{
+                assistant_sms: "Stub: applied.",
+                operations: [{:update_by_id, 44, %{address: "99 Oak"}}]
+              }} =
                SmsJobExtractor.extract(raw, [])
     end
 
@@ -26,8 +30,10 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
             "updates" => %{"phone" => "802"}
           })
 
-      assert {:ok, %{assistant_sms: "Stub: applied.", operations: [{:update, match, %{phone: "802"}}]}} =
+      assert {:ok,
+              %{assistant_sms: "Stub: applied.", operations: [{:update, match, %{phone: "802"}}]}} =
                SmsJobExtractor.extract(raw, [])
+
       assert match == %{"client_name" => "Pat"}
     end
 
@@ -71,7 +77,8 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
               %{
                 assistant_sms: "Stub: applied.",
                 operations: [
-                  {:create, %{client_name: "Mark Sino", work_description: "Replace refrigerator"}},
+                  {:create,
+                   %{client_name: "Mark Sino", work_description: "Replace refrigerator"}},
                   {:create, %{client_name: "Dave Woll", work_description: "Clogged drain"}},
                   {:update_by_id, 7, %{phone: "8029897658"}}
                 ]

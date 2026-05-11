@@ -202,7 +202,9 @@ defmodule RompCrm.Ai.SmsJobExtractor do
   defp parse_create_intent(map) do
     payload =
       case Map.get(map, "job") do
-        %{} = job_map -> job_map
+        %{} = job_map ->
+          job_map
+
         _ ->
           Map.drop(map, [
             "intent",
