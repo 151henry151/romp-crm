@@ -1,91 +1,26 @@
-<div class="min-h-screen bg-base-200/40 text-base-content">
-  <%!-- Header --%>
-  <header class="bg-base-100 border-b border-base-300 px-4 sm:px-6 py-4">
-    <div class="max-w-screen-xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="min-w-0">
-        <div class="brand-logo-hitbox inline-flex">
-          <span class="brand-logo-crop block aspect-[1154/489] h-12 sm:h-14 overflow-hidden rounded-2xl">
-            <img
-              src={~p"/images/romp-crm-logo-main.png"}
-              alt="Romp CRM"
-              class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
-            />
-            <img
-              src={~p"/images/romp-crm-logo-main-dark.png"}
-              alt="Romp CRM"
-              class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
-            />
-          </span>
-        </div>
-        <p class="text-sm text-base-content/70 mt-1">Customer & Job Tracker</p>
-        <p class="text-xs text-base-content/70 mt-1">
-          <span class="text-base-content/80 font-medium">Text new jobs and updates:</span>
-          <a
-            href={@sms_intake_href}
-            class="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap"
-          >
-            {@sms_intake_display}
-          </a>
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3 shrink-0">
-        <%= if assigns[:my_businesses] && length(@my_businesses) > 1 do %>
-          <form action={~p"/business/switch"} method="post" class="flex items-center gap-2">
-            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-            <label for="business-switch" class="text-xs text-base-content/80 whitespace-nowrap">
-              Business
-            </label>
-            <select
-              id="business-switch"
-              name="business_id"
-              class="text-sm border border-base-300 rounded-md px-2 py-1 bg-base-100 max-w-[14rem]"
-              onchange="this.form.requestSubmit()"
-            >
-              <%= for b <- @my_businesses do %>
-                <option value={b.id} selected={b.id == @current_business_id}>{b.name}</option>
-              <% end %>
-            </select>
-          </form>
-        <% end %>
-        <.link
-          navigate={~p"/time-log"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
-          Job time log
-        </.link>
-        <.link
-          navigate={~p"/my-timeclock"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
-          Workday timeclock
-        </.link>
-        <%= if @is_business_owner do %>
-          <.link
-            navigate={~p"/employees"}
-            class="text-sm font-medium text-blue-600 hover:text-blue-800"
-          >
-            Employees
-          </.link>
-        <% end %>
-        <.link
-          navigate={~p"/businesses"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
-          Businesses
-        </.link>
-        <.link
-          href={~p"/users/settings"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
-          Settings
-        </.link>
-        <Layouts.support_contact />
-        <Layouts.theme_toggle />
-      </div>
-    </div>
-  </header>
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+  content_width={:wide}
+>
+  <:header_extras>
+    <p class="text-sm text-base-content/70">Customer & Job Tracker</p>
+    <p class="text-xs text-base-content/70">
+      <span class="text-base-content/80 font-medium">Text new jobs and updates:</span>
+      <a
+        href={@sms_intake_href}
+        class="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap"
+      >
+        {@sms_intake_display}
+      </a>
+    </p>
+  </:header_extras>
 
-  <main class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
+  <div class="text-base-content">
     <%!-- Status filter tabs + new job --%>
     <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300">
       <div class="flex min-w-0 flex-1 flex-wrap gap-1">
@@ -506,10 +441,7 @@
         </tbody>
       </table>
     </div>
-  </main>
-
-  <Layouts.legal_footer />
-</div>
+  </div>
 
 <%!-- Modal: log hours on a job (closed interval; not punch clock) --%>
 <%= if @log_job_time_job_id do %>
@@ -587,3 +519,4 @@
     />
   </.modal>
 <% end %>
+</Layouts.app>

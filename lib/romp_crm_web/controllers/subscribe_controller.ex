@@ -3,6 +3,7 @@ defmodule RompCrmWeb.SubscribeController do
 
   alias RompCrm.Accounts.{Scope, User}
   alias RompCrm.Billing
+  alias RompCrm.Businesses
   alias RompCrm.Repo
 
   @doc """
@@ -88,10 +89,14 @@ defmodule RompCrmWeb.SubscribeController do
         conn
 
       {:show, conn} ->
+        nav = layout_nav_assigns(conn)
+
         render(conn, :show,
-          paywall: Billing.paywall_enabled?(),
-          pending_user: pending_paywall_user(conn),
-          paypal_trial_days: Billing.paypal_trial_days()
+          [
+            paywall: Billing.paywall_enabled?(),
+            pending_user: pending_paywall_user(conn),
+            paypal_trial_days: Billing.paypal_trial_days()
+          ] ++ Map.to_list(nav)
         )
     end
   end
@@ -120,6 +125,31 @@ defmodule RompCrmWeb.SubscribeController do
     case conn.assigns[:current_scope] do
       %Scope{user: %User{} = user} -> user
       _ -> nil
+    end
+  end
+
+  defp layout_nav_assigns(conn) do
+    case scope_logged_in_user(conn) do
+      nil ->
+        %{
+          show_workspace_nav: false,
+          current_business_id: nil,
+          my_businesses: [],
+          is_business_owner: false
+        }
+
+      user ->
+        businesses = Businesses.list_businesses_for_user(user)
+        session = conn.private[:plug_session] || %{}
+        bid = Businesses.resolve_active_business_id(user, businesses, session)
+        is_owner = bid != nil && Businesses.owner?(user, bid)
+
+        %{
+          show_workspace_nav: businesses != [],
+          current_business_id: bid,
+          my_businesses: businesses,
+          is_business_owner: is_owner
+        }
     end
   end
 

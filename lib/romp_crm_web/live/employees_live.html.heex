@@ -1,17 +1,16 @@
-<Layouts.app flash={@flash} current_scope={@current_scope} content_width={:wide}>
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  content_width={:wide}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
   <div>
     <div class="mb-6 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
       <h1 class="text-xl font-semibold">Employees</h1>
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <.link navigate={~p"/"} class="text-sm font-medium text-blue-600 hover:text-blue-800">
-          Jobs
-        </.link>
-        <.link
-          navigate={~p"/time-log"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
-          Time Log
-        </.link>
         <.link
           patch={~p"/employees/new"}
           class="inline-flex h-9 min-h-[2.25rem] items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white no-underline shadow-sm hover:bg-blue-500"

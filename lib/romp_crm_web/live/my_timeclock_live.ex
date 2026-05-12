@@ -23,7 +23,7 @@ defmodule RompCrmWeb.MyTimeclockLive do
      |> assign(:open_entry, open)
      |> assign(:recent_entries, load_recent(emp, bid))
      |> assign(:can_punch, EmployeePermissions.can_punch_own_timeclock?(caps))
-     |> assign(:is_owner, Businesses.owner?(user, bid))}
+     |> assign(:is_business_owner, Businesses.owner?(user, bid))}
   end
 
   defp load_recent(nil, _bid), do: []
@@ -56,6 +56,7 @@ defmodule RompCrmWeb.MyTimeclockLive do
     |> assign(:open_entry, open)
     |> assign(:recent_entries, load_recent(emp, bid))
     |> assign(:can_punch, EmployeePermissions.can_punch_own_timeclock?(caps))
+    |> assign(:is_business_owner, Businesses.owner?(user, bid))
   end
 
   @impl true

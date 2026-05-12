@@ -82,4 +82,31 @@ defmodule RompCrm.BusinessesTest do
                Businesses.resolve_sms_business_id(Accounts.get_user!(user.id))
     end
   end
+
+  describe "resolve_active_business_id/3" do
+    test "returns nil when businesses list is empty" do
+      user = user_fixture()
+      assert Businesses.resolve_active_business_id(user, [], %{}) == nil
+    end
+
+    test "prefers session current_business_id when valid" do
+      user = user_fixture()
+      {:ok, _biz_a} = Businesses.create_business(user, %{name: "Alpha"})
+      {:ok, biz_b} = Businesses.create_business(user, %{name: "Beta"})
+      businesses = Businesses.list_businesses_for_user(user)
+      session = %{"current_business_id" => to_string(biz_b.id)}
+
+      assert Businesses.resolve_active_business_id(user, businesses, session) == biz_b.id
+    end
+
+    test "falls back to first listed business when session id is not a membership" do
+      user = user_fixture()
+      {:ok, biz_a} = Businesses.create_business(user, %{name: "Alpha"})
+      {:ok, _biz_b} = Businesses.create_business(user, %{name: "Beta"})
+      businesses = Businesses.list_businesses_for_user(user)
+      session = %{"current_business_id" => "99999"}
+
+      assert Businesses.resolve_active_business_id(user, businesses, session) == biz_a.id
+    end
+  end
 end

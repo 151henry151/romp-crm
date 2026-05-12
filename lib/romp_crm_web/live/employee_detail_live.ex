@@ -1,6 +1,7 @@
 defmodule RompCrmWeb.EmployeeDetailLive do
   use RompCrmWeb, :live_view
 
+  alias RompCrm.Businesses
   alias RompCrm.Employees
   alias RompCrm.Employees.EmployeeTimeEntry
 
@@ -14,7 +15,9 @@ defmodule RompCrmWeb.EmployeeDetailLive do
     {:ok,
      socket
      |> assign(:employee, emp)
-     |> assign(:entries, Employees.list_time_entries(emp.id, bid))}
+     |> assign(:entries, Employees.list_time_entries(emp.id, bid))
+     |> assign(:my_businesses, Businesses.list_businesses_for_user(socket.assigns.current_scope.user))
+     |> assign(:is_business_owner, true)}
   end
 
   @impl true

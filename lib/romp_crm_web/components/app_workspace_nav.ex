@@ -1,0 +1,133 @@
+defmodule RompCrmWeb.AppWorkspaceNav do
+  @moduledoc """
+  Shared workspace navigation (jobs area): time log, timeclock, employees, businesses, settings.
+  Desktop: inline links. Mobile: `<details>` “hamburger” panel with the same links.
+  """
+  use Phoenix.Component
+  use Gettext, backend: RompCrmWeb.Gettext
+
+  use Phoenix.VerifiedRoutes,
+    endpoint: RompCrmWeb.Endpoint,
+    router: RompCrmWeb.Router,
+    statics: RompCrmWeb.static_paths()
+
+  import Phoenix.Controller, only: [get_csrf_token: 0]
+  import RompCrmWeb.CoreComponents
+
+  attr :current_business_id, :any, default: nil
+  attr :my_businesses, :list, default: []
+  attr :is_business_owner, :boolean, default: false
+
+  def app_workspace_nav(assigns) do
+    ~H"""
+    <div class="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
+      <%!-- Desktop --%>
+      <div class="hidden flex-wrap items-center gap-x-3 gap-y-1 lg:flex">
+        <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
+          <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} />
+        <% end %>
+        <.nav_links class="text-sm font-medium text-blue-600 hover:text-blue-800" is_business_owner={@is_business_owner} />
+      </div>
+
+      <%!-- Mobile menu --%>
+      <details class="group relative lg:hidden">
+        <summary
+          class="btn btn-ghost btn-sm list-none gap-2 border border-base-300 [&::-webkit-details-marker]:hidden"
+          aria-label="Open navigation menu"
+        >
+          <.icon name="hero-bars-3" class="size-5" />
+          <span class="text-sm font-medium">Menu</span>
+        </summary>
+        <div class="absolute right-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+          <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
+            <div class="mb-1 border-b border-base-300 pb-2">
+              <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} compact={true} />
+            </div>
+          <% end %>
+          <.nav_links
+            class="block rounded-md px-2 py-2 text-sm font-medium text-base-content hover:bg-base-200"
+            is_business_owner={@is_business_owner}
+            mobile={true}
+          />
+        </div>
+      </details>
+    </div>
+    """
+  end
+
+  attr :my_businesses, :list, required: true
+  attr :current_business_id, :any, default: nil
+  attr :compact, :boolean, default: false
+
+  def business_switcher(assigns) do
+    wrap_class =
+      if assigns.compact,
+        do: "flex flex-col gap-1",
+        else: "flex flex-wrap items-center gap-2"
+
+    select_id =
+      if assigns.compact, do: "app-nav-business-switch-mobile", else: "app-nav-business-switch-desktop"
+
+    assigns =
+      assigns
+      |> assign(:wrap_class, wrap_class)
+      |> assign(:select_id, select_id)
+
+    ~H"""
+    <form action={~p"/business/switch"} method="post" class={@wrap_class}>
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+      <label for={@select_id} class="sr-only">Business</label>
+      <select
+        id={@select_id}
+        name="business_id"
+        class={[
+          "select select-bordered select-sm max-w-full bg-base-100",
+          @compact && "w-full"
+        ]}
+        onchange="this.form.requestSubmit()"
+      >
+        <%= for b <- @my_businesses do %>
+          <option value={b.id} selected={b.id == @current_business_id}>{b.name}</option>
+        <% end %>
+      </select>
+    </form>
+    """
+  end
+
+  attr :class, :any, required: true
+  attr :is_business_owner, :boolean, default: false
+  attr :mobile, :boolean, default: false
+
+  def nav_links(assigns) do
+    mobile_attrs =
+      if assigns.mobile,
+        do: %{"onclick" => "this.closest('details')?.removeAttribute('open')"},
+        else: %{}
+
+    assigns = assign(assigns, :mobile_attrs, mobile_attrs)
+
+    ~H"""
+    <.link navigate={~p"/time-log"} class={nav_link_classes(@class, false)} {@mobile_attrs}>
+      Job time log
+    </.link>
+    <.link navigate={~p"/my-timeclock"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+      Workday timeclock
+    </.link>
+    <%= if @is_business_owner do %>
+      <.link navigate={~p"/employees"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+        Employees
+      </.link>
+    <% end %>
+    <.link navigate={~p"/businesses"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+      Businesses
+    </.link>
+    <.link href={~p"/users/settings"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+      Settings
+    </.link>
+    """
+  end
+
+  defp nav_link_classes(base, mobile?) do
+    if mobile?, do: [base, "mt-0.5"], else: base
+  end
+end

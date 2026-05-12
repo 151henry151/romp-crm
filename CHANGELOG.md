@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.9.26] - 2026-05-12
+
+### Added
+
+- **`RompCrmWeb.AppWorkspaceNav`**: shared header workspace links (**Job time log**, **Workday timeclock**, **Employees** when owner, **Businesses**, **Settings**); desktop inline row; mobile **Menu** `<details>` panel; optional multi-business switcher
+- **`Layouts.app`**: **`show_workspace_nav`**, **`current_business_id`**, **`my_businesses`**, **`is_business_owner`**, optional **`header_extras`** slot; **`JobsLive`** uses layout with SMS intake lines in **`header_extras`**
+- **`Businesses.resolve_active_business_id/3`**: centralize active-workspace resolution for nav and **`UserAuth.on_mount(:ensure_business_scope)`**
+- **Tests**: **`resolve_active_business_id/3`** coverage in **`BusinessesTest`**
+
+### Changed
+
+- **`UserAuth`**: **`ensure_business_scope`** calls **`Businesses.resolve_active_business_id/3`**
+- **`JobsLive`**, **`TimeLogLive`**, **`MyTimeclockLive`**, **`EmployeesLive`**, **`EmployeeDetailLive`**, **`BusinessesLive`**, **`UserSettingsController`**, **`SubscribeController`**: pass workspace nav assigns into **`Layouts.app`**; remove duplicated per-page link rows where replaced by the shared nav
+
 ## [0.9.25] - 2026-05-08
 
 ### Added

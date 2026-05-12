@@ -5,11 +5,13 @@ defmodule RompCrmWeb.BusinessesLive do
   alias RompCrm.Businesses
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     user = socket.assigns.current_scope.user
     businesses = Businesses.list_businesses_for_user(user)
 
     may_create? = User.may_create_business?(user)
+    bid = Businesses.resolve_active_business_id(user, businesses, session)
+    is_owner = bid && Businesses.owner?(user, bid)
 
     {:ok,
      socket
@@ -18,6 +20,9 @@ defmodule RompCrmWeb.BusinessesLive do
      |> assign(:invite_forms, invite_forms_init(businesses))
      |> assign(:user, user)
      |> assign(:may_create_business, may_create?)
+     |> assign(:current_business_id, bid)
+     |> assign(:my_businesses, businesses)
+     |> assign(:is_business_owner, is_owner == true)
      |> assign_new(:form, fn -> to_form(%{"name" => ""}, as: :business) end)
      |> assign(:page_title, "Businesses")}
   end
