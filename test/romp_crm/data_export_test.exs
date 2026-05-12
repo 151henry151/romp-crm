@@ -46,6 +46,28 @@ defmodule RompCrm.DataExportTest do
     end
   end
 
+  describe "build_audit_log_csv/1" do
+    test "includes audit rows for owned business ids" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, biz} = Businesses.create_business(owner, %{name: "Audit Co"})
+
+      RompCrm.BusinessAuditLogs.record(%{
+        business_id: biz.id,
+        actor_user_id: owner.id,
+        source: "web",
+        action: "jobs.create",
+        entity_type: "jobs",
+        entity_id: 42,
+        metadata: %{}
+      })
+
+      csv = DataExport.build_audit_log_csv([biz.id])
+      assert csv =~ "jobs.create"
+      assert csv =~ owner.email
+      assert csv =~ "42"
+    end
+  end
+
   describe "build_time_log_csv/1" do
     test "includes job time rows for business" do
       owner = AccountsFixtures.user_fixture()

@@ -7,7 +7,9 @@ defmodule RompCrm.Businesses do
   alias RompCrm.Repo
 
   alias RompCrm.Accounts.User
+  alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses.{Business, BusinessInvitation, BusinessMembership}
+  alias RompCrm.Employees
 
   @max_owned_businesses_per_account 3
 
@@ -190,6 +192,32 @@ defmodule RompCrm.Businesses do
          |> BusinessInvitation.changeset(attrs)
          |> Repo.insert() do
       {:ok, invitation} ->
+        case Employees.ensure_placeholder_for_invitation(business.id, email, inviter.id) do
+          {:ok, :created, emp} ->
+            BusinessAuditLogs.record(%{
+              business_id: business.id,
+              actor_user_id: inviter.id,
+              source: "web",
+              action: "employees.create",
+              entity_type: "employees",
+              entity_id: emp.id,
+              metadata: %{reason: "invitation_placeholder"}
+            })
+
+          _ ->
+            :ok
+        end
+
+        BusinessAuditLogs.record(%{
+          business_id: business.id,
+          actor_user_id: inviter.id,
+          source: "web",
+          action: "business_invitation.create",
+          entity_type: "business_invitations",
+          entity_id: invitation.id,
+          metadata: %{email: email}
+        })
+
         url = invitation_accept_url(raw_token)
         _ = RompCrm.Businesses.Notifier.deliver_invitation(invitation, business, url)
         {:ok, invitation}
@@ -244,30 +272,48 @@ defmodule RompCrm.Businesses do
             e
 
           :ok ->
-            Repo.transaction(fn ->
-              cs =
-                %BusinessMembership{}
-                |> BusinessMembership.changeset(%{
-                  business_id: inv.business_id,
-                  user_id: user.id,
-                  role: :member
+            case Repo.transaction(fn ->
+                   cs =
+                     %BusinessMembership{}
+                     |> BusinessMembership.changeset(%{
+                       business_id: inv.business_id,
+                       user_id: user.id,
+                       role: :member
+                     })
+
+                   case Repo.insert(cs) do
+                     {:ok, _} ->
+                       :ok
+
+                     {:error, changeset} ->
+                       if duplicate_membership_constraint?(changeset) do
+                         :ok
+                       else
+                         Repo.rollback(changeset)
+                       end
+                   end
+
+                   Repo.delete!(inv)
+                   get_business!(inv.business_id)
+                 end) do
+              {:ok, business} ->
+                _ = Employees.link_user_after_invite_accept(business.id, user)
+
+                BusinessAuditLogs.record(%{
+                  business_id: business.id,
+                  actor_user_id: user.id,
+                  source: "web",
+                  action: "business_membership.create",
+                  entity_type: "businesses",
+                  entity_id: business.id,
+                  metadata: %{role: "member", via: "invitation_accept"}
                 })
 
-              case Repo.insert(cs) do
-                {:ok, _} ->
-                  :ok
+                {:ok, business}
 
-                {:error, changeset} ->
-                  if duplicate_membership_constraint?(changeset) do
-                    :ok
-                  else
-                    Repo.rollback(changeset)
-                  end
-              end
-
-              Repo.delete!(inv)
-              get_business!(inv.business_id)
-            end)
+              {:error, reason} ->
+                {:error, reason}
+            end
         end
     end
   end
@@ -296,7 +342,26 @@ defmodule RompCrm.Businesses do
     inv = Repo.get!(BusinessInvitation, invitation_id)
 
     if owner?(user, inv.business_id) do
-      Repo.delete(inv)
+      bid = inv.business_id
+      iid = inv.id
+
+      case Repo.delete(inv) do
+        {:ok, _} ->
+          BusinessAuditLogs.record(%{
+            business_id: bid,
+            actor_user_id: user.id,
+            source: "web",
+            action: "business_invitation.cancel",
+            entity_type: "business_invitations",
+            entity_id: iid,
+            metadata: %{}
+          })
+
+          {:ok, :deleted}
+
+        {:error, _} = err ->
+          err
+      end
     else
       {:error, :not_owner}
     end

@@ -1,6 +1,7 @@
 defmodule RompCrmWeb.JobsLive do
   use RompCrmWeb, :live_view
 
+  alias RompCrm.EmployeePermissions
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.TimeTracking
@@ -28,19 +29,29 @@ defmodule RompCrmWeb.JobsLive do
           "+18022780965"
       end
 
+    caps = EmployeePermissions.for(socket.assigns.current_scope.user, bid)
+
     {:ok,
      socket
      |> assign(:filter, :all)
      |> assign(:expanded_job_id, nil)
      |> assign(:expanded_time_entries, %{})
      |> assign(:jobs, Jobs.list_jobs(bid))
+     |> assign(:can_edit_jobs, EmployeePermissions.can_edit_jobs?(caps))
      |> assign(:sms_intake_href, Phone.sms_uri(sms_from))
      |> assign(:sms_intake_display, Phone.format_us_display(sms_from))}
   end
 
   @impl true
   def handle_params(params, _url, socket) do
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    if socket.assigns.live_action in [:new, :edit] and not socket.assigns.can_edit_jobs do
+      {:noreply,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, "You do not have permission to edit jobs.")
+       |> Phoenix.LiveView.push_patch(to: ~p"/")}
+    else
+      {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    end
   end
 
   defp apply_action(socket, :index, _params) do
@@ -117,10 +128,31 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    bid = socket.assigns.current_business_id
-    job = Jobs.get_job!(String.to_integer(id), bid)
-    {:ok, _} = Jobs.delete_job(job)
-    {:noreply, refresh_jobs(socket)}
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete jobs.")}
+    else
+      bid = socket.assigns.current_business_id
+      user = socket.assigns.current_scope.user
+      job = Jobs.get_job!(String.to_integer(id), bid)
+
+      case Jobs.delete_job(job) do
+        {:ok, _} ->
+          RompCrm.BusinessAuditLogs.record(%{
+            business_id: bid,
+            actor_user_id: user.id,
+            source: "web",
+            action: "jobs.delete",
+            entity_type: "jobs",
+            entity_id: job.id,
+            metadata: %{client_name: job.client_name}
+          })
+
+          {:noreply, refresh_jobs(socket)}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Could not delete that job.")}
+      end
+    end
   end
 
   def handle_event("toggle_row", %{"id" => id}, socket) do

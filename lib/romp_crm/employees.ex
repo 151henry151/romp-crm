@@ -26,6 +26,157 @@ defmodule RompCrm.Employees do
     Repo.get_by(Employee, id: id, business_id: business_id)
   end
 
+  @doc """
+  Returns the employee row linked to **`user_id`** in **`business_id`**, if any.
+  """
+  def get_employee_by_user_id(user_id, business_id)
+      when is_integer(user_id) and is_integer(business_id) do
+    Repo.one(
+      from e in Employee,
+        where: e.user_id == ^user_id and e.business_id == ^business_id,
+        limit: 1
+    )
+  end
+
+  @doc """
+  Ensures a roster row exists for an invited email (name derived from the local part).
+
+  Returns **`{:ok, :created, employee}`**, **`{:ok, :existing, employee}`**, **`{:ok, :skipped}`**,
+  or **`{:error, changeset}`**.
+  """
+  def ensure_placeholder_for_invitation(business_id, email, _inviter_user_id \\ nil)
+      when is_integer(business_id) and is_binary(email) do
+    norm = email |> String.trim() |> String.downcase()
+
+    cond do
+      norm == "" ->
+        {:ok, :skipped}
+
+      true ->
+        existing =
+          Repo.one(
+            from e in Employee,
+              where: e.business_id == ^business_id,
+              where: fragment("lower(trim(?)) = ?", e.email, ^norm),
+              limit: 1
+          )
+
+        if existing do
+          {:ok, :existing, existing}
+        else
+          local =
+            norm
+            |> String.split("@")
+            |> List.first()
+            |> to_string()
+            |> String.replace(~r/[._]+/, " ")
+            |> String.trim()
+
+          name = if local == "", do: norm, else: local
+
+          case create_employee(%{
+                 "business_id" => business_id,
+                 "name" => name,
+                 "email" => norm,
+                 "can_edit_jobs" => false,
+                 "can_log_job_time" => true,
+                 "can_log_own_employee_time" => true,
+                 "can_log_employee_time_for_others" => false
+               }) do
+            {:ok, emp} -> {:ok, :created, emp}
+            err -> err
+          end
+        end
+    end
+  end
+
+  @doc """
+  After a user accepts a business invitation, links **`users`** ↔ **`employees`**
+  by matching email or creates a new roster row with defaults.
+  """
+  def link_user_after_invite_accept(business_id, user) when is_integer(business_id) do
+    norm = user.email |> String.trim() |> String.downcase()
+
+    cond do
+      norm == "" ->
+        {:error, :missing_user_email}
+
+      true ->
+        existing =
+          Repo.one(
+            from e in Employee,
+              where: e.business_id == ^business_id,
+              where: fragment("lower(trim(?)) = ?", e.email, ^norm),
+              limit: 1
+          )
+
+        case existing do
+          %Employee{user_id: nil} = emp ->
+            case update_employee(emp, %{user_id: user.id}) do
+              {:ok, updated} ->
+                RompCrm.BusinessAuditLogs.record(%{
+                  business_id: business_id,
+                  actor_user_id: user.id,
+                  source: "web",
+                  action: "employees.link_user",
+                  entity_type: "employees",
+                  entity_id: updated.id,
+                  metadata: %{}
+                })
+
+                {:ok, updated}
+
+              err ->
+                err
+            end
+
+          %Employee{user_id: uid} = emp when uid == user.id ->
+            {:ok, emp}
+
+          %Employee{} ->
+            {:error, :employee_email_linked_to_other_user}
+
+          nil ->
+            local =
+              norm
+              |> String.split("@")
+              |> List.first()
+              |> to_string()
+              |> String.replace(~r/[._]+/, " ")
+              |> String.trim()
+
+            name = if local == "", do: norm, else: local
+
+            case create_employee(%{
+                   "business_id" => business_id,
+                   "name" => name,
+                   "email" => norm,
+                   "user_id" => user.id,
+                   "can_edit_jobs" => false,
+                   "can_log_job_time" => true,
+                   "can_log_own_employee_time" => true,
+                   "can_log_employee_time_for_others" => false
+                 }) do
+              {:ok, emp} ->
+                RompCrm.BusinessAuditLogs.record(%{
+                  business_id: business_id,
+                  actor_user_id: user.id,
+                  source: "web",
+                  action: "employees.create",
+                  entity_type: "employees",
+                  entity_id: emp.id,
+                  metadata: %{reason: "invite_accept_new_roster"}
+                })
+
+                {:ok, emp}
+
+              err ->
+                err
+            end
+        end
+    end
+  end
+
   def create_employee(attrs) do
     with {:ok, employee} <- %Employee{} |> Employee.changeset(attrs) |> Repo.insert() do
       broadcast(employee.business_id, {:employee_created, employee})

@@ -9,8 +9,8 @@ defmodule RompCrm.DataExport do
   alias RompCrm.DataExportSchedule
   alias RompCrm.Employees.{Employee, EmployeeTimeEntry}
   alias RompCrm.Jobs.Job
+  alias RompCrm.BusinessAuditLogs
   alias RompCrm.Repo
-  alias RompCrm.SmsInteractionLogs
   alias RompCrm.TimeTracking.TimeEntry
 
   require Logger
@@ -48,13 +48,13 @@ defmodule RompCrm.DataExport do
       jobs_csv = build_jobs_csv(business_ids)
       employees_csv = build_employees_csv(business_ids)
       time_log_csv = build_time_log_csv(business_ids)
-      sms_csv = build_sms_interactions_csv(business_ids)
+      audit_csv = build_audit_log_csv(business_ids)
 
       case UserNotifier.deliver_data_export_csvs(user, [
              {"jobs.csv", jobs_csv},
              {"employees.csv", employees_csv},
              {"time_log.csv", time_log_csv},
-             {"sms_interactions.csv", sms_csv}
+             {"audit_log.csv", audit_csv}
            ]) do
         {:ok, _} -> {:ok, :sent}
         {:error, _} = err -> err
@@ -156,18 +156,23 @@ defmodule RompCrm.DataExport do
         )
       end
 
-    header = ~w(business_id employee_id name title phone email notes inserted_at updated_at)
+    header = ~w(business_id employee_id user_id name title phone email notes can_edit_jobs can_log_job_time can_log_own_employee_time can_log_employee_time_for_others inserted_at updated_at)
 
     lines =
       Enum.map(rows, fn e ->
         [
           e.business_id,
           e.id,
+          e.user_id,
           e.name,
           e.title,
           e.phone,
           e.email,
           e.notes,
+          e.can_edit_jobs,
+          e.can_log_job_time,
+          e.can_log_own_employee_time,
+          e.can_log_employee_time_for_others,
           format_dt(e.inserted_at),
           format_dt(e.updated_at)
         ]
@@ -257,8 +262,7 @@ defmodule RompCrm.DataExport do
         {r.business_id, ts, r.id}
       end)
 
-    header =
-      ~w(entry_type business_id entry_id job_id client_name employee_id employee_name start end lunch_start lunch_end duration notes row_inserted_at)
+    header = ~w(entry_type business_id entry_id job_id client_name employee_id employee_name start end lunch_start lunch_end duration notes row_inserted_at)
 
     lines =
       Enum.map(merged, fn r ->
@@ -285,26 +289,30 @@ defmodule RompCrm.DataExport do
     Enum.join([Enum.join(Enum.map(header, &csv_cell/1), ",") | lines], "\n") <> "\n"
   end
 
-  def build_sms_interactions_csv(business_ids) do
-    logs = SmsInteractionLogs.list_for_business_ids(business_ids)
+  def build_audit_log_csv(business_ids) do
+    logs = BusinessAuditLogs.list_for_business_ids(business_ids)
 
-    header =
-      ~w(id inserted_at business_id user_id twilio_message_sid phone_normalized outcome inbound_body outbound_body planned_operations results_summary)
+    header = ~w(id inserted_at business_id actor_user_id actor_email source action entity_type entity_id metadata)
 
     lines =
       Enum.map(logs, fn l ->
+        actor_email =
+          case l.actor_user do
+            %{email: e} when is_binary(e) -> e
+            _ -> ""
+          end
+
         [
           l.id,
           format_dt(l.inserted_at),
           l.business_id,
-          l.user_id,
-          l.twilio_message_sid,
-          l.phone_normalized,
-          l.outcome,
-          l.inbound_body,
-          l.outbound_body,
-          l.planned_operations,
-          l.results_summary
+          l.actor_user_id,
+          actor_email,
+          l.source,
+          l.action,
+          l.entity_type,
+          l.entity_id,
+          l.metadata
         ]
         |> Enum.map(&csv_cell/1)
         |> Enum.join(",")

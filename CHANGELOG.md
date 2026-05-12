@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [0.9.24] - 2026-05-08
+
+### Added
+
+- **`employees`**: optional **`user_id`** (FK to **`users`**), permission booleans **`can_edit_jobs`**, **`can_log_job_time`**, **`can_log_own_employee_time`**, **`can_log_employee_time_for_others`** (defaults: job time and own employee time on; job edits and others’ employee time off); partial unique index on **`(business_id, user_id)`** when **`user_id`** is set
+- **`business_audit_logs`** table and **`RompCrm.BusinessAuditLogs`**: append-only rows with **`actor_user_id`**, **`source`** (`web` / `sms`), **`action`**, **`entity_type`**, **`entity_id`**, **`metadata`** (JSON); migration copies existing **`sms_interaction_logs`** into **`business_audit_logs`** as legacy rows
+- **`RompCrm.EmployeePermissions`**: resolve effective caps for owners vs linked members
+- **`Employees.ensure_placeholder_for_invitation/3`**, **`Employees.link_user_after_invite_accept/2`**: roster row for invite email; link or create employee when a user accepts an invitation
+- **Employees UI**: permission checkboxes on the employee form; **Invite to app** on roster rows with email and no linked user (calls **`Businesses.invite_user/3`**)
+- **`UserAuth.on_mount(:require_business_owner)`** and a dedicated **`live_session`** so **`/employees`** routes are owner-only
+- **Tests**: **`EmployeePermissionsTest`**, **`DataExport.build_audit_log_csv/1`** coverage
+
+### Changed
+
+- **`Businesses.invite_user`**: after creating an invitation, ensure an employee placeholder for the invited email; record **`business_invitation.create`** and **`employees.create`** (placeholder) in **`business_audit_logs`**
+- **`Businesses.accept_invitation_raw`**: after membership insert, call **`Employees.link_user_after_invite_accept/2`**; record **`business_membership.create`** in **`business_audit_logs`**
+- **`Businesses.cancel_invitation`**: return **`{:ok, :deleted}`** / error tuple and append **`business_invitation.cancel`** audit row
+- **`DataExport.deliver_email_export/1`**: attach **`audit_log.csv`** (from **`business_audit_logs`**) instead of **`sms_interactions.csv`**; extend **`employees.csv`** with **`user_id`** and permission columns
+- **`TwilioWebhookController`**: filter parsed operations by **`EmployeePermissions`**; record one **`business_audit_logs`** row per successful DB mutation from SMS (job / job time / employee time); remove writes to **`sms_interaction_logs`**
+- **`JobsLive`** / **`JobFormComponent`**: gate create / edit / delete on **`can_edit_jobs`**; append **`jobs.create`**, **`jobs.update`**, **`jobs.delete`** audit rows from the web UI
+- **`EmployeesLive`** / **`EmployeeFormComponent`**: append **`employees.create`**, **`employees.update`**, **`employees.delete`** audit rows
+- **`Employees.link_user_after_invite_accept`**: append **`employees.link_user`** or **`employees.create`** audit rows as appropriate
+- **`UserNotifier.deliver_data_export_csvs`**, **Settings → Data export** copy: describe **`audit_log.csv`** instead of SMS-only export
+- **`config/test.exs`**: use ephemeral HTTP **`port: 0`** for **`Endpoint`** to reduce port collisions; set SQLite **`busy_timeout`** on **`Repo`**
+
 ## [0.9.23] - 2026-05-13
 
 ### Added

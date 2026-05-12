@@ -5,12 +5,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   alias RompCrm.Accounts
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
+  alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
+  alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.SmsConversations
-  alias RompCrm.SmsInteractionLogs
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -128,20 +129,36 @@ defmodule RompCrmWeb.TwilioWebhookController do
       {:ok,
        %{
          assistant_sms: assistant,
-         job_operations: job_ops,
-         time_operations: time_ops,
-         emp_operations: emp_ops
+         job_operations: job_ops_raw,
+         time_operations: time_ops_raw,
+         emp_operations: emp_ops_raw
        }} ->
+        caps = EmployeePermissions.for(user, business_id)
+
+        {job_ops, time_ops, emp_ops} =
+          filter_sms_operations_by_permissions(job_ops_raw, time_ops_raw, emp_ops_raw, caps)
+
+        had_extracted_ops =
+          job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != []
+
         all_ops = job_ops ++ time_ops ++ emp_ops
 
         log_base = %{
           message_sid: message_sid,
-          planned_job_ops: job_ops,
-          planned_time_ops: time_ops,
-          planned_emp_ops: emp_ops
+          planned_job_ops: job_ops_raw,
+          planned_time_ops: time_ops_raw,
+          planned_emp_ops: emp_ops_raw
         }
 
         cond do
+          all_ops == [] and had_extracted_ops ->
+            reply =
+              "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
+
+            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+              Map.merge(log_base, %{outcome: "permission_denied", results: []})
+            )
+
           all_ops == [] ->
             msg = first_nonempty([assistant])
 
@@ -149,14 +166,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               msg ||
                 "No changes applied. Open Romp CRM or include clearer job/time details."
 
-            sms_reply_and_log(
-              conn,
-              from,
-              user,
-              business_id,
-              phone_norm,
-              body_text,
-              reply,
+            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
               Map.merge(log_base, %{outcome: "no_db_operations", results: []})
             )
 
@@ -174,29 +184,16 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
             case run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
               {:clarify, msg} ->
-                sms_reply_and_log(
-                  conn,
-                  from,
-                  user,
-                  business_id,
-                  phone_norm,
-                  body_text,
-                  msg,
+                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg,
                   Map.merge(log_base, %{outcome: "clarify", results: []})
                 )
 
               {:ok, all_results} ->
+                record_sms_db_audits(business_id, user.id, message_sid, all_results)
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
 
-                sms_reply_and_log(
-                  conn,
-                  from,
-                  user,
-                  business_id,
-                  phone_norm,
-                  body_text,
-                  reply,
+                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
                   Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
                 )
             end
@@ -229,80 +226,141 @@ defmodule RompCrmWeb.TwilioWebhookController do
          phone_norm,
          inbound_body,
          reply_text,
-         log_extra
+         _log_extra
        ) do
     _ = Messages.send_sms(from, reply_text)
     maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, reply_text)
-
-    maybe_record_sms_interaction_log(
-      business_id,
-      user,
-      phone_norm,
-      inbound_body,
-      reply_text,
-      log_extra
-    )
-
     twiml_ok(conn)
   end
 
-  defp maybe_record_sms_interaction_log(
-         business_id,
-         user,
-         phone_norm,
-         inbound_body,
-         outbound_body,
-         extra
-       ) do
-    planned =
-      [
-        inspect(Map.get(extra, :planned_job_ops, []), limit: 150),
-        inspect(Map.get(extra, :planned_time_ops, []), limit: 150),
-        inspect(Map.get(extra, :planned_emp_ops, []), limit: 150)
-      ]
-      |> Enum.join("\n---\n")
+  defp filter_sms_operations_by_permissions(job_ops, time_ops, emp_ops, caps) do
+    job_ops =
+      if EmployeePermissions.can_edit_jobs?(caps), do: job_ops, else: []
 
-    results =
-      case Map.get(extra, :results) do
-        list when is_list(list) -> inspect(list, limit: 200)
-        _ -> ""
-      end
+    time_ops =
+      if EmployeePermissions.can_log_job_time?(caps), do: time_ops, else: []
 
-    outcome =
-      case Map.get(extra, :outcome) do
-        s when is_binary(s) -> s
-        _ -> "unknown"
-      end
+    emp_ops =
+      Enum.filter(emp_ops, fn op ->
+        id = emp_op_target_employee_id(op)
+        EmployeePermissions.can_log_employee_time?(caps, id)
+      end)
 
-    extraction = Map.get(extra, :extraction_error)
-
-    results =
-      if is_binary(extraction) and extraction != "",
-        do: results <> "\nextraction_error: " <> extraction,
-        else: results
-
-    attrs = %{
-      business_id: business_id,
-      user_id: user.id,
-      twilio_message_sid: Map.get(extra, :message_sid),
-      phone_normalized: phone_norm || "",
-      outcome: outcome,
-      inbound_body: String.slice(to_string(inbound_body || ""), 0, 4000),
-      outbound_body: String.slice(to_string(outbound_body || ""), 0, 4000),
-      planned_operations: String.slice(planned, 0, 32_000),
-      results_summary: String.slice(results, 0, 32_000)
-    }
-
-    case SmsInteractionLogs.insert(attrs) do
-      {:ok, _} ->
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "Twilio SMS: could not persist interaction log business_id=#{business_id} reason=#{inspect(reason)}"
-        )
-    end
+    {job_ops, time_ops, emp_ops}
   end
+
+  defp emp_op_target_employee_id({:emp_clock_in_by_id, id, _}), do: id
+  defp emp_op_target_employee_id({:emp_clock_out_by_id, id, _}), do: id
+  defp emp_op_target_employee_id({:emp_lunch_by_id, id, _, _}), do: id
+
+  defp record_sms_db_audits(business_id, actor_user_id, message_sid, results) when is_list(results) do
+    base = %{twilio_message_sid: message_sid}
+
+    Enum.each(results, fn r ->
+      record_one_sms_audit(business_id, actor_user_id, base, r)
+    end)
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:created, %Job{} = job}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "jobs.create",
+      entity_type: "jobs",
+      entity_id: job.id,
+      metadata: Map.merge(base, %{client_name: job.client_name})
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:updated, %Job{} = job, fields}) when is_list(fields) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "jobs.update",
+      entity_type: "jobs",
+      entity_id: job.id,
+      metadata: Map.merge(base, %{fields: fields, client_name: job.client_name})
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:time_clocked_in, entry_id, name, at}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "time_entries.create",
+      entity_type: "time_entries",
+      entity_id: entry_id,
+      metadata: Map.merge(base, %{job_client_name: name, started_at: inspect(at)})
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:time_clocked_out, entry_id, name, started_at, ended_at}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "time_entries.update",
+      entity_type: "time_entries",
+      entity_id: entry_id,
+      metadata:
+        Map.merge(base, %{
+          job_client_name: name,
+          started_at: inspect(started_at),
+          ended_at: inspect(ended_at)
+        })
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:emp_clocked_in, entry_id, emp_name, at}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "employee_time_entries.create",
+      entity_type: "employee_time_entries",
+      entity_id: entry_id,
+      metadata: Map.merge(base, %{employee_name: emp_name, clocked_in_at: inspect(at)})
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:emp_clocked_out, entry_id, emp_name, tin, tout}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "employee_time_entries.update",
+      entity_type: "employee_time_entries",
+      entity_id: entry_id,
+      metadata:
+        Map.merge(base, %{
+          employee_name: emp_name,
+          clocked_in_at: inspect(tin),
+          clocked_out_at: inspect(tout)
+        })
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:emp_lunched, entry_id, emp_name, ls, le}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "employee_time_entries.update",
+      entity_type: "employee_time_entries",
+      entity_id: entry_id,
+      metadata:
+        Map.merge(base, %{
+          employee_name: emp_name,
+          lunch_start_at: inspect(ls),
+          lunch_end_at: inspect(le)
+        })
+    })
+  end
+
+  defp record_one_sms_audit(_, _, _, _), do: :ok
 
   defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)
        when is_binary(phone_norm) and phone_norm != "" do
@@ -424,7 +482,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 "Twilio SMS time_clock_in applied: sid=#{sid} op_index=#{idx} job_id=#{job.id} entry_id=#{entry.id}"
               )
 
-              {:time_clocked_in, job.client_name, started_at}
+              {:time_clocked_in, entry.id, job.client_name, started_at}
 
             {:error, cs} ->
               Logger.warning(
@@ -472,7 +530,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               )
 
               job = Jobs.get_job(job_id, business_id)
-              {:time_clocked_out, job && job.client_name, updated.started_at, ended_at}
+              {:time_clocked_out, updated.id, job && job.client_name, updated.started_at, ended_at}
 
             {:error, cs} ->
               Logger.warning(
@@ -536,7 +594,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 "Twilio SMS emp_clock_in applied: sid=#{sid} employee_id=#{emp.id} entry_id=#{entry.id}"
               )
 
-              {:emp_clocked_in, emp.name, clocked_in_at}
+              {:emp_clocked_in, entry.id, emp.name, clocked_in_at}
 
             {:error, cs} ->
               Logger.warning("Twilio SMS emp_clock_in failed: #{inspect(cs.errors)}")
@@ -581,7 +639,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               )
 
               emp = Employees.get_employee(emp_id, business_id)
-              {:emp_clocked_out, emp && emp.name, updated.clocked_in_at, clocked_out_at}
+              {:emp_clocked_out, updated.id, emp && emp.name, updated.clocked_in_at, clocked_out_at}
 
             {:error, cs} ->
               Logger.warning("Twilio SMS emp_clock_out failed: #{inspect(cs.errors)}")
@@ -623,10 +681,10 @@ defmodule RompCrmWeb.TwilioWebhookController do
                  lunch_start_at: lunch_start,
                  lunch_end_at: lunch_end
                }) do
-            {:ok, _updated} ->
+            {:ok, updated} ->
               Logger.info("Twilio SMS emp_lunch applied: sid=#{sid} employee_id=#{emp_id}")
               emp = Employees.get_employee(emp_id, business_id)
-              {:emp_lunched, emp && emp.name, lunch_start, lunch_end}
+              {:emp_lunched, updated.id, emp && emp.name, lunch_start, lunch_end}
 
             {:error, cs} ->
               Logger.warning("Twilio SMS emp_lunch failed: #{inspect(cs.errors)}")

@@ -122,7 +122,15 @@ defmodule RompCrmWeb.Router do
       live "/jobs/:id/edit", JobsLive, :edit
 
       live "/time-log", TimeLogLive, :index
+    end
 
+    live_session :authenticated_employees_owner,
+      on_mount: [
+        {RompCrmWeb.UserAuth, :require_authenticated},
+        {RompCrmWeb.UserAuth, :require_active_subscription},
+        {RompCrmWeb.UserAuth, :ensure_business_scope},
+        {RompCrmWeb.UserAuth, :require_business_owner}
+      ] do
       live "/employees", EmployeesLive, :index
       live "/employees/new", EmployeesLive, :new
       live "/employees/:id/edit", EmployeesLive, :edit

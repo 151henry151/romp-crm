@@ -106,14 +106,16 @@
           </button>
         <% end %>
       </div>
-      <.link
-        patch={~p"/jobs/new"}
-        class="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center self-center rounded-lg bg-blue-600 px-6 text-lg font-semibold leading-none text-white no-underline shadow-sm hover:bg-blue-500 hover:no-underline"
-        title="New Job"
-        aria-label="New Job"
-      >
-        +
-      </.link>
+      <%= if @can_edit_jobs do %>
+        <.link
+          patch={~p"/jobs/new"}
+          class="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center self-center rounded-lg bg-blue-600 px-6 text-lg font-semibold leading-none text-white no-underline shadow-sm hover:bg-blue-500 hover:no-underline"
+          title="New Job"
+          aria-label="New Job"
+        >
+          +
+        </.link>
+      <% end %>
     </div>
 
     <div class="md:hidden space-y-3">
@@ -224,22 +226,24 @@
                   </table>
                 <% end %>
               </div>
-              <div class="pt-2 flex items-center gap-4">
-                <.link
-                  patch={~p"/jobs/#{job.id}/edit"}
-                  class="text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Edit
-                </.link>
-                <button
-                  phx-click="delete"
-                  phx-value-id={job.id}
-                  data-confirm="Delete this job?"
-                  class="text-red-500 hover:text-red-700 font-medium"
-                >
-                  Delete
-                </button>
-              </div>
+              <%= if @can_edit_jobs do %>
+                <div class="pt-2 flex items-center gap-4">
+                  <.link
+                    patch={~p"/jobs/#{job.id}/edit"}
+                    class="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Edit
+                  </.link>
+                  <button
+                    phx-click="delete"
+                    phx-value-id={job.id}
+                    data-confirm="Delete this job?"
+                    class="text-red-500 hover:text-red-700 font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              <% end %>
             </div>
           <% end %>
         </div>
@@ -265,7 +269,9 @@
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Status</th>
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Referred By</th>
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Next Action</th>
-            <th class="px-4 py-3"></th>
+            <%= if @can_edit_jobs do %>
+              <th class="px-4 py-3"></th>
+            <% end %>
           </tr>
         </thead>
         <tbody class="divide-y divide-base-300">
@@ -304,28 +310,30 @@
               <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
                 {job.next_action}
               </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <.link
-                    patch={~p"/jobs/#{job.id}/edit"}
-                    class="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Edit
-                  </.link>
-                  <button
-                    phx-click="delete"
-                    phx-value-id={job.id}
-                    data-confirm="Delete this job?"
-                    class="text-red-500 hover:text-red-700 font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
+              <%= if @can_edit_jobs do %>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <.link
+                      patch={~p"/jobs/#{job.id}/edit"}
+                      class="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Edit
+                    </.link>
+                    <button
+                      phx-click="delete"
+                      phx-value-id={job.id}
+                      data-confirm="Delete this job?"
+                      class="text-red-500 hover:text-red-700 font-medium"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              <% end %>
             </tr>
             <%= if expanded?(@expanded_job_id, job.id) do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
-                <td colspan="9" class="px-4 py-3 text-sm text-base-content">
+                <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
                     <p>
                       <span class="font-medium text-base-content/90">Client:</span> {display(
@@ -431,7 +439,7 @@
           <% end %>
           <%= if visible_jobs(@jobs, @filter) == [] do %>
             <tr>
-              <td colspan="9" class="px-4 py-12 text-center text-base-content/60">
+              <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-12 text-center text-base-content/60">
                 No jobs found.
               </td>
             </tr>
@@ -454,6 +462,8 @@
       action={@live_action}
       job={@job}
       current_business_id={@current_business_id}
+      actor_user_id={@current_scope.user.id}
+      can_edit_jobs={@can_edit_jobs}
       patch={~p"/"}
     />
   </.modal>
