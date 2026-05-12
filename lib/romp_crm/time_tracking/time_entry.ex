@@ -24,9 +24,24 @@ defmodule RompCrm.TimeTracking.TimeEntry do
     entry
     |> cast(attrs, [:business_id, :job_id, :started_at, :ended_at, :notes])
     |> validate_required([:business_id, :job_id, :started_at])
+    |> validate_end_after_start()
     |> unique_constraint([:business_id, :job_id],
-      name: :time_entries_one_open_clock_per_job
-    )
+          name: :time_entries_one_open_clock_per_job
+        )
+  end
+
+  defp validate_end_after_start(changeset) do
+    case {get_field(changeset, :started_at), get_field(changeset, :ended_at)} do
+      {%NaiveDateTime{} = s, %NaiveDateTime{} = e} ->
+        if NaiveDateTime.compare(e, s) == :gt do
+          changeset
+        else
+          add_error(changeset, :ended_at, "must be after start")
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   @doc "Duration in minutes between started_at and ended_at. nil if entry is still open."

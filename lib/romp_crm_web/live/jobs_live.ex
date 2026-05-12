@@ -1,12 +1,16 @@
 defmodule RompCrmWeb.JobsLive do
   use RompCrmWeb, :live_view
 
+  alias RompCrm.BusinessAuditLogs
+  alias RompCrm.Businesses
   alias RompCrm.EmployeePermissions
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.TimeTracking
   alias RompCrm.TimeTracking.TimeEntry
   alias RompCrm.Twilio.Phone
+  alias RompCrmWeb.DatetimeLocal
+  alias RompCrmWeb.JobTimeLogDefaults
 
   @impl true
   def mount(_params, _session, socket) do
@@ -29,7 +33,8 @@ defmodule RompCrmWeb.JobsLive do
           "+18022780965"
       end
 
-    caps = EmployeePermissions.for(socket.assigns.current_scope.user, bid)
+    user = socket.assigns.current_scope.user
+    caps = EmployeePermissions.for(user, bid)
 
     {:ok,
      socket
@@ -38,6 +43,14 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:expanded_time_entries, %{})
      |> assign(:jobs, Jobs.list_jobs(bid))
      |> assign(:can_edit_jobs, EmployeePermissions.can_edit_jobs?(caps))
+     |> assign(:can_log_job_time, EmployeePermissions.can_log_job_time?(caps))
+     |> assign(:is_business_owner, Businesses.owner?(user, bid))
+     |> assign(:can_punch_own_timeclock, EmployeePermissions.can_punch_own_timeclock?(caps))
+     |> assign(:log_job_time_job_id, nil)
+     |> assign(:log_job_time_client_name, "")
+     |> assign(:job_time_started_at, "")
+     |> assign(:job_time_ended_at, "")
+     |> assign(:job_time_notes, "")
      |> assign(:sms_intake_href, Phone.sms_uri(sms_from))
      |> assign(:sms_intake_display, Phone.format_us_display(sms_from))}
   end
@@ -137,7 +150,7 @@ defmodule RompCrmWeb.JobsLive do
 
       case Jobs.delete_job(job) do
         {:ok, _} ->
-          RompCrm.BusinessAuditLogs.record(%{
+          BusinessAuditLogs.record(%{
             business_id: bid,
             actor_user_id: user.id,
             source: "web",
@@ -151,6 +164,128 @@ defmodule RompCrmWeb.JobsLive do
 
         {:error, _} ->
           {:noreply, put_flash(socket, :error, "Could not delete that job.")}
+      end
+    end
+  end
+
+  def handle_event("open_job_time_log", %{"job_id" => job_id}, socket) do
+    if not socket.assigns.can_log_job_time do
+      {:noreply, put_flash(socket, :error, "You do not have permission to log time on jobs.")}
+    else
+      job_id = String.to_integer(job_id)
+      bid = socket.assigns.current_business_id
+      job = Jobs.get_job!(job_id, bid)
+      {s, e} = JobTimeLogDefaults.default_datetime_local_pair()
+
+      {:noreply,
+       socket
+       |> assign(:log_job_time_job_id, job_id)
+       |> assign(:log_job_time_client_name, job.client_name || "Job")
+       |> assign(:job_time_started_at, s)
+       |> assign(:job_time_ended_at, e)
+       |> assign(:job_time_notes, "")}
+    end
+  end
+
+  def handle_event("close_job_time_log", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:log_job_time_job_id, nil)
+     |> assign(:log_job_time_client_name, "")
+     |> assign(:job_time_started_at, "")
+     |> assign(:job_time_ended_at, "")
+     |> assign(:job_time_notes, "")}
+  end
+
+  def handle_event("job_time_field", params, socket) do
+    started = Map.get(params, "started_at", socket.assigns.job_time_started_at)
+    ended = Map.get(params, "ended_at", socket.assigns.job_time_ended_at)
+    notes = Map.get(params, "notes", socket.assigns.job_time_notes)
+
+    {:noreply,
+     socket
+     |> assign(:job_time_started_at, started)
+     |> assign(:job_time_ended_at, ended)
+     |> assign(:job_time_notes, notes)}
+  end
+
+  def handle_event("save_job_time_log", params, socket) do
+    if not socket.assigns.can_log_job_time do
+      {:noreply, put_flash(socket, :error, "You do not have permission to log time on jobs.")}
+    else
+      job_id = socket.assigns.log_job_time_job_id
+      bid = socket.assigns.current_business_id
+      user = socket.assigns.current_scope.user
+
+      if is_nil(job_id) do
+        {:noreply, socket}
+      else
+        started_s = Map.get(params, "started_at", socket.assigns.job_time_started_at)
+        ended_s = Map.get(params, "ended_at", socket.assigns.job_time_ended_at)
+
+        notes =
+          (Map.get(params, "notes") || socket.assigns.job_time_notes)
+          |> to_string()
+          |> String.trim()
+
+        case {DatetimeLocal.parse(started_s), DatetimeLocal.parse(ended_s)} do
+          {{:error, :missing}, _} ->
+            {:noreply, put_flash(socket, :error, "Start and end are required.")}
+
+          {_, {:error, :missing}} ->
+            {:noreply, put_flash(socket, :error, "Start and end are required.")}
+
+          {{:error, _}, _} ->
+            {:noreply, put_flash(socket, :error, "Invalid start time.")}
+
+          {_, {:error, _}} ->
+            {:noreply, put_flash(socket, :error, "Invalid end time.")}
+
+          {{:ok, started_at}, {:ok, ended_at}} ->
+            if NaiveDateTime.compare(ended_at, started_at) != :gt do
+              {:noreply, put_flash(socket, :error, "End time must be after start time.")}
+            else
+              attrs = %{
+                business_id: bid,
+                job_id: job_id,
+                started_at: started_at,
+                ended_at: ended_at,
+                notes: if(notes == "", do: nil, else: notes)
+              }
+
+              case TimeTracking.create_time_entry(attrs) do
+                {:ok, entry} ->
+                  BusinessAuditLogs.record(%{
+                    business_id: bid,
+                    actor_user_id: user.id,
+                    source: "web",
+                    action: "time_entries.create",
+                    entity_type: "time_entries",
+                    entity_id: entry.id,
+                    metadata: %{job_id: job_id, source: "job_hours_form"}
+                  })
+
+                  {:noreply,
+                   socket
+                   |> assign(:log_job_time_job_id, nil)
+                   |> assign(:log_job_time_client_name, "")
+                   |> assign(:job_time_started_at, "")
+                   |> assign(:job_time_ended_at, "")
+                   |> assign(:job_time_notes, "")
+                   |> put_flash(:info, "Job hours saved.")
+                   |> refresh_time_entries()
+                   |> refresh_jobs()}
+
+                {:error, %Ecto.Changeset{} = cs} ->
+                  msg =
+                    cs.errors
+                    |> Enum.map(fn {k, {m, _}} -> "#{k} #{m}" end)
+                    |> Enum.join("; ")
+
+                  {:noreply, put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
+              end
+            end
+        end
       end
     end
   end
