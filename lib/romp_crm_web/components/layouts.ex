@@ -5,6 +5,8 @@ defmodule RompCrmWeb.Layouts do
   """
   use RompCrmWeb, :html
 
+  import RompCrmWeb.AppWorkspaceNav
+
   # Embed all files in layouts/* within this module.
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
@@ -35,7 +37,16 @@ defmodule RompCrmWeb.Layouts do
     default: :narrow,
     doc: "`:narrow` (~672px) for forms; `:wide` (~1280px) to match the Jobs list layout"
 
+  attr :show_workspace_nav, :boolean,
+    default: false,
+    doc: "when true, show full CRM workspace links (time log, timeclock, employees, …) in the header"
+
+  attr :current_business_id, :any, default: nil
+  attr :my_businesses, :list, default: []
+  attr :is_business_owner, :boolean, default: false
+
   slot :inner_block, required: true
+  slot :header_extras
 
   def app(assigns) do
     assigns =
@@ -45,42 +56,62 @@ defmodule RompCrmWeb.Layouts do
 
     ~H"""
     <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-4">
-      <div class="mx-auto flex max-w-screen-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="min-w-0 shrink">
-          <a
-            href={~p"/"}
-            class="brand-logo-hitbox inline-flex focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-          >
-            <span class="brand-logo-crop block aspect-[1154/489] h-10 sm:h-12 overflow-hidden rounded-2xl">
-              <img
-                src={~p"/images/romp-crm-logo-main.png"}
-                alt="Romp CRM"
-                class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
-              />
-              <img
-                src={~p"/images/romp-crm-logo-main-dark.png"}
-                alt="Romp CRM"
-                class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
-              />
-            </span>
-          </a>
-        </div>
-        <nav class="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-auto sm:justify-end">
-          <%= if @current_scope && @current_scope.user do %>
-            <a href={~p"/businesses"} class="link link-hover shrink-0 text-sm whitespace-nowrap">
-              Businesses
+      <div class="mx-auto max-w-screen-xl space-y-3">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div class="min-w-0 flex-1">
+            <a
+              href={~p"/"}
+              class="brand-logo-hitbox inline-flex focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+            >
+              <span class="brand-logo-crop block aspect-[1154/489] h-10 sm:h-12 overflow-hidden rounded-2xl">
+                <img
+                  src={~p"/images/romp-crm-logo-main.png"}
+                  alt="Romp CRM"
+                  class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
+                />
+                <img
+                  src={~p"/images/romp-crm-logo-main-dark.png"}
+                  alt="Romp CRM"
+                  class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
+                />
+              </span>
             </a>
-            <a href={~p"/users/settings"} class="link link-hover shrink-0 text-sm whitespace-nowrap">
-              Settings
-            </a>
-          <% end %>
-          <div class="shrink-0 [&_details]:max-w-[calc(100vw-2rem)]">
-            <.support_contact />
+            <%= if @header_extras != [] do %>
+              <div class="mt-2 max-w-2xl space-y-1 text-sm">
+                {render_slot(@header_extras)}
+              </div>
+            <% end %>
           </div>
-          <div class="shrink-0">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+            <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
+              <.app_workspace_nav
+                current_business_id={@current_business_id}
+                my_businesses={@my_businesses}
+                is_business_owner={@is_business_owner}
+              />
+            <% else %>
+              <%= if @current_scope && @current_scope.user do %>
+                <nav class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <a href={~p"/businesses"} class="link link-hover whitespace-nowrap">
+                    Businesses
+                  </a>
+                  <a href={~p"/users/settings"} class="link link-hover whitespace-nowrap">
+                    Settings
+                  </a>
+                </nav>
+              <% end %>
+            <% end %>
+          </div>
+          <div class="ml-auto flex shrink-0 items-center gap-2">
+            <div class="[&_details]:max-w-[calc(100vw-2rem)]">
+              <.support_contact />
+            </div>
             <.theme_toggle />
           </div>
-        </nav>
+        </div>
       </div>
     </header>
 

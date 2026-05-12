@@ -11,6 +11,7 @@ defmodule RompCrmWeb.UserSettingsController do
 
   plug :require_sudo_mode
   plug :assign_email_and_password_changesets
+  plug :assign_workspace_nav_for_layout
 
   def edit(conn, _params) do
     render(conn, :edit)
@@ -178,5 +179,19 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:show_paypal_subscription_help, show_subscription_help)
     |> assign(:show_cancel_subscription, show_cancel_subscription)
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
+  end
+
+  defp assign_workspace_nav_for_layout(conn, _opts) do
+    user = conn.assigns.current_scope.user
+    businesses = Businesses.list_businesses_for_user(user)
+    session = conn.private[:plug_session] || %{}
+    bid = Businesses.resolve_active_business_id(user, businesses, session)
+    is_owner = bid != nil && Businesses.owner?(user, bid)
+
+    conn
+    |> assign(:show_workspace_nav, businesses != [])
+    |> assign(:current_business_id, bid)
+    |> assign(:my_businesses, businesses)
+    |> assign(:is_business_owner, is_owner)
   end
 end

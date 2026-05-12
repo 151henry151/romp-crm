@@ -15,7 +15,8 @@ defmodule RompCrmWeb.EmployeesLive do
     {:ok,
      socket
      |> assign(:employees, Employees.list_employees(bid))
-     |> assign(:employee, nil)}
+     |> assign(:employee, nil)
+     |> assign(:is_business_owner, Businesses.owner?(socket.assigns.current_scope.user, bid))}
   end
 
   @impl true

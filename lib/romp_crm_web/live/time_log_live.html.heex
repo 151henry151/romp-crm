@@ -1,36 +1,23 @@
-<Layouts.app flash={@flash} current_scope={@current_scope} content_width={:wide}>
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  content_width={:wide}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
   <div>
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-xl font-semibold">Job time log</h1>
-        <p class="mt-1 text-sm text-base-content/70 max-w-2xl">
-          Hours tied to a <span class="font-medium text-base-content/90">client job</span> (including SMS and
-          “add job hours” from Jobs). For punching in/out for your employer’s workday, use
-          <.link navigate={~p"/my-timeclock"} class="text-blue-600 hover:text-blue-800 font-medium">
-            Workday timeclock
-          </.link>
-          .
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 shrink-0">
-        <.link navigate={~p"/"} class="text-sm font-medium text-blue-600 hover:text-blue-800">
-          Jobs
-        </.link>
-        <.link
-          navigate={~p"/my-timeclock"}
-          class="text-sm font-medium text-blue-600 hover:text-blue-800"
-        >
+    <div class="mb-6">
+      <h1 class="text-xl font-semibold">Job time log</h1>
+      <p class="mt-1 text-sm text-base-content/70 max-w-2xl">
+        Hours tied to a <span class="font-medium text-base-content/90">client job</span> (including SMS and
+        “add job hours” from Jobs). For punching in/out for your employer’s workday, use
+        <.link navigate={~p"/my-timeclock"} class="text-blue-600 hover:text-blue-800 font-medium">
           Workday timeclock
         </.link>
-        <%= if @is_business_owner do %>
-          <.link
-            navigate={~p"/employees"}
-            class="text-sm font-medium text-blue-600 hover:text-blue-800"
-          >
-            Employees
-          </.link>
-        <% end %>
-      </div>
+        .
+      </p>
     </div>
 
     <%= if @entries == [] do %>

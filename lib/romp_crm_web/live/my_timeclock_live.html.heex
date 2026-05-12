@@ -1,21 +1,20 @@
-<Layouts.app flash={@flash} current_scope={@current_scope} content_width={:wide}>
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  content_width={:wide}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
   <div class="space-y-6">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 class="text-xl font-semibold text-base-content">Workday timeclock</h1>
-        <p class="text-sm text-base-content/70 max-w-2xl mt-1">
-          Punch in when you start working for <span class="font-medium text-base-content/90">this business</span>
-          and punch out when you stop. This is <span class="font-medium text-base-content/90">not</span> the same as
-          logging hours on a client job — use the Jobs board → open a job → <span class="font-medium text-base-content/90">Add job hours</span> for that.
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm shrink-0">
-        <.link navigate={~p"/"} class="font-medium text-blue-600 hover:text-blue-800">Jobs</.link>
-        <.link navigate={~p"/time-log"} class="font-medium text-blue-600 hover:text-blue-800">Job time log</.link>
-        <%= if @is_owner do %>
-          <.link navigate={~p"/employees"} class="font-medium text-blue-600 hover:text-blue-800">Employees</.link>
-        <% end %>
-      </div>
+    <div>
+      <h1 class="text-xl font-semibold text-base-content">Workday timeclock</h1>
+      <p class="text-sm text-base-content/70 max-w-2xl mt-1">
+        Punch in when you start working for <span class="font-medium text-base-content/90">this business</span>
+        and punch out when you stop. This is <span class="font-medium text-base-content/90">not</span> the same as
+        logging hours on a client job — use the Jobs board → open a job → <span class="font-medium text-base-content/90">Add job hours</span> for that.
+      </p>
     </div>
 
     <%= if is_nil(@employee) do %>
@@ -24,7 +23,7 @@
         class="rounded-lg border border-amber-300/60 bg-amber-50/10 px-4 py-6 text-sm text-base-content/90 max-w-2xl"
       >
         <p class="font-semibold text-base-content mb-2">You are not on the employee roster (or your account is not linked).</p>
-        <%= if @is_owner do %>
+        <%= if @is_business_owner do %>
           <p class="mb-3">
             Add yourself under <.link navigate={~p"/employees"} class="text-blue-600 hover:text-blue-800 font-medium">Employees</.link>
             with the same email as this login, or ask your admin to link your user to your roster row.

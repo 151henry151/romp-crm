@@ -272,7 +272,7 @@ defmodule RompCrmWeb.UserAuth do
          |> Phoenix.LiveView.redirect(to: ~p"/businesses")}
 
       true ->
-        bid = resolve_session_business_id(session, businesses, user)
+        bid = Businesses.resolve_active_business_id(user, businesses, session)
 
         {:cont,
          socket
@@ -297,35 +297,6 @@ defmodule RompCrmWeb.UserAuth do
        socket
        |> Phoenix.LiveView.put_flash(:error, "Only a business owner can manage employees.")
        |> Phoenix.LiveView.redirect(to: ~p"/")}
-    end
-  end
-
-  defp resolve_session_business_id(session, businesses, %User{} = user) do
-    allowed = Enum.map(businesses, & &1.id) |> MapSet.new()
-
-    session_business_id = parse_session_business_id(session["current_business_id"])
-    persisted_id = user.selected_business_id
-
-    cond do
-      session_business_id && MapSet.member?(allowed, session_business_id) ->
-        session_business_id
-
-      persisted_id && MapSet.member?(allowed, persisted_id) ->
-        persisted_id
-
-      true ->
-        hd(businesses).id
-    end
-  end
-
-  defp parse_session_business_id(nil), do: nil
-
-  defp parse_session_business_id(id) when is_integer(id), do: id
-
-  defp parse_session_business_id(id) when is_binary(id) do
-    case Integer.parse(id) do
-      {n, _} -> n
-      :error -> nil
     end
   end
 

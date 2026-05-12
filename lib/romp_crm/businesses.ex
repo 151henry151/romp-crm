@@ -52,6 +52,55 @@ defmodule RompCrm.Businesses do
     )
   end
 
+  @doc """
+  Resolves the active workspace **`business_id`** for **`user`**, matching
+  **`RompCrmWeb.UserAuth.on_mount(:ensure_business_scope)`** rules.
+
+  Uses **`session["current_business_id"]`** when it matches a membership, then
+  **`user.selected_business_id`**, then the first row in **`businesses`**.
+
+  Returns **`nil`** when **`businesses`** is empty.
+  """
+  def resolve_active_business_id(%User{} = user, businesses, session)
+      when is_list(businesses) and is_map(session) do
+    case businesses do
+      [] -> nil
+      _ -> do_resolve_active_business_id(user, businesses, session)
+    end
+  end
+
+  defp do_resolve_active_business_id(%User{} = user, businesses, session) do
+    allowed = MapSet.new(Enum.map(businesses, & &1.id))
+
+    session_business_id =
+      parse_session_business_id(
+        Map.get(session, "current_business_id") || Map.get(session, :current_business_id)
+      )
+
+    persisted_id = user.selected_business_id
+
+    cond do
+      session_business_id && MapSet.member?(allowed, session_business_id) ->
+        session_business_id
+
+      persisted_id && MapSet.member?(allowed, persisted_id) ->
+        persisted_id
+
+      true ->
+        hd(businesses).id
+    end
+  end
+
+  defp parse_session_business_id(nil), do: nil
+  defp parse_session_business_id(id) when is_integer(id), do: id
+
+  defp parse_session_business_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {n, _} -> n
+      :error -> nil
+    end
+  end
+
   def member?(%User{id: uid}, business_id) when is_integer(business_id) do
     Repo.exists?(
       from m in BusinessMembership,
