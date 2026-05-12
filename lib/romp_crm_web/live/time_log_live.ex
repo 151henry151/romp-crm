@@ -1,18 +1,21 @@
 defmodule RompCrmWeb.TimeLogLive do
   use RompCrmWeb, :live_view
 
+  alias RompCrm.Businesses
   alias RompCrm.TimeTracking
   alias RompCrm.TimeTracking.TimeEntry
 
   @impl true
   def mount(_params, _session, socket) do
     bid = socket.assigns.current_business_id
+    user = socket.assigns.current_scope.user
 
     if connected?(socket), do: TimeTracking.subscribe(bid)
 
     {:ok,
      socket
-     |> assign(:entries, TimeTracking.list_time_entries(bid))}
+     |> assign(:entries, TimeTracking.list_time_entries(bid))
+     |> assign(:is_business_owner, Businesses.owner?(user, bid))}
   end
 
   @impl true

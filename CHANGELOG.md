@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.25] - 2026-05-08
+
+### Added
+
+- **`/my-timeclock`** (**`MyTimeclockLive`**): workday punch **Clock in** / **Clock out** for the signed-in user’s linked employee row; copy distinguishes employer timeclock vs client job hours; audit rows **`employee_time_entries.create`** / updates on punch out
+- **`EmployeePermissions.can_punch_own_timeclock?/1`**: gate web punch clock (roster link + own employee time permission)
+- **`JobsLive`**: **Add job hours…** modal with **`datetime-local`** start/end (**`step="900"`**), optional notes; **`RompCrmWeb.DatetimeLocal`**, **`RompCrmWeb.JobTimeLogDefaults`**; audit **`time_entries.create`** with **`metadata.source`** **`job_hours_form`**
+- **`TimeEntry` changeset**: validate **`ended_at`** after **`started_at`** when both present
+
+### Changed
+
+- **`JobsLive`** header: **Job time log**, **Workday timeclock**, **Employees** (owners only); expanded job panels label **Hours on this job** with cross-links to the timeclock and job time log
+- **`TimeLogLive`**: title **Job time log**, explanatory copy and nav (**Workday timeclock**, **Employees** for owners); empty-state copy references Jobs board job hours
+- **`RompCrmWeb.DatetimeLocal.parse/1`**: map any failed ISO parse to **`{:error, :invalid}`** (covers **`{:error, :invalid_format}`** from **`NaiveDateTime.from_iso8601/1`**)
+
 ## [0.9.24] - 2026-05-08
 
 ### Added

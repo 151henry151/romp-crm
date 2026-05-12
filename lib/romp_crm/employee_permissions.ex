@@ -74,6 +74,16 @@ defmodule RompCrm.EmployeePermissions do
 
   def can_log_job_time?(%__MODULE__{can_log_job_time: v}), do: v
 
+  @doc """
+  True when the user has a linked roster row and may record their own workday punches
+  (**clock in / clock out** on the employee timeclock).
+  """
+  def can_punch_own_timeclock?(%__MODULE__{linked_employee_id: nil}), do: false
+
+  def can_punch_own_timeclock?(%__MODULE__{} = caps) do
+    can_log_employee_time?(caps, caps.linked_employee_id)
+  end
+
   def can_log_employee_time?(%__MODULE__{} = caps, employee_id)
       when is_integer(employee_id) do
     cond do

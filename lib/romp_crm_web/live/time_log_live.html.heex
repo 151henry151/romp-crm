@@ -1,17 +1,35 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} content_width={:wide}>
   <div>
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h1 class="text-xl font-semibold">Time Log</h1>
-      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div>
+        <h1 class="text-xl font-semibold">Job time log</h1>
+        <p class="mt-1 text-sm text-base-content/70 max-w-2xl">
+          Hours tied to a <span class="font-medium text-base-content/90">client job</span> (including SMS and
+          “add job hours” from Jobs). For punching in/out for your employer’s workday, use
+          <.link navigate={~p"/my-timeclock"} class="text-blue-600 hover:text-blue-800 font-medium">
+            Workday timeclock
+          </.link>
+          .
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 shrink-0">
         <.link navigate={~p"/"} class="text-sm font-medium text-blue-600 hover:text-blue-800">
           Jobs
         </.link>
         <.link
-          navigate={~p"/employees"}
+          navigate={~p"/my-timeclock"}
           class="text-sm font-medium text-blue-600 hover:text-blue-800"
         >
-          Employees
+          Workday timeclock
         </.link>
+        <%= if @is_business_owner do %>
+          <.link
+            navigate={~p"/employees"}
+            class="text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            Employees
+          </.link>
+        <% end %>
       </div>
     </div>
 
@@ -20,7 +38,7 @@
         id="time-log-empty"
         class="rounded-lg border border-base-300 bg-base-100 px-4 py-12 text-center text-base-content/60"
       >
-        No time entries yet. Text in when you start and finish a job.
+        No job hours yet. Text in when you start and finish a job, or add hours from the Jobs board.
       </div>
     <% else %>
       <%!-- Mobile: stacked cards (no horizontal scroll) --%>

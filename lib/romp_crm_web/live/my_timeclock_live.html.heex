@@ -1,0 +1,113 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} content_width={:wide}>
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-base-content">Workday timeclock</h1>
+        <p class="text-sm text-base-content/70 max-w-2xl mt-1">
+          Punch in when you start working for <span class="font-medium text-base-content/90">this business</span>
+          and punch out when you stop. This is <span class="font-medium text-base-content/90">not</span> the same as
+          logging hours on a client job — use the Jobs board → open a job → <span class="font-medium text-base-content/90">Add job hours</span> for that.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm shrink-0">
+        <.link navigate={~p"/"} class="font-medium text-blue-600 hover:text-blue-800">Jobs</.link>
+        <.link navigate={~p"/time-log"} class="font-medium text-blue-600 hover:text-blue-800">Job time log</.link>
+        <%= if @is_owner do %>
+          <.link navigate={~p"/employees"} class="font-medium text-blue-600 hover:text-blue-800">Employees</.link>
+        <% end %>
+      </div>
+    </div>
+
+    <%= if is_nil(@employee) do %>
+      <div
+        id="timeclock-no-employee"
+        class="rounded-lg border border-amber-300/60 bg-amber-50/10 px-4 py-6 text-sm text-base-content/90 max-w-2xl"
+      >
+        <p class="font-semibold text-base-content mb-2">You are not on the employee roster (or your account is not linked).</p>
+        <%= if @is_owner do %>
+          <p class="mb-3">
+            Add yourself under <.link navigate={~p"/employees"} class="text-blue-600 hover:text-blue-800 font-medium">Employees</.link>
+            with the same email as this login, or ask your admin to link your user to your roster row.
+          </p>
+        <% else %>
+          <p>Ask the business owner to add you under Employees and connect your email to your roster entry.</p>
+        <% end %>
+      </div>
+    <% else %>
+      <%= if not @can_punch do %>
+        <div class="rounded-lg border border-base-300 bg-base-100 px-4 py-4 text-sm text-base-content/80 max-w-2xl">
+          Your permissions do not include using the workday timeclock. Ask the business owner to enable
+          <span class="font-medium text-base-content/90">log own employee time</span> for your profile.
+        </div>
+      <% else %>
+        <div class="rounded-xl border border-base-300 bg-base-100 p-5 max-w-xl shadow-sm">
+          <p class="text-sm text-base-content/70 mb-1">Logged in as</p>
+          <p class="text-lg font-semibold text-base-content mb-4">{@employee.name}</p>
+
+          <%= if @open_entry do %>
+            <div class="mb-4 rounded-lg bg-green-500/10 border border-green-500/30 px-3 py-2 text-sm">
+              <span class="font-medium text-green-800 dark:text-green-300">On the clock</span>
+              <span class="text-base-content/80">
+                since {format_date(@open_entry.clocked_in_at)} {format_time(@open_entry.clocked_in_at)}
+              </span>
+            </div>
+            <button
+              type="button"
+              phx-click="clock_out"
+              class="inline-flex items-center justify-center rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold px-5 py-2.5 text-sm w-full sm:w-auto"
+            >
+              Clock out
+            </button>
+          <% else %>
+            <button
+              type="button"
+              phx-click="clock_in"
+              class="inline-flex items-center justify-center rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold px-5 py-2.5 text-sm w-full sm:w-auto"
+            >
+              Clock in
+            </button>
+          <% end %>
+        </div>
+
+        <%= if @recent_entries != [] do %>
+          <div>
+            <h2 class="text-base font-semibold text-base-content/90 mb-2">Recent punches</h2>
+            <div class="rounded-lg border border-base-300 bg-base-100 overflow-hidden text-sm">
+              <table class="w-full">
+                <thead class="bg-base-200/50 text-left text-xs text-base-content/70">
+                  <tr>
+                    <th class="px-3 py-2">In</th>
+                    <th class="px-3 py-2">Out</th>
+                    <th class="px-3 py-2">Worked</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-base-300">
+                  <%= for e <- @recent_entries do %>
+                    <tr>
+                      <td class="px-3 py-2 whitespace-nowrap">{format_date(e.clocked_in_at)} {format_time(e.clocked_in_at)}</td>
+                      <td class="px-3 py-2 whitespace-nowrap">
+                        <%= if e.clocked_out_at do %>
+                          {format_date(e.clocked_out_at)} {format_time(e.clocked_out_at)}
+                        <% else %>
+                          <span class="text-green-600 font-medium text-xs">Open</span>
+                        <% end %>
+                      </td>
+                      <td class="px-3 py-2">
+                        <%= case RompCrm.Employees.EmployeeTimeEntry.format_duration(e) do %>
+                          <% nil -> %>
+                            —
+                          <% d -> %>
+                            {d}
+                        <% end %>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+</Layouts.app>

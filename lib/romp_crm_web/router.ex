@@ -122,6 +122,7 @@ defmodule RompCrmWeb.Router do
       live "/jobs/:id/edit", JobsLive, :edit
 
       live "/time-log", TimeLogLive, :index
+      live "/my-timeclock", MyTimeclockLive, :index
     end
 
     live_session :authenticated_employees_owner,
