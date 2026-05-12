@@ -25,6 +25,10 @@ defmodule RompCrm.Accounts.User do
     # Hosted paywall: invite-only members (`subscription_status` `invited_member`) cannot create businesses.
     field :may_create_business, :boolean, default: true
 
+    field :data_export_schedule, :string, default: "none"
+    field :data_export_next_run_at, :utc_datetime
+    field :data_export_last_sent_at, :utc_datetime
+
     has_many :business_memberships, RompCrm.Businesses.BusinessMembership
 
     timestamps(type: :utc_datetime)
@@ -179,6 +183,33 @@ defmodule RompCrm.Accounts.User do
         |> unsafe_validate_unique(:phone_normalized, RompCrm.Repo)
         |> unique_constraint(:phone_normalized)
     end
+  end
+
+  @export_schedules ~w(none daily weekly monthly)
+
+  @doc "Allowed **`data_export_schedule`** string values."
+  def export_schedules, do: @export_schedules
+
+  @doc "Changeset for scheduled CSV email export (owner businesses only in generated files)."
+  def export_settings_changeset(user, attrs \\ %{}) do
+    user
+    |> cast(attrs, [:data_export_schedule])
+    |> validate_required([:data_export_schedule])
+    |> validate_inclusion(:data_export_schedule, @export_schedules)
+    |> put_export_next_run_at()
+  end
+
+  defp put_export_next_run_at(changeset) do
+    sch = get_field(changeset, :data_export_schedule)
+
+    next_at =
+      if sch == "none" do
+        nil
+      else
+        RompCrm.DataExportSchedule.compute_next_run_at(sch, DateTime.utc_now(:second))
+      end
+
+    put_change(changeset, :data_export_next_run_at, next_at)
   end
 
   @doc """

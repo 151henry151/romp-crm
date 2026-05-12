@@ -4,6 +4,7 @@ defmodule RompCrmWeb.UserSettingsController do
   alias RompCrm.Accounts
   alias RompCrm.Billing
   alias RompCrm.Businesses
+  alias RompCrm.DataExport
   alias RompCrmWeb.UserAuth
 
   import RompCrmWeb.UserAuth, only: [require_sudo_mode: 2]
@@ -13,6 +14,48 @@ defmodule RompCrmWeb.UserSettingsController do
 
   def edit(conn, _params) do
     render(conn, :edit)
+  end
+
+  def update(conn, %{"action" => "export_data_now"} = _params) do
+    user = conn.assigns.current_scope.user
+
+    case DataExport.deliver_email_export(user) do
+      {:ok, :sent} ->
+        conn
+        |> put_flash(
+          :info,
+          "Check your email for CSV attachments: jobs, employees, time log, and SMS interaction log."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:ok, :skipped_no_owned_businesses} ->
+        conn
+        |> put_flash(
+          :info,
+          "We sent a short email: this account does not own any businesses yet, so there were no CSV rows to attach."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, "Could not send export right now. (#{inspect(reason)})")
+        |> redirect(to: ~p"/users/settings")
+    end
+  end
+
+  def update(conn, %{"action" => "update_data_export_schedule"} = params) do
+    %{"user" => user_params} = params
+    user = conn.assigns.current_scope.user
+
+    case Accounts.update_user_export_settings(user, user_params) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "Scheduled data export settings saved.")
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        render(conn, :edit, export_changeset: cs)
+    end
   end
 
   def update(conn, %{"action" => "cancel_subscription"} = _) do
@@ -129,7 +172,9 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:email_changeset, Accounts.change_user_email(user))
     |> assign(:password_changeset, Accounts.change_user_password(user))
     |> assign(:profile_changeset, Accounts.change_user_profile(user))
+    |> assign(:export_changeset, Accounts.change_user_export_settings(user))
     |> assign(:profile_businesses, Businesses.list_businesses_for_user(user))
+    |> assign(:owned_businesses_for_export, Businesses.list_owned_businesses_for_user(user))
     |> assign(:show_paypal_subscription_help, show_subscription_help)
     |> assign(:show_cancel_subscription, show_cancel_subscription)
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
