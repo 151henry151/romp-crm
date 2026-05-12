@@ -10,6 +10,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.SmsConversations
+  alias RompCrm.SmsInteractionLogs
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -133,6 +134,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
        }} ->
         all_ops = job_ops ++ time_ops ++ emp_ops
 
+        log_base = %{
+          message_sid: message_sid,
+          planned_job_ops: job_ops,
+          planned_time_ops: time_ops,
+          planned_emp_ops: emp_ops
+        }
+
         cond do
           all_ops == [] ->
             msg = first_nonempty([assistant])
@@ -141,7 +149,16 @@ defmodule RompCrmWeb.TwilioWebhookController do
               msg ||
                 "No changes applied. Open Romp CRM or include clearer job/time details."
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
+            sms_reply_and_log(
+              conn,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_text,
+              reply,
+              Map.merge(log_base, %{outcome: "no_db_operations", results: []})
+            )
 
           true ->
             Logger.info(
@@ -157,12 +174,31 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
             case run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
               {:clarify, msg} ->
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg)
+                sms_reply_and_log(
+                  conn,
+                  from,
+                  user,
+                  business_id,
+                  phone_norm,
+                  body_text,
+                  msg,
+                  Map.merge(log_base, %{outcome: "clarify", results: []})
+                )
 
               {:ok, all_results} ->
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
+
+                sms_reply_and_log(
+                  conn,
+                  from,
+                  user,
+                  business_id,
+                  phone_norm,
+                  body_text,
+                  reply,
+                  Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
+                )
             end
         end
 
@@ -172,15 +208,100 @@ defmodule RompCrmWeb.TwilioWebhookController do
         )
 
         reply = sms_extraction_failed_reply(reason)
-        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply)
+
+        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply, %{
+          message_sid: message_sid,
+          outcome: "extraction_error",
+          planned_job_ops: [],
+          planned_time_ops: [],
+          planned_emp_ops: [],
+          extraction_error: inspect(reason),
+          results: []
+        })
     end
   end
 
-  defp sms_reply_and_log(conn, from, user, business_id, phone_norm, inbound_body, reply_text)
-       when is_binary(reply_text) do
+  defp sms_reply_and_log(
+         conn,
+         from,
+         user,
+         business_id,
+         phone_norm,
+         inbound_body,
+         reply_text,
+         log_extra
+       ) do
     _ = Messages.send_sms(from, reply_text)
     maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, reply_text)
+
+    maybe_record_sms_interaction_log(
+      business_id,
+      user,
+      phone_norm,
+      inbound_body,
+      reply_text,
+      log_extra
+    )
+
     twiml_ok(conn)
+  end
+
+  defp maybe_record_sms_interaction_log(
+         business_id,
+         user,
+         phone_norm,
+         inbound_body,
+         outbound_body,
+         extra
+       ) do
+    planned =
+      [
+        inspect(Map.get(extra, :planned_job_ops, []), limit: 150),
+        inspect(Map.get(extra, :planned_time_ops, []), limit: 150),
+        inspect(Map.get(extra, :planned_emp_ops, []), limit: 150)
+      ]
+      |> Enum.join("\n---\n")
+
+    results =
+      case Map.get(extra, :results) do
+        list when is_list(list) -> inspect(list, limit: 200)
+        _ -> ""
+      end
+
+    outcome =
+      case Map.get(extra, :outcome) do
+        s when is_binary(s) -> s
+        _ -> "unknown"
+      end
+
+    extraction = Map.get(extra, :extraction_error)
+
+    results =
+      if is_binary(extraction) and extraction != "",
+        do: results <> "\nextraction_error: " <> extraction,
+        else: results
+
+    attrs = %{
+      business_id: business_id,
+      user_id: user.id,
+      twilio_message_sid: Map.get(extra, :message_sid),
+      phone_normalized: phone_norm || "",
+      outcome: outcome,
+      inbound_body: String.slice(to_string(inbound_body || ""), 0, 4000),
+      outbound_body: String.slice(to_string(outbound_body || ""), 0, 4000),
+      planned_operations: String.slice(planned, 0, 32_000),
+      results_summary: String.slice(results, 0, 32_000)
+    }
+
+    case SmsInteractionLogs.insert(attrs) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Twilio SMS: could not persist interaction log business_id=#{business_id} reason=#{inspect(reason)}"
+        )
+    end
   end
 
   defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)

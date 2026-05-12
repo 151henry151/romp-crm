@@ -12,6 +12,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       conn = get(conn, ~p"/users/settings")
       response = html_response(conn, 200)
       assert response =~ "Settings"
+      assert response =~ "Data export"
     end
 
     test "redirects if user is not logged in" do
@@ -205,6 +206,30 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       updated = Repo.get!(RompCrm.Accounts.User, user.id)
       assert updated.subscription_status == "active"
       assert updated.paypal_subscription_id == "I-NOCANCEL"
+    end
+  end
+
+  describe "PUT /users/settings (data export)" do
+    setup :register_and_log_in_user_with_business
+
+    test "saves scheduled export", %{conn: conn, user: user} do
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "update_data_export_schedule",
+          "user" => %{"data_export_schedule" => "daily"}
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      updated = Repo.get!(RompCrm.Accounts.User, user.id)
+      assert updated.data_export_schedule == "daily"
+      assert %DateTime{} = updated.data_export_next_run_at
+    end
+
+    test "one-time export shows flash", %{conn: conn} do
+      conn = put(conn, ~p"/users/settings", %{"action" => "export_data_now"})
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "email"
     end
   end
 end

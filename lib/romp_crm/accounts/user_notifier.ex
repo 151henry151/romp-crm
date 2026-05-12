@@ -84,4 +84,67 @@ defmodule RompCrm.Accounts.UserNotifier do
     ==============================
     """)
   end
+
+  @doc """
+  Sends CSV attachments (jobs, employees, time log, SMS interaction log) for **owner** businesses only.
+  """
+  def deliver_data_export_csvs(%User{email: to_email}, files)
+      when is_list(files) and is_binary(to_email) do
+    from_name = Application.get_env(:romp_crm, :mail_from_name, "Romp CRM")
+    from_address = Application.get_env(:romp_crm, :mail_from_address, "contact@example.com")
+
+    attachments =
+      Enum.map(files, fn {filename, body} ->
+        body = body || <<>>
+        Swoosh.Attachment.new({:data, body}, filename: filename, content_type: "text/csv")
+      end)
+
+    intro = """
+    Your Romp CRM data export is attached as UTF-8 CSV files:
+
+    - jobs.csv — jobs for businesses you created (owner only)
+    - employees.csv — employees for those businesses
+    - time_log.csv — job time entries and employee clock entries
+    - sms_interactions.csv — inbound SMS handled by the assistant with planned operations and results
+
+    Rows never include businesses where you are only a member (non-owner).
+    """
+
+    email_built =
+      new()
+      |> to(to_email)
+      |> from({from_name, from_address})
+      |> subject("Romp CRM — your data export")
+      |> text_body(intro)
+      |> attach_all_csv(attachments)
+
+    Mailer.deliver(email_built)
+  end
+
+  defp attach_all_csv(email, attachments) do
+    Enum.reduce(attachments, email, fn att, em -> attachment(em, att) end)
+  end
+
+  @doc "Notifies the user they have no owner businesses, so there is nothing to export."
+  def deliver_data_export_no_owned_businesses(%User{email: email}) when is_binary(email) do
+    from_name = Application.get_env(:romp_crm, :mail_from_name, "Romp CRM")
+    from_address = Application.get_env(:romp_crm, :mail_from_address, "contact@example.com")
+
+    body = """
+    You asked for a Romp CRM data export, but this account does not own any businesses yet.
+
+    Exports only include businesses you created (owner). Businesses where you were invited as a member are not included.
+
+    Create a business in Romp CRM, then run an export again.
+    """
+
+    email =
+      new()
+      |> to(email)
+      |> from({from_name, from_address})
+      |> subject("Romp CRM — data export (nothing to export)")
+      |> text_body(body)
+
+    Mailer.deliver(email)
+  end
 end

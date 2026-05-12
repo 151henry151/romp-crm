@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.9.23] - 2026-05-13
+
+### Added
+
+- **`users`**: **`data_export_schedule`**, **`data_export_next_run_at`**, **`data_export_last_sent_at`** for optional scheduled CSV email exports (owner businesses only)
+- **`sms_interaction_logs`** table and **`SmsInteractionLogs`** context: one row per inbound SMS handled by **`TwilioWebhookController`** with planned operations and results summaries for export
+- **`RompCrm.DataExport`**: build UTF-8 CSVs for jobs, employees, combined time log (job + employee clocks), and SMS interaction log; **`deliver_email_export/1`** emails attachments via **`UserNotifier`**
+- **`RompCrm.DataExportSchedule`**: compute next UTC run for daily / weekly / monthly intervals
+- **`RompCrm.DataExportScheduler`**: GenServer tick (5 minutes) calling **`DataExport.run_due_exports/0`** when **`config :romp_crm, :data_export_scheduler_enabled`** is not **`false`**
+- **`Businesses.list_owned_businesses_for_user/1`**: businesses where membership role is **owner** only
+- **Settings → Data export**: schedule (off / daily / weekly / monthly) and **Email export now** one-time action
+
+### Changed
+
+- **`TwilioWebhookController`**: persist **`SmsInteractionLogs`** rows alongside conversation exchange logging
+- **`UserNotifier`**: add **`deliver_data_export_csvs/2`** and **`deliver_data_export_no_owned_businesses/1`**
+- **`Accounts`**: **`change_user_export_settings/2`**, **`update_user_export_settings/2`**, **`advance_data_export_schedule_after_send/1`**
+- **`UserSettingsController`** / **`user_settings_html/edit`**: export schedule form and one-time export button
+- **`config/test.exs`**: set **`data_export_scheduler_enabled`** **`false`** so tests do not run the export loop
+
 ## [0.9.22] - 2026-05-11
 
 ### Changed

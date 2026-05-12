@@ -75,6 +75,61 @@
 
   <div class="divider" />
 
+  <h2 class="text-lg font-semibold text-base-content mb-1">Data export (email)</h2>
+  <p class="text-sm text-base-content/70 mb-4 max-w-lg mx-auto text-left">
+    CSV files cover businesses you <span class="font-semibold">created</span>
+    (owner). Businesses where you are only a member or invitee are never included. Attachments: <span class="font-medium text-base-content/90">jobs</span>, <span class="font-medium text-base-content/90">employees</span>,
+    <span class="font-medium text-base-content/90">time log</span>
+    (job clocks and employee clocks),
+    and <span class="font-medium text-base-content/90">sms_interactions</span>
+    (inbound texts plus planned operations and what was applied).
+  </p>
+
+  <.form
+    :let={f}
+    for={@export_changeset}
+    action={~p"/users/settings"}
+    method="post"
+    id="update_data_export_schedule"
+  >
+    <input type="hidden" name="_method" value="put" />
+    <input type="hidden" name="action" value="update_data_export_schedule" />
+
+    <.input
+      field={f[:data_export_schedule]}
+      type="select"
+      label="Automatic export schedule"
+      options={[
+        {"Off", "none"},
+        {"Daily", "daily"},
+        {"Weekly", "weekly"},
+        {"Monthly", "monthly"}
+      ]}
+    />
+
+    <p class="text-xs text-base-content/60 mb-3 max-w-lg mx-auto text-left">
+      When enabled, the server emails you on each interval (counted in UTC from the last successful send). Use “Email export now” anytime for a one-time delivery.
+    </p>
+
+    <.button variant="primary" phx-disable-with="Saving...">Save schedule</.button>
+  </.form>
+
+  <div class="mt-4 max-w-lg mx-auto flex flex-wrap items-center gap-3 text-left">
+    <form action={~p"/users/settings"} method="post">
+      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+      <input type="hidden" name="_method" value="put" />
+      <input type="hidden" name="action" value="export_data_now" />
+      <button type="submit" class="btn btn-outline btn-sm">
+        Email export now (one-time)
+      </button>
+    </form>
+    <span class="text-sm text-base-content/70">
+      Owner businesses: {length(@owned_businesses_for_export)}
+    </span>
+  </div>
+
+  <div class="divider" />
+
   <.form :let={f} for={@email_changeset} action={~p"/users/settings"} id="update_email">
     <input type="hidden" name="action" value="update_email" />
 

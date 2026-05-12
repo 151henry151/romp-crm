@@ -8,6 +8,7 @@ defmodule RompCrm.Accounts do
 
   alias RompCrm.Accounts.{User, UserToken, UserNotifier}
   alias RompCrm.Businesses.BusinessInvitation
+  alias RompCrm.DataExportSchedule
 
   ## Database getters
 
@@ -599,6 +600,40 @@ defmodule RompCrm.Accounts do
   def delete_user_session_token(token) do
     Repo.delete_all(from(UserToken, where: [token: ^token, context: "session"]))
     :ok
+  end
+
+  @doc "Returns a changeset for **`data_export_schedule`** (CSV email export)."
+  def change_user_export_settings(%User{} = user, attrs \\ %{}) do
+    User.export_settings_changeset(user, attrs)
+  end
+
+  @doc "Updates scheduled CSV export; recalculates **`data_export_next_run_at`** when schedule is not **`none`**."
+  def update_user_export_settings(%User{} = user, attrs) when is_map(attrs) do
+    user
+    |> User.export_settings_changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  After a successful export email, sets **`data_export_last_sent_at`** and advances
+  **`data_export_next_run_at`** by the current schedule interval.
+  """
+  def advance_data_export_schedule_after_send(%User{id: id}) do
+    user = get_user!(id)
+    now = DateTime.utc_now(:second)
+
+    next_at =
+      case user.data_export_schedule do
+        "none" -> nil
+        sch -> DataExportSchedule.compute_next_run_at(sch, now)
+      end
+
+    user
+    |> Ecto.Changeset.change(%{
+      data_export_last_sent_at: now,
+      data_export_next_run_at: next_at
+    })
+    |> Repo.update()
   end
 
   ## Token helper

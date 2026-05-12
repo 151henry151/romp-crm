@@ -7,16 +7,17 @@ defmodule RompCrm.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      RompCrmWeb.Telemetry,
-      RompCrm.Repo,
-      {Ecto.Migrator,
-       repos: Application.fetch_env!(:romp_crm, :ecto_repos), skip: skip_migrations?()},
-      {DNSCluster, query: Application.get_env(:romp_crm, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: RompCrm.PubSub},
-      {Finch, name: RompCrm.Finch},
-      RompCrmWeb.Endpoint
-    ]
+    children =
+      [
+        RompCrmWeb.Telemetry,
+        RompCrm.Repo,
+        {Ecto.Migrator,
+         repos: Application.fetch_env!(:romp_crm, :ecto_repos), skip: skip_migrations?()},
+        {DNSCluster, query: Application.get_env(:romp_crm, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: RompCrm.PubSub},
+        {Finch, name: RompCrm.Finch},
+        RompCrmWeb.Endpoint
+      ] ++ data_export_scheduler_child()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -35,5 +36,13 @@ defmodule RompCrm.Application do
   defp skip_migrations?() do
     # By default, sqlite migrations are run when using a release
     System.get_env("RELEASE_NAME") == nil
+  end
+
+  defp data_export_scheduler_child do
+    if Application.get_env(:romp_crm, :data_export_scheduler_enabled, true) do
+      [{RompCrm.DataExportScheduler, []}]
+    else
+      []
+    end
   end
 end

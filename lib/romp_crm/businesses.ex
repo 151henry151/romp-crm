@@ -23,6 +23,20 @@ defmodule RompCrm.Businesses do
   def get_business(id), do: Repo.get(Business, id)
 
   @doc """
+  Lists businesses the user owns (**`role` `:owner`** only).
+  """
+  def list_owned_businesses_for_user(%User{} = user) do
+    Repo.all(
+      from b in Business,
+        join: m in BusinessMembership,
+        on: m.business_id == b.id,
+        where: m.user_id == ^user.id and m.role == ^:owner,
+        order_by: [asc: b.name],
+        select: b
+    )
+  end
+
+  @doc """
   Lists businesses the user belongs to.
   """
   def list_businesses_for_user(%User{} = user) do
