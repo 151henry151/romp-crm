@@ -29,10 +29,15 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocketPath =
   document.querySelector("meta[name='live-socket-path']")?.getAttribute("content") || "/live"
 
+// Do not set longPollFallbackMs here: the default Phoenix value (2.5s) re-armed after
+// every WebSocket open can fall back to LongPoll when the RTT ping is slow on mobile
+// networks, tearing down the socket and surfacing the LiveView "Something went wrong!"
+// toast even though the page still works after reconnect.
 const liveSocket = new LiveSocket(liveSocketPath, Socket, {
-  longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {...colocatedHooks},
+  // Default is 500ms — brief transport blips on mobile then flash the error toast; wait a bit longer.
+  disconnectedTimeout: 2_500,
 })
 
 // Show progress bar on live navigation and form submits
