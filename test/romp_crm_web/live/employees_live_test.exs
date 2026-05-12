@@ -16,7 +16,8 @@ defmodule RompCrmWeb.EmployeesLiveTest do
   # ── Employee list page ─────────────────────────────────────────────────────
 
   describe "employees list" do
-    test "renders employees table", %{conn: conn} do
+    test "renders employees table when employees exist", %{conn: conn, biz: biz} do
+      employee_fixture(%{business_id: biz.id})
       {:ok, view, _html} = live(conn, ~p"/employees")
       assert has_element?(view, "#employees-table")
     end

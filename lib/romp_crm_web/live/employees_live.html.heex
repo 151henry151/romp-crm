@@ -21,62 +21,113 @@
       </div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-base-300 bg-base-100 [-webkit-overflow-scrolling:touch]">
-      <table class="w-full min-w-[40rem] text-sm" id="employees-table">
-        <thead>
-          <tr class="border-b border-base-300 bg-base-200/40">
-            <th class="text-left px-4 py-3 font-medium text-base-content/80">Name</th>
-            <th class="text-left px-4 py-3 font-medium text-base-content/80">Title</th>
-            <th class="text-left px-4 py-3 font-medium text-base-content/80">Phone</th>
-            <th class="text-left px-4 py-3 font-medium text-base-content/80">Email</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-base-300">
-          <%= if @employees == [] do %>
-            <tr id="employees-empty">
-              <td colspan="5" class="px-4 py-12 text-center text-base-content/60">
-                No employees yet. Add team members to track their time.
-              </td>
+    <%= if @employees == [] do %>
+      <div
+        id="employees-empty"
+        class="rounded-lg border border-base-300 bg-base-100 px-4 py-12 text-center text-base-content/60"
+      >
+        No employees yet. Add team members to track their time.
+      </div>
+    <% else %>
+      <%!-- Mobile: stacked cards (no horizontal scroll) --%>
+      <div class="md:hidden space-y-3">
+        <%= for emp <- @employees do %>
+          <div class="rounded-lg border border-base-300 bg-base-100 px-4 py-3 space-y-3">
+            <p class="font-semibold text-base-content break-words">
+              <.link
+                navigate={~p"/employees/#{emp.id}"}
+                class="text-blue-600 hover:text-blue-800"
+              >
+                {emp.name}
+              </.link>
+            </p>
+            <dl class="space-y-2 text-sm text-base-content/80">
+              <div>
+                <dt class="font-medium text-base-content/90">Title</dt>
+                <dd class="mt-0.5 break-words">{display_cell(emp.title)}</dd>
+              </div>
+              <div>
+                <dt class="font-medium text-base-content/90">Phone</dt>
+                <dd class="mt-0.5 break-words">{display_cell(emp.phone)}</dd>
+              </div>
+              <div>
+                <dt class="font-medium text-base-content/90">Email</dt>
+                <dd class="mt-0.5 break-words">{display_cell(emp.email)}</dd>
+              </div>
+            </dl>
+            <div class="flex flex-wrap items-center gap-4 pt-2 border-t border-base-300">
+              <.link
+                patch={~p"/employees/#{emp.id}/edit"}
+                class="text-blue-600 hover:text-blue-800 font-medium text-sm"
+              >
+                Edit
+              </.link>
+              <button
+                type="button"
+                id={"delete-employee-sm-#{emp.id}"}
+                phx-click="delete"
+                phx-value-id={emp.id}
+                data-confirm="Delete this employee?"
+                class="text-red-500 hover:text-red-700 font-medium text-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <%!-- Desktop: table --%>
+      <div class="hidden md:block rounded-lg border border-base-300 bg-base-100 overflow-hidden">
+        <table class="w-full text-sm" id="employees-table">
+          <thead>
+            <tr class="border-b border-base-300 bg-base-200/40">
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Name</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Title</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Phone</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Email</th>
+              <th class="px-4 py-3"></th>
             </tr>
-          <% end %>
-          <%= for emp <- @employees do %>
-            <tr id={"employee-row-#{emp.id}"} class="hover:bg-base-200/40 group">
-              <td class="px-4 py-3 font-medium text-base-content">
-                <.link
-                  navigate={~p"/employees/#{emp.id}"}
-                  class="text-blue-600 hover:text-blue-800"
-                >
-                  {emp.name}
-                </.link>
-              </td>
-              <td class="px-4 py-3 text-base-content/80">{emp.title}</td>
-              <td class="px-4 py-3 text-base-content/80">{emp.phone}</td>
-              <td class="px-4 py-3 text-base-content/80">{emp.email}</td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          </thead>
+          <tbody class="divide-y divide-base-300">
+            <%= for emp <- @employees do %>
+              <tr id={"employee-row-#{emp.id}"} class="hover:bg-base-200/40 group">
+                <td class="px-4 py-3 font-medium text-base-content">
                   <.link
-                    patch={~p"/employees/#{emp.id}/edit"}
-                    class="text-blue-600 hover:text-blue-800 font-medium"
+                    navigate={~p"/employees/#{emp.id}"}
+                    class="text-blue-600 hover:text-blue-800"
                   >
-                    Edit
+                    {emp.name}
                   </.link>
-                  <button
-                    id={"delete-employee-#{emp.id}"}
-                    phx-click="delete"
-                    phx-value-id={emp.id}
-                    data-confirm="Delete this employee?"
-                    class="text-red-500 hover:text-red-700 font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+                </td>
+                <td class="px-4 py-3 text-base-content/80">{emp.title}</td>
+                <td class="px-4 py-3 text-base-content/80">{emp.phone}</td>
+                <td class="px-4 py-3 text-base-content/80">{emp.email}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <.link
+                      patch={~p"/employees/#{emp.id}/edit"}
+                      class="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Edit
+                    </.link>
+                    <button
+                      id={"delete-employee-#{emp.id}"}
+                      phx-click="delete"
+                      phx-value-id={emp.id}
+                      data-confirm="Delete this employee?"
+                      class="text-red-500 hover:text-red-700 font-medium"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
   </div>
 </Layouts.app>
 

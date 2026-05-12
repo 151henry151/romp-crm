@@ -52,4 +52,7 @@ defmodule RompCrmWeb.TimeLogLive do
 
     "#{h12}:#{min} #{ampm}"
   end
+
+  defp job_client_name(%{job: %{client_name: name}}) when is_binary(name), do: name
+  defp job_client_name(_), do: "—"
 end

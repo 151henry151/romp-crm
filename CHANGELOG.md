@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.22] - 2026-05-11
+
+### Changed
+
+- **`employees_live`** / **`time_log_live`**: add **`md:hidden`** stacked card lists on small viewports (same pattern as **`jobs_live`**); show **`hidden md:block`** tables on **`md+`** without **`overflow-x-auto`** or forced table **`min-width`**
+- **`EmployeesLiveTest`**: assert **`#employees-table`** only when the list is non-empty
+
 ## [0.9.21] - 2026-05-12
 
 ### Added
@@ -14,7 +21,7 @@
 - **`TwilioWebhookController`**: load prior turns before extraction; after each assistant reply, **`record_exchange/5`** stores the inbound/outbound pair
 - **`SmsUnifiedInboundExtractor.DeterministicStub`**: legacy **`STUB_JSON`** payloads with **`actions`** (instead of **`job_actions`**) lift into **`job_actions`** for tests
 - **`Layouts.app`**: add **`content_width`** (**`:wide`** vs **`:narrow`**); use **`max-w-screen-xl`** for wide pages; stack and wrap header nav on small viewports to avoid horizontal overflow
-- **`employees_live`**, **`time_log_live`**, **`employee_detail_live`**: use wide layout; stack page titles and actions on narrow screens; wrap tables in horizontal scroll where needed
+- **`employees_live`**, **`time_log_live`**, **`employee_detail_live`**: use wide layout; stack page titles and actions on narrow screens; **`employee_detail_live`**: wrap wide tables in horizontal scroll where needed
 - **`TimeTrackingTest`** / **`EmployeesTest`**: close the first time entry in ordering tests so fixtures respect partial unique indexes on open clocks
 
 ## [0.9.20] - 2026-05-08
