@@ -42,6 +42,26 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+  # WebSocket `Origin` must match the browser hostname. This app is legitimately served
+  # under both hromp.com and rompcrm.com (apex + www); `PHX_HOST` alone is not enough.
+  known_public_origins = [
+    "https://rompcrm.com",
+    "https://www.rompcrm.com",
+    "https://hromp.com",
+    "https://www.hromp.com"
+  ]
+
+  check_origin =
+    case System.get_env("PHX_CHECK_ORIGINS") |> to_string() |> String.trim() do
+      "" ->
+        apex = host |> String.trim() |> String.replace_prefix("www.", "")
+        derived = ["https://#{apex}", "https://www.#{apex}"]
+        Enum.uniq(derived ++ known_public_origins)
+
+      csv ->
+        csv |> String.split(",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    end
+
   # `/romp-crm` etc. — set at compile time in config/prod.exs (`:path_prefix`).
   path_prefix = Application.compile_env(:romp_crm, :path_prefix, "/")
 
@@ -61,7 +81,8 @@ if config_env() == :prod do
       ip: http_ip,
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    check_origin: check_origin
 
   mail_from_name = System.get_env("MAIL_FROM_NAME") || "Romp CRM"
 
@@ -246,6 +267,10 @@ if config_env() == :prod do
           _ -> :always
         end
 
+      # `no_mx_lookups: true` — always connect to `relay` by name. If MX lookup is
+      # enabled and the host has no MX (common for submission hosts like mail.spacemail.com),
+      # gen_smtp falls back to A records and connects by IP; STARTTLS then fails hostname
+      # verification against a cert such as *.spacemail.com (`:tls_failed`).
       config :romp_crm, RompCrm.Mailer,
         adapter: Swoosh.Adapters.SMTP,
         relay: relay,
@@ -255,6 +280,7 @@ if config_env() == :prod do
         tls: tls_mode,
         auth: if(smtp_username != "", do: :always, else: :never),
         port: smtp_port,
+        no_mx_lookups: true,
         retries: 2
 
       config :swoosh, :api_client, false

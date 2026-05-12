@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.9.28] - 2026-05-12
+
+### Fixed
+
+- **`config/runtime.exs`**: set **`check_origin`** from **`PHX_HOST`** (apex + **`www`**) merged with **`https://{hromp,rompcrm}.com`** (each apex + www) when **`PHX_CHECK_ORIGINS`** is unset, so LiveView works on **`rompcrm.com`** while **`PHX_HOST`** stays **`hromp.com`**; optional **`PHX_CHECK_ORIGINS`** alone for self-host overrides
+- **`assets/js/app.js`**: remove **`longPollFallbackMs: 2500`** so Phoenix does not tear down a working WebSocket when the post-connect RTT ping is slow (common on mobile), which triggered LiveView **`phx-server-error`** and the “Something went wrong! Attempting to reconnect” toast in a loop; set **`disconnectedTimeout: 2500`** so brief blips wait longer before showing that toast
+- **`deploy/nginx-location-romp-crm.conf`**: document **`$connection_upgrade`** map and use it instead of unconditional **`Connection: upgrade`**
+
+## [0.9.27] - 2026-05-12
+
+### Fixed
+
+- **`config/runtime.exs`**: set **`no_mx_lookups: true`** on **`RompCrm.Mailer`** so gen_smtp connects to **`SMTP_HOST`** by hostname; avoids STARTTLS **`:tls_failed`** when the host has no MX and the client would otherwise use the A record IP (e.g. SpaceMail)
+
 ## [0.9.26] - 2026-05-12
 
 ### Added
