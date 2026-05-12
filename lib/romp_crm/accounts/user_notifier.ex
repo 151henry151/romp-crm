@@ -105,7 +105,7 @@ defmodule RompCrm.Accounts.UserNotifier do
     - jobs.csv — jobs for businesses you created (owner only)
     - employees.csv — employees for those businesses
     - time_log.csv — job time entries and employee clock entries
-    - sms_interactions.csv — inbound SMS handled by the assistant with planned operations and results
+    - audit_log.csv — append-only log of business-scoped changes (web and SMS) with actor user id and email
 
     Rows never include businesses where you are only a member (non-owner).
     """

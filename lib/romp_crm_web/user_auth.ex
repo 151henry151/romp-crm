@@ -281,6 +281,25 @@ defmodule RompCrmWeb.UserAuth do
     end
   end
 
+  @doc """
+  Requires **`Businesses.owner?/2`** for **`current_business_id`**.
+
+  Run after **`:ensure_business_scope`**.
+  """
+  def on_mount(:require_business_owner, _params, _session, socket) do
+    user = socket.assigns.current_scope.user
+    bid = socket.assigns.current_business_id
+
+    if Businesses.owner?(user, bid) do
+      {:cont, socket}
+    else
+      {:halt,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, "Only a business owner can manage employees.")
+       |> Phoenix.LiveView.redirect(to: ~p"/")}
+    end
+  end
+
   defp resolve_session_business_id(session, businesses, %User{} = user) do
     allowed = Enum.map(businesses, & &1.id) |> MapSet.new()
 

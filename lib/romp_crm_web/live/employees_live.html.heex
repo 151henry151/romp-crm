@@ -55,14 +55,24 @@
                 <dd class="mt-0.5 break-words">{display_cell(emp.email)}</dd>
               </div>
             </dl>
-            <div class="flex flex-wrap items-center gap-4 pt-2 border-t border-base-300">
-              <.link
-                patch={~p"/employees/#{emp.id}/edit"}
-                class="text-blue-600 hover:text-blue-800 font-medium text-sm"
-              >
-                Edit
-              </.link>
-              <button
+              <div class="flex flex-wrap items-center gap-4 pt-2 border-t border-base-300">
+                <.link
+                  patch={~p"/employees/#{emp.id}/edit"}
+                  class="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                >
+                  Edit
+                </.link>
+                <%= if is_nil(emp.user_id) && emp.email && String.trim(to_string(emp.email)) != "" do %>
+                  <button
+                    type="button"
+                    phx-click="invite_to_app"
+                    phx-value-id={emp.id}
+                    class="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                  >
+                    Invite to app
+                  </button>
+                <% end %>
+                <button
                 type="button"
                 id={"delete-employee-sm-#{emp.id}"}
                 phx-click="delete"
@@ -86,6 +96,7 @@
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Title</th>
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Phone</th>
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Email</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">App</th>
               <th class="px-4 py-3"></th>
             </tr>
           </thead>
@@ -103,8 +114,25 @@
                 <td class="px-4 py-3 text-base-content/80">{emp.title}</td>
                 <td class="px-4 py-3 text-base-content/80">{emp.phone}</td>
                 <td class="px-4 py-3 text-base-content/80">{emp.email}</td>
+                <td class="px-4 py-3 text-base-content/80 text-xs">
+                  <%= if emp.user_id do %>
+                    Linked
+                  <% else %>
+                    <span class="text-base-content/50">—</span>
+                  <% end %>
+                </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <%= if is_nil(emp.user_id) && emp.email && String.trim(to_string(emp.email)) != "" do %>
+                      <button
+                        type="button"
+                        phx-click="invite_to_app"
+                        phx-value-id={emp.id}
+                        class="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                      >
+                        Invite
+                      </button>
+                    <% end %>
                     <.link
                       patch={~p"/employees/#{emp.id}/edit"}
                       class="text-blue-600 hover:text-blue-800 font-medium"
@@ -134,14 +162,15 @@
 <%!-- Modal for new/edit employee --%>
 <%= if @live_action in [:new, :edit] do %>
   <.modal id="employee-modal" show on_cancel={JS.patch(~p"/employees")}>
-    <.live_component
-      module={RompCrmWeb.EmployeeFormComponent}
-      id={(@employee && @employee.id) || :new}
-      title={if @live_action == :new, do: "New Employee", else: "Edit Employee"}
-      action={@live_action}
-      employee={@employee}
-      current_business_id={@current_business_id}
-      patch={~p"/employees"}
-    />
+      <.live_component
+        module={RompCrmWeb.EmployeeFormComponent}
+        id={(@employee && @employee.id) || :new}
+        title={if @live_action == :new, do: "New Employee", else: "Edit Employee"}
+        action={@live_action}
+        employee={@employee}
+        current_business_id={@current_business_id}
+        actor_user_id={@current_scope.user.id}
+        patch={~p"/employees"}
+      />
   </.modal>
 <% end %>

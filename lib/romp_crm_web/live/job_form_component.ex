@@ -1,6 +1,7 @@
 defmodule RompCrmWeb.JobFormComponent do
   use RompCrmWeb, :live_component
 
+  alias RompCrm.BusinessAuditLogs
   alias RompCrm.Jobs
 
   @impl true
@@ -9,24 +10,35 @@ defmodule RompCrmWeb.JobFormComponent do
      socket
      |> assign(assigns)
      |> assign_new(:current_business_id, fn -> nil end)
+     |> assign_new(:actor_user_id, fn -> nil end)
+     |> assign_new(:can_edit_jobs, fn -> true end)
      |> assign_new(:form, fn -> to_form(Jobs.change_job(job)) end)}
   end
 
   @impl true
   def handle_event("validate", %{"job" => params}, socket) do
-    changeset = Jobs.change_job(socket.assigns.job, params)
-    {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
+    if socket.assigns.can_edit_jobs do
+      changeset = Jobs.change_job(socket.assigns.job, params)
+      {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("save", %{"job" => params}, socket) do
-    case socket.assigns.action do
-      :new -> create_job(socket, params)
-      :edit -> update_job(socket, params)
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, socket}
+    else
+      case socket.assigns.action do
+        :new -> create_job(socket, params)
+        :edit -> update_job(socket, params)
+      end
     end
   end
 
   defp create_job(socket, params) do
     bid = socket.assigns.current_business_id
+    uid = socket.assigns.actor_user_id
 
     params =
       params
@@ -34,6 +46,16 @@ defmodule RompCrmWeb.JobFormComponent do
 
     case Jobs.create_job(params) do
       {:ok, job} ->
+        BusinessAuditLogs.record(%{
+          business_id: bid,
+          actor_user_id: uid,
+          source: "web",
+          action: "jobs.create",
+          entity_type: "jobs",
+          entity_id: job.id,
+          metadata: %{client_name: job.client_name}
+        })
+
         notify_parent({:saved, job})
         {:noreply, push_patch(socket, to: socket.assigns.patch)}
 
@@ -43,8 +65,22 @@ defmodule RompCrmWeb.JobFormComponent do
   end
 
   defp update_job(socket, params) do
-    case Jobs.update_job(socket.assigns.job, params) do
+    bid = socket.assigns.current_business_id
+    uid = socket.assigns.actor_user_id
+    job = socket.assigns.job
+
+    case Jobs.update_job(job, params) do
       {:ok, job} ->
+        BusinessAuditLogs.record(%{
+          business_id: bid,
+          actor_user_id: uid,
+          source: "web",
+          action: "jobs.update",
+          entity_type: "jobs",
+          entity_id: job.id,
+          metadata: %{client_name: job.client_name}
+        })
+
         notify_parent({:saved, job})
         {:noreply, push_patch(socket, to: socket.assigns.patch)}
 
@@ -106,7 +142,11 @@ defmodule RompCrmWeb.JobFormComponent do
         <.input field={@form[:notes]} type="textarea" label="Notes / Availability" rows="3" />
 
         <div class="flex justify-end pt-2">
-          <.button type="submit" phx-disable-with="Saving…">Save Job</.button>
+          <%= if @can_edit_jobs do %>
+            <.button type="submit" phx-disable-with="Saving…">Save Job</.button>
+          <% else %>
+            <p class="text-sm text-base-content/70">You do not have permission to save job changes.</p>
+          <% end %>
         </div>
       </.form>
     </div>

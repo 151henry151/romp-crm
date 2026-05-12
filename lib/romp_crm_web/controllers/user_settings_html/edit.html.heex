@@ -77,21 +77,14 @@
 
   <h2 class="text-lg font-semibold text-base-content mb-1">Data export (email)</h2>
   <p class="text-sm text-base-content/70 mb-4 max-w-lg mx-auto text-left">
-    CSV files cover businesses you <span class="font-semibold">created</span>
-    (owner). Businesses where you are only a member or invitee are never included. Attachments: <span class="font-medium text-base-content/90">jobs</span>, <span class="font-medium text-base-content/90">employees</span>,
-    <span class="font-medium text-base-content/90">time log</span>
-    (job clocks and employee clocks),
-    and <span class="font-medium text-base-content/90">sms_interactions</span>
-    (inbound texts plus planned operations and what was applied).
+    CSV files cover businesses you <span class="font-semibold">created</span> (owner). Businesses where you are only a member or invitee are never included. Attachments:
+    <span class="font-medium text-base-content/90">jobs</span>,
+    <span class="font-medium text-base-content/90">employees</span>,
+    <span class="font-medium text-base-content/90">time log</span> (job clocks and employee clocks),
+    and <span class="font-medium text-base-content/90">audit_log</span> (business-scoped changes from the web UI and SMS, with which user made each change).
   </p>
 
-  <.form
-    :let={f}
-    for={@export_changeset}
-    action={~p"/users/settings"}
-    method="post"
-    id="update_data_export_schedule"
-  >
+  <.form :let={f} for={@export_changeset} action={~p"/users/settings"} method="post" id="update_data_export_schedule">
     <input type="hidden" name="_method" value="put" />
     <input type="hidden" name="action" value="update_data_export_schedule" />
 
