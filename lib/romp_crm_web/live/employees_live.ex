@@ -56,6 +56,15 @@ defmodule RompCrmWeb.EmployeesLive do
     assign(socket, :employees, Employees.list_employees(socket.assigns.current_business_id))
   end
 
+  defp display_cell(nil), do: "—"
+  defp display_cell(""), do: "—"
+
+  defp display_cell(v) when is_binary(v) do
+    if String.trim(v) == "", do: "—", else: v
+  end
+
+  defp display_cell(v), do: v
+
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
     bid = socket.assigns.current_business_id
