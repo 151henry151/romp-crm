@@ -227,7 +227,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     **Update job:** `"intent": "update"`, `"job_id": <int from jobs snapshot>`, `"updates": { only changed fields }`.
 
-    **Work items (tasks):** In **create** `job` or **update** `updates`, include `"work_items": [ { "title": "...", "scheduled_on": "YYYY-MM-DD" or null, "sort_order": 0 } ]` when the SMS lists multiple distinct tasks (e.g. dishwasher, sink leak, shower valve). Prefer separate work item rows instead of one long `work_description` when the message clearly enumerates tasks.
+    **Adding scope to an existing job (judgment, not keyword rules):** Read the SMS and the snapshot for that job (`work_description`, `notes`, existing `work_items` titles). When the contractor is clearly **adding another distinct task** on the same visit or same job (e.g. "also change her kitchen sink faucet when we're there for the water heater", "add to Celeste's job …", "while we're there can we …"), use **`updates.work_items`**: add a **new line item** with a concise **`title`** for that added task (and optional per-line **`scheduled_on`** if they give a date). **Also** update **`work_description`** when a refreshed one-line summary helps the office read the job at a glance — do **both** when that fits the message. For **net-new line items only**, you may send rows **without** `"id"`; the server appends them after existing snapshot line items. If you are **replacing, deleting, or reordering** line items, send the **complete** `work_items` array including every existing **`id`** from the snapshot plus your edits.
+
+    **Work items on creates / multi-task messages:** Same idea: prefer **`work_items`** rows for separate tasks instead of one long `work_description` alone when the message clearly enumerates distinct work.
 
     **Job-level date:** `"scheduled_on": "YYYY-MM-DD"` on create/update for the overall job start or primary visit date when stated.
 

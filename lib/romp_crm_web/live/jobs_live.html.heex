@@ -63,7 +63,11 @@
 
     <div class="md:hidden space-y-3">
       <%= for job <- visible_jobs(@jobs, @filter) do %>
-        <div class="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
+        <% mob_expanded? = expanded?(@expanded_job_id, job.id) %>
+        <div class={[
+          "rounded-lg border border-base-300 overflow-hidden",
+          if(mob_expanded?, do: "bg-base-200/40", else: "bg-base-100")
+        ]}>
           <button
             type="button"
             phx-click="toggle_row"
@@ -73,7 +77,7 @@
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0 space-y-1">
                 <p class="font-semibold text-base-content break-words">{job.client_name}</p>
-                <%= if not expanded?(@expanded_job_id, job.id) do %>
+                <%= if not mob_expanded? do %>
                   <p class="text-sm text-base-content/80 break-words line-clamp-2">
                     <span class="font-medium text-base-content/90">Work:</span>
                     {display(job.work_description)}
@@ -92,7 +96,7 @@
             </div>
           </button>
 
-          <%= if expanded?(@expanded_job_id, job.id) do %>
+          <%= if mob_expanded? do %>
             <div
               id={"job-expand-sm-#{job.id}"}
               class="border-t border-base-300 px-4 py-3 text-sm text-base-content space-y-2"
@@ -294,11 +298,15 @@
         </thead>
         <tbody class="divide-y divide-base-300">
           <%= for job <- visible_jobs(@jobs, @filter) do %>
+            <% job_expanded? = expanded?(@expanded_job_id, job.id) %>
             <tr
               id={"job-row-#{job.id}"}
               phx-click="toggle_row"
               phx-value-id={job.id}
-              class="hover:bg-base-200/40 group cursor-pointer"
+              class={[
+                "group cursor-pointer",
+                if(job_expanded?, do: "bg-base-200/40", else: "hover:bg-base-200/40")
+              ]}
             >
               <td class="px-4 py-3 font-medium text-base-content whitespace-nowrap">
                 {job.client_name}
@@ -306,7 +314,7 @@
               <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">{job.address}</td>
               <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">{job.phone}</td>
               <td class="px-4 py-3 text-base-content/90 max-w-[220px] align-top">
-                <%= if expanded?(@expanded_job_id, job.id) do %>
+                <%= if job_expanded? do %>
                   <span class="sr-only">Work description shown in expanded row below</span>
                 <% else %>
                   <span class="line-clamp-2">{job.work_description}</span>
@@ -330,7 +338,10 @@
               </td>
               <%= if @can_edit_jobs do %>
                 <td class="px-4 py-3">
-                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div class={[
+                    "flex items-center gap-2 transition-opacity",
+                    if(job_expanded?, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
+                  ]}>
                     <.link
                       patch={~p"/jobs/#{job.id}/edit"}
                       class="text-blue-600 hover:text-blue-800 font-medium"
@@ -349,7 +360,7 @@
                 </td>
               <% end %>
             </tr>
-            <%= if expanded?(@expanded_job_id, job.id) do %>
+            <%= if job_expanded? do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
                 <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.9.33] - 2026-05-13
+
+### Changed
+
+- **Jobs list (desktop)**: keep header row **`bg-base-200/40`** and visible **Edit / Delete** when a job is expanded, not only on hover; mobile cards use the same expanded background.
+
+## [0.9.32] - 2026-05-13
+
+### Added
+
+- **`Jobs.update_job/2`**: when **`work_items`** lists only rows without persisted **`id`**, merge them after existing line items so **`cast_assoc`** does not delete prior tasks (SMS “add also …” updates).
+
+### Changed
+
+- **Anthropic SMS prompts** (unified + job): instruct the model to add distinct follow-on work as **`work_items`** and refresh **`work_description`** when a summary helps, using judgment over the snapshot.
+
 ## [0.9.31] - 2026-05-08
 
 ### Added

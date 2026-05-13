@@ -146,7 +146,9 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     Use keys on an action object:
     - "intent": "update"
     - "job_id": integer — MUST be exactly one `"id"` from the snapshot JSON that matches the SMS (your semantic judgment).
-    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`), plus optional **`scheduled_on`** (date string `YYYY-MM-DD`), **`work_items`** (array of `{ "title", "scheduled_on"?, "sort_order"? }` matching snapshot work item ids/titles where applicable), and **`materials`** (array of `{ "description", "job_work_item_id"?, "work_item_index"? }`).
+    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`), plus optional **`scheduled_on`** (date string `YYYY-MM-DD`), **`work_items`** (array of `{ "title", "scheduled_on"?, "sort_order"?, "id"? }`), and **`materials`** (array of `{ "description", "job_work_item_id"?, "work_item_index"? }`).
+
+    **Interpreting add-on work (your judgment):** Compare the SMS to the snapshot. When the user is **adding** another distinct task to an existing customer/job (same visit / same scope of work, phrases like "also", "add to her job", "when we're there for the X, also Y"), put that added task as a **new `work_items` row** (`title` = the new task). Update **`work_description`** too when a refreshed summary helps; **both** are appropriate when the message reads that way. For additions only, new rows may omit `"id"` (server keeps existing line items and appends). To remove or rewrite existing line items, include every remaining **`id`** from the snapshot in `work_items` with the intended titles.
 
     ## Action type: attach_photo (MMS)
     When the user message lists Twilio media URLs and the intent is to store photos on an existing job:
@@ -170,6 +172,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     - Snapshot lists ids `…`; SMS "Angela Brande's address is 42 Maple St Burlington" → `{"actions":[{"intent":"update","job_id":<Angela's id>,"updates":{"address":"42 Maple St Burlington"}}]}`
     - SMS "the guy we're doing the water shutoff for — correct address Waterfall Lane" → pick the snapshot row whose work/name context fits; `job_id` that row; `updates.address`.
     - SMS "Mark Sino replace refrigerator, Dave Woll clogged drain, and toilet replacement guy phone 8029897658" → three actions in order: create Mark job, create Dave job, update existing toilet-replacement row with phone.
+    - SMS "Add to Celeste's job we're also changing her kitchen sink faucet when we're there doing the water heater" → one **update** on Celeste's snapshot row: `updates.work_items` includes a **new** line item titled for the faucet work (no `id` on that row if other line items already exist in the snapshot), and `updates.work_description` refreshed if it improves the summary — not **only** `work_description` with no line item.
     - No plausible snapshot match for a mention → create action for that mention.
 
     Normalize phones naturally; prefer null over guessing.
