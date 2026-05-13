@@ -267,6 +267,21 @@ if config_env() == :prod do
           _ -> :always
         end
 
+      # gen_smtp merges defaults that include `{depth, 0}` for the post-STARTTLS `ssl:connect/3`,
+      # which breaks verification of normal provider chains (e.g. Sectigo / SpaceMail).
+      # Upgrading a TCP socket also needs `server_name_indication` set to the SMTP hostname.
+      # OS CA certs (`cacerts_get/0`) plus HTTPS-style hostname matching are required so wildcard
+      # SMTP certs (e.g. `*.spacemail.com` for `mail.spacemail.com`) verify under `:verify_peer`.
+      verify_host_fun = :public_key.pkix_verify_hostname_match_fun(:https)
+
+      smtp_tls_opts = [
+        {:verify, :verify_peer},
+        {:cacerts, :public_key.cacerts_get()},
+        {:depth, 100},
+        {:server_name_indication, String.to_charlist(relay)},
+        {:customize_hostname_check, [{:match_fun, verify_host_fun}]}
+      ]
+
       # `no_mx_lookups: true` — always connect to `relay` by name. If MX lookup is
       # enabled and the host has no MX (common for submission hosts like mail.spacemail.com),
       # gen_smtp falls back to A records and connects by IP; STARTTLS then fails hostname
@@ -281,6 +296,7 @@ if config_env() == :prod do
         auth: if(smtp_username != "", do: :always, else: :never),
         port: smtp_port,
         no_mx_lookups: true,
+        tls_options: smtp_tls_opts,
         retries: 2
 
       config :swoosh, :api_client, false
