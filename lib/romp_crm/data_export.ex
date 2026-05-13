@@ -15,6 +15,142 @@ defmodule RompCrm.DataExport do
 
   require Logger
 
+  @export_kind_strings ~w(jobs employees time_log audit_log)
+
+  @doc "Ordered export kinds used for scheduled (full) exports and default selection."
+  def all_export_kinds, do: [:jobs, :employees, :time_log, :audit_log]
+
+  @doc """
+  Parses **`params["export_kinds"]`** (from HTML **`export_kinds[]`** checkboxes) into a unique
+  subset of allowed kinds. Returns **`{:ok, atoms_in_canonical_order}`** or **`{:error, :none_selected}`**.
+  """
+  def normalize_export_kinds(params) when is_map(params) do
+    raw =
+      case Map.get(params, "export_kinds") do
+        nil -> []
+        list when is_list(list) -> list
+        one when is_binary(one) -> [one]
+        _ -> []
+      end
+
+    allowed = MapSet.new(@export_kind_strings)
+
+    chosen_set =
+      raw
+      |> Enum.map(&to_string/1)
+      |> Enum.filter(&MapSet.member?(allowed, &1))
+      |> MapSet.new()
+
+    if MapSet.size(chosen_set) == 0 do
+      {:error, :none_selected}
+    else
+      ordered =
+        Enum.filter(all_export_kinds(), fn k ->
+          MapSet.member?(chosen_set, Atom.to_string(k))
+        end)
+
+      {:ok, ordered}
+    end
+  end
+
+  @doc """
+  Parses **`params["export_business_ids"]`** (checkbox **`export_business_ids[]`**) into integer ids
+  the user **owns**. Returns **`{:ok, sorted_unique_ids}`**, **`{:error, :no_owned_businesses}`**, or
+  **`{:error, :no_business_selected}`** when the account owns workspaces but none were chosen (or
+  only invalid ids were submitted).
+  """
+  def normalize_export_business_ids(%User{} = user, params) when is_map(params) do
+    owned = Businesses.list_owned_businesses_for_user(user)
+    allowed = MapSet.new(Enum.map(owned, & &1.id))
+
+    if MapSet.size(allowed) == 0 do
+      {:error, :no_owned_businesses}
+    else
+      raw =
+        case Map.get(params, "export_business_ids") do
+          nil -> []
+          list when is_list(list) -> list
+          one when is_binary(one) -> [one]
+          _ -> []
+        end
+
+      chosen =
+        raw
+        |> Enum.flat_map(fn
+          v when is_integer(v) ->
+            if MapSet.member?(allowed, v), do: [v], else: []
+
+          v when is_binary(v) ->
+            case Integer.parse(String.trim(to_string(v))) do
+              {i, _} -> if MapSet.member?(allowed, i), do: [i], else: []
+              :error -> []
+            end
+
+          _ ->
+            []
+        end)
+        |> MapSet.new()
+        |> MapSet.to_list()
+        |> Enum.sort()
+
+      if chosen == [] do
+        {:error, :no_business_selected}
+      else
+        {:ok, chosen}
+      end
+    end
+  end
+
+  @doc false
+  def build_export_files(business_ids, kinds) when is_list(business_ids) and is_list(kinds) do
+    for kind <- kinds, reduce: [] do
+      acc ->
+        {name, body} = file_for_kind(business_ids, kind)
+        [{name, body} | acc]
+    end
+    |> Enum.reverse()
+  end
+
+  defp file_for_kind(business_ids, :jobs), do: {"jobs.csv", build_jobs_csv(business_ids)}
+  defp file_for_kind(business_ids, :employees), do: {"employees.csv", build_employees_csv(business_ids)}
+  defp file_for_kind(business_ids, :time_log), do: {"time_log.csv", build_time_log_csv(business_ids)}
+  defp file_for_kind(business_ids, :audit_log), do: {"audit_log.csv", build_audit_log_csv(business_ids)}
+
+  @doc """
+  Builds a response body for a browser download: one CSV, or a ZIP when multiple files are selected.
+  """
+  def build_download_payload(files) when is_list(files) do
+    case files do
+      [] ->
+        {:error, :empty}
+
+      [{name, body}] ->
+        {:ok, {:one, name, body}}
+
+      many ->
+        tmp = Path.join(System.tmp_dir!(), "romp-crm-export-#{System.unique_integer([:positive])}.zip")
+        cl_tmp = String.to_charlist(tmp)
+
+        file_specs =
+          Enum.map(many, fn {fname, body} ->
+            {String.to_charlist(fname), body}
+          end)
+
+        try do
+          case :zip.create(cl_tmp, file_specs, []) do
+            {:ok, _} ->
+              data = File.read!(tmp)
+              {:ok, {:zip, data}}
+
+            {:error, reason} ->
+              {:error, {:zip_failed, reason}}
+          end
+        after
+          _ = File.rm(tmp)
+        end
+    end
+  end
+
   @doc """
   Users with an active schedule whose **`data_export_next_run_at`** is in the past (UTC).
   """
@@ -32,30 +168,38 @@ defmodule RompCrm.DataExport do
   Builds CSV binaries and emails them. Only includes rows for businesses the user **owns**
   (`BusinessMembership` role **owner**).
 
-  Returns **`{:ok, :sent}`**, **`{:ok, :skipped_no_owned_businesses}`**, or **`{:error, reason}`**.
+  Same as **`deliver_email_export(user, all_export_kinds(), all_owned_business_ids)`** — used by
+  scheduled exports (full kinds, all owned workspaces).
   """
   def deliver_email_export(%User{} = user) do
     user = Repo.get!(User, user.id)
     owned = Businesses.list_owned_businesses_for_user(user)
     business_ids = Enum.map(owned, & &1.id)
+    do_deliver_email_export(user, all_export_kinds(), business_ids)
+  end
 
+  @doc """
+  Emails CSV attachments for **`kinds`** limited to **`business_ids`** (each must be a business the
+  user owns; callers should use **`normalize_export_business_ids/2`**).
+
+  Returns **`{:ok, :sent}`**, **`{:ok, :skipped_no_owned_businesses}`**, or **`{:error, reason}`**.
+  """
+  def deliver_email_export(%User{} = user, kinds, business_ids)
+      when is_list(kinds) and is_list(business_ids) do
+    user = Repo.get!(User, user.id)
+    do_deliver_email_export(user, kinds, business_ids)
+  end
+
+  defp do_deliver_email_export(user, kinds, business_ids) do
     if business_ids == [] do
       case UserNotifier.deliver_data_export_no_owned_businesses(user) do
         {:ok, _} -> {:ok, :skipped_no_owned_businesses}
         {:error, _} = err -> err
       end
     else
-      jobs_csv = build_jobs_csv(business_ids)
-      employees_csv = build_employees_csv(business_ids)
-      time_log_csv = build_time_log_csv(business_ids)
-      audit_csv = build_audit_log_csv(business_ids)
+      files = build_export_files(business_ids, kinds)
 
-      case UserNotifier.deliver_data_export_csvs(user, [
-             {"jobs.csv", jobs_csv},
-             {"employees.csv", employees_csv},
-             {"time_log.csv", time_log_csv},
-             {"audit_log.csv", audit_csv}
-           ]) do
+      case UserNotifier.deliver_data_export_csvs(user, files) do
         {:ok, _} -> {:ok, :sent}
         {:error, _} = err -> err
       end

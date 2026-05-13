@@ -82,13 +82,13 @@
 
   <div class="divider" />
 
-  <h2 class="text-lg font-semibold text-base-content mb-1">Data export (email)</h2>
+  <h2 class="text-lg font-semibold text-base-content mb-1">Data export (CSV)</h2>
   <p class="text-sm text-base-content/70 mb-4 max-w-lg mx-auto text-left">
-    CSV files cover businesses you <span class="font-semibold">created</span> (owner). Businesses where you are only a member or invitee are never included. Attachments:
-    <span class="font-medium text-base-content/90">jobs</span>,
-    <span class="font-medium text-base-content/90">employees</span>,
-    <span class="font-medium text-base-content/90">time log</span> (job clocks and employee clocks),
-    and <span class="font-medium text-base-content/90">audit_log</span> (business-scoped changes from the web UI and SMS, with which user made each change).
+    Choose which workspaces and which tables to include. Only businesses you <span class="font-semibold">created</span> (owner) appear here. Workspaces where you are only a member or invitee are never included.
+    <span class="font-medium text-base-content/90">Jobs</span> (jobs.csv),
+    <span class="font-medium text-base-content/90">Employees</span> (employees.csv),
+    <span class="font-medium text-base-content/90">Time log</span> (job clocks and employee clocks),
+    <span class="font-medium text-base-content/90">Audit log</span> (business-scoped changes from the web UI and SMS, with which user made each change).
   </p>
 
   <.form :let={f} for={@export_changeset} action={~p"/users/settings"} method="post" id="update_data_export_schedule">
@@ -108,25 +108,73 @@
     />
 
     <p class="text-xs text-base-content/60 mb-3 max-w-lg mx-auto text-left">
-      When enabled, the server emails you on each interval (counted in UTC from the last successful send). Use “Email export now” anytime for a one-time delivery.
+      When enabled, the server emails you on each interval (counted in UTC from the last successful send). Scheduled runs always include all four CSVs and all workspaces you own. For a one-off, use the buttons below and pick workspaces and files.
     </p>
 
     <.button variant="primary" phx-disable-with="Saving...">Save schedule</.button>
   </.form>
 
-  <div class="mt-4 max-w-lg mx-auto flex flex-wrap items-center gap-3 text-left">
-    <form action={~p"/users/settings"} method="post">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <input type="hidden" name="_method" value="put" />
-      <input type="hidden" name="action" value="export_data_now" />
-      <button type="submit" class="btn btn-outline btn-sm">
-        Email export now (one-time)
+  <form action={~p"/users/settings"} method="post" class="mt-4 max-w-lg mx-auto text-left space-y-3">
+    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+    <input type="hidden" name="_method" value="put" />
+
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Workspaces to include</legend>
+      <%= if @owned_businesses_for_export == [] do %>
+        <p class="text-sm text-base-content/70">
+          You do not own any workspaces yet — create one under Jobs to export data.
+        </p>
+      <% else %>
+        <%= for biz <- @owned_businesses_for_export do %>
+          <label class="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="export_business_ids[]"
+              value={biz.id}
+              checked
+              class="checkbox checkbox-sm mt-0.5"
+            />
+            <span class="font-medium">{biz.name}</span>
+          </label>
+        <% end %>
+      <% end %>
+    </fieldset>
+
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Tables to include</legend>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input type="checkbox" name="export_kinds[]" value="jobs" checked class="checkbox checkbox-sm mt-0.5" />
+        <span><span class="font-medium">Jobs</span> — jobs.csv</span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input type="checkbox" name="export_kinds[]" value="employees" checked class="checkbox checkbox-sm mt-0.5" />
+        <span><span class="font-medium">Employees</span> — employees.csv</span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input type="checkbox" name="export_kinds[]" value="time_log" checked class="checkbox checkbox-sm mt-0.5" />
+        <span><span class="font-medium">Time log</span> — time_log.csv</span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input type="checkbox" name="export_kinds[]" value="audit_log" checked class="checkbox checkbox-sm mt-0.5" />
+        <span><span class="font-medium">Audit log</span> — audit_log.csv</span>
+      </label>
+    </fieldset>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="submit" name="action" value="export_email_now" class="btn btn-outline btn-sm">
+        Email selected to me
       </button>
-    </form>
-    <span class="text-sm text-base-content/70">
-      Owner businesses: {length(@owned_businesses_for_export)}
-    </span>
-  </div>
+      <button type="submit" name="action" value="export_download" class="btn btn-outline btn-sm">
+        Download selected
+      </button>
+      <span class="text-sm text-base-content/70">
+        Owner businesses: {length(@owned_businesses_for_export)}
+      </span>
+    </div>
+    <p class="text-xs text-base-content/60">
+      One CSV downloads as that file. If you pick more than one table, you get a single <code class="text-xs">.zip</code> containing the selected CSVs. Rows are limited to the workspaces checked above.
+    </p>
+  </form>
 
   <div class="divider" />
 
