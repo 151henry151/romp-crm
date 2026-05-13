@@ -146,6 +146,7 @@ defmodule RompCrm.Jobs do
   def update_job(%Job{} = job, attrs) do
     job = Repo.preload(job, [:work_items, :materials])
     attrs = normalize_job_nested_attrs(attrs)
+    attrs = merge_append_only_work_items(job, attrs)
     {mat_action, attrs} = pop_material_specs_attr(attrs)
 
     case job |> Job.changeset(attrs) |> Repo.update() do
@@ -348,6 +349,78 @@ defmodule RompCrm.Jobs do
   end
 
   defp maybe_add_work_item_sort_orders(attrs), do: attrs
+
+  # When `cast_assoc(:work_items)` receives only new rows (no `id`), Ecto would replace the
+  # association and delete existing line items (`on_replace: :delete`). SMS updates often add a
+  # single new task; merge those onto the preloaded rows. If any row carries a persisted `id`,
+  # the caller (LLM or UI) is responsible for supplying the full intended list — pass through unchanged.
+  defp merge_append_only_work_items(%Job{} = job, attrs) when is_map(attrs) do
+    existing = job.work_items || []
+
+    case Map.get(attrs, "work_items") do
+      list when is_list(list) and list != [] ->
+        if existing != [] and work_items_all_without_persisted_id?(list) do
+          preserved = Enum.map(existing, &work_item_to_nested_attrs/1)
+          new_rows = Enum.map(list, &strip_work_item_id_for_append/1)
+          merged = renumber_work_item_sort_orders(preserved ++ new_rows)
+          Map.put(attrs, "work_items", merged)
+        else
+          attrs
+        end
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp work_items_all_without_persisted_id?(list) when is_list(list) do
+    Enum.all?(list, fn row -> not work_item_row_has_persisted_id?(row) end)
+  end
+
+  defp work_item_row_has_persisted_id?(row) when is_map(row) do
+    m = stringify_keys_shallow(row)
+
+    case Map.get(m, "id") do
+      nil -> false
+      "" -> false
+      n when is_integer(n) and n > 0 -> true
+      s when is_binary(s) ->
+        case Integer.parse(String.trim(s)) do
+          {i, _} when i > 0 -> true
+          _ -> false
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp work_item_to_nested_attrs(%JobWorkItem{} = wi) do
+    base = %{
+      "id" => wi.id,
+      "title" => wi.title,
+      "sort_order" => wi.sort_order
+    }
+
+    case wi.scheduled_on do
+      nil -> base
+      %Date{} = d -> Map.put(base, "scheduled_on", Date.to_iso8601(d))
+    end
+  end
+
+  defp strip_work_item_id_for_append(row) when is_map(row) do
+    row
+    |> stringify_keys_shallow()
+    |> Map.delete("id")
+    |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" end)
+    |> Map.new()
+  end
+
+  defp renumber_work_item_sort_orders(rows) when is_list(rows) do
+    rows
+    |> Enum.with_index()
+    |> Enum.map(fn {row, i} -> Map.put(row, "sort_order", i) end)
+  end
 
   defp maybe_parse_work_item_date(row) do
     case Map.get(row, "scheduled_on") do

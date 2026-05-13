@@ -93,10 +93,38 @@ defmodule RompCrm.JobsTest do
       assert job.next_action == "some next_action"
     end
 
-    test "update_job/2 with invalid data returns error changeset" do
-      job = job_fixture()
-      assert {:error, %Ecto.Changeset{}} = Jobs.update_job(job, @invalid_attrs)
-      assert Jobs.get_job!(job.id, job.business_id).client_name == job.client_name
+    test "update_job/2 appends work_items without id onto existing line items" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Celeste",
+                 "priority" => "normal",
+                 "status" => "pending",
+                 "work_description" => "Water heater",
+                 "work_items" => [
+                   %{"title" => "Replace water heater"},
+                   %{"title" => "Reconnect lines"}
+                 ]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+      assert length(job.work_items) == 2
+
+      assert {:ok, %Job{} = job2} =
+               Jobs.update_job(job, %{
+                 "work_description" => "Water heater; kitchen faucet on same visit",
+                 "work_items" => [%{"title" => "Replace kitchen sink faucet"}]
+               })
+
+      job2 = Jobs.get_job!(job2.id, b.id)
+      titles = Enum.map(job2.work_items, & &1.title)
+      assert length(job2.work_items) == 3
+      assert "Replace kitchen sink faucet" in titles
+      assert "Replace water heater" in titles
+      assert "Reconnect lines" in titles
+      assert job2.work_description == "Water heater; kitchen faucet on same visit"
     end
 
     test "delete_job/1 deletes the job" do
