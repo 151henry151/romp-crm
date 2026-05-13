@@ -13,11 +13,11 @@ defmodule RompCrm.Jobs do
   defp topic(business_id), do: "jobs:business:#{business_id}"
 
   defp work_items_preload_query do
-    from wi in JobWorkItem, order_by: [asc: wi.sort_order, asc: wi.id]
+    from wi in JobWorkItem, order_by: [asc: wi.completed, asc: wi.sort_order, asc: wi.id]
   end
 
   defp materials_preload_query do
-    from m in JobMaterial, order_by: [asc: m.sort_order, asc: m.id]
+    from m in JobMaterial, order_by: [asc: m.completed, asc: m.sort_order, asc: m.id]
   end
 
   defp photos_preload_query do
@@ -108,7 +108,8 @@ defmodule RompCrm.Jobs do
             %{
               "id" => wi.id,
               "title" => wi.title,
-              "scheduled_on" => date_to_iso(wi.scheduled_on)
+              "scheduled_on" => date_to_iso(wi.scheduled_on),
+              "completed" => wi.completed
             }
           end),
         "materials" =>
@@ -116,7 +117,10 @@ defmodule RompCrm.Jobs do
             %{
               "id" => m.id,
               "description" => m.description,
-              "job_work_item_id" => m.job_work_item_id
+              "job_work_item_id" => m.job_work_item_id,
+              "completed" => m.completed,
+              "quantity" => m.quantity,
+              "unit_price" => m.unit_price
             }
           end)
       }
@@ -200,6 +204,102 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  @doc """
+  Updates a work item belonging to **`job`**, reloads the job, and broadcasts **`{:updated, job}`**.
+  """
+  def update_job_work_item(%Job{} = job, work_item_id, attrs)
+      when is_integer(work_item_id) and is_map(attrs) do
+    bid = job.business_id
+    attrs = stringify_keys_shallow(attrs)
+
+    case Repo.get_by(JobWorkItem, id: work_item_id, job_id: job.id) do
+      nil ->
+        {:error, :not_found}
+
+      wi ->
+        case wi |> JobWorkItem.changeset(attrs) |> Repo.update() do
+          {:ok, _} ->
+            job = get_job!(job.id, bid)
+            broadcast(bid, {:updated, job})
+            {:ok, job}
+
+          {:error, %Ecto.Changeset{} = cs} ->
+            {:error, cs}
+        end
+    end
+  end
+
+  @doc """
+  Deletes a work item belonging to **`job`**, reloads the job, and broadcasts **`{:updated, job}`**.
+  """
+  def delete_job_work_item(%Job{} = job, work_item_id) when is_integer(work_item_id) do
+    bid = job.business_id
+
+    case Repo.get_by(JobWorkItem, id: work_item_id, job_id: job.id) do
+      nil ->
+        {:error, :not_found}
+
+      wi ->
+        case Repo.delete(wi) do
+          {:ok, _} ->
+            job = get_job!(job.id, bid)
+            broadcast(bid, {:updated, job})
+            {:ok, job}
+
+          {:error, _} ->
+            {:error, :delete_failed}
+        end
+    end
+  end
+
+  @doc """
+  Updates a material row belonging to **`job`**, reloads the job, and broadcasts **`{:updated, job}`**.
+  """
+  def update_job_material(%Job{} = job, material_id, attrs)
+      when is_integer(material_id) and is_map(attrs) do
+    bid = job.business_id
+    attrs = stringify_keys_shallow(attrs)
+
+    case Repo.get_by(JobMaterial, id: material_id, job_id: job.id) do
+      nil ->
+        {:error, :not_found}
+
+      m ->
+        case m |> JobMaterial.changeset(attrs) |> Repo.update() do
+          {:ok, _} ->
+            job = get_job!(job.id, bid)
+            broadcast(bid, {:updated, job})
+            {:ok, job}
+
+          {:error, %Ecto.Changeset{} = cs} ->
+            {:error, cs}
+        end
+    end
+  end
+
+  @doc """
+  Deletes a material row belonging to **`job`**, reloads the job, and broadcasts **`{:updated, job}`**.
+  """
+  def delete_job_material(%Job{} = job, material_id) when is_integer(material_id) do
+    bid = job.business_id
+
+    case Repo.get_by(JobMaterial, id: material_id, job_id: job.id) do
+      nil ->
+        {:error, :not_found}
+
+      m ->
+        case Repo.delete(m) do
+          {:ok, _} ->
+            job = get_job!(job.id, bid)
+            broadcast(bid, {:updated, job})
+            {:ok, job}
+
+          {:error, _} ->
+            {:error, :delete_failed}
+        end
+    end
+  end
+
   def change_job(%Job{} = job, attrs \\ %{}) do
     attrs =
       attrs
@@ -218,7 +318,7 @@ defmodule RompCrm.Jobs do
     item_by_id = Map.new(job.work_items || [], &{&1.id, &1})
 
     (job.materials || [])
-    |> Enum.sort_by(&{&1.sort_order, &1.id})
+    |> Enum.sort_by(&{&1.completed, &1.sort_order, &1.id})
     |> Enum.map(fn m ->
       scope =
         case m.job_work_item_id do
@@ -232,7 +332,15 @@ defmodule RompCrm.Jobs do
             end
         end
 
-      %{id: m.id, description: m.description, scope_label: scope}
+      %{
+        id: m.id,
+        description: m.description,
+        scope_label: scope,
+        completed: m.completed,
+        quantity: m.quantity,
+        unit_price: m.unit_price,
+        job_work_item_id: m.job_work_item_id
+      }
     end)
   end
 
@@ -399,7 +507,8 @@ defmodule RompCrm.Jobs do
     base = %{
       "id" => wi.id,
       "title" => wi.title,
-      "sort_order" => wi.sort_order
+      "sort_order" => wi.sort_order,
+      "completed" => wi.completed
     }
 
     case wi.scheduled_on do

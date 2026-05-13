@@ -8,14 +8,18 @@ defmodule RompCrm.Jobs.JobMaterial do
 
     field :description, :string
     field :sort_order, :integer, default: 0
+    field :completed, :boolean, default: false
+    field :quantity, :float, default: 1.0
+    field :unit_price, :float
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(row, attrs) do
     row
-    |> cast(attrs, [:job_id, :job_work_item_id, :description, :sort_order])
+    |> cast(attrs, [:job_id, :job_work_item_id, :description, :sort_order, :completed, :quantity, :unit_price])
     |> validate_required([:job_id, :description])
+    |> validate_number(:quantity, greater_than: 0)
     |> validate_length(:description, max: 4000)
   end
 end

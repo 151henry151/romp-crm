@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.9.34] - 2026-05-13
+
+### Added
+
+- **`priv/repo/migrations/20260515180500_work_items_materials_completed_qty_price.exs`**: add **`completed`** to **`job_work_items`** and **`job_materials`**; add **`quantity`**, **`unit_price`** to **`job_materials`**
+- **`RompCrmWeb.JobExpandLists`**: **`job_work_items_section`** / **`job_materials_section`** for expanded rows (dotted row separators, checkbox completion with dimmed styling and bottom sort, inline date or qty/price, per-line remove)
+- **`RompCrmWeb.JobsLive`** **`handle_event`** for **`toggle_work_item_completed`**, **`work_item_scheduled_on`**, **`delete_work_item`**, **`toggle_material_completed`**, **`material_quantity`**, **`material_unit_price`**, **`delete_material`**
+
+### Changed
+
+- **`JobWorkItem`** and **`JobMaterial`** schemas and **`RompCrm.Jobs`** (preloads, **`materials_combined/1`**, **`update_job_work_item`**, **`delete_job_work_item`**, **`update_job_material`**, **`delete_job_material`**) for the new fields and ordering
+- **`jobs_live.html.heex`**: render work items and materials via **`JobExpandLists`** instead of static bullet lists
+- **`job_form_component`**: add **Completed** checkbox per nested work item row
+
 ## [0.9.33] - 2026-05-13
 
 ### Changed

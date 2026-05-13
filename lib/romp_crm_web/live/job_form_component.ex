@@ -233,9 +233,10 @@ defmodule RompCrmWeb.JobFormComponent do
             </button>
           </div>
           <.inputs_for :let={wi} field={@form[:work_items]}>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 border-b border-base-300/80 pb-2 last:border-0">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 border-b border-base-300/80 pb-2 last:border-0">
               <.input field={wi[:title]} type="text" label="Task description" />
               <.input field={wi[:scheduled_on]} type="date" label="Scheduled (optional)" />
+              <.input field={wi[:completed]} type="checkbox" label="Completed" />
             </div>
           </.inputs_for>
           <p class="text-xs text-base-content/60">

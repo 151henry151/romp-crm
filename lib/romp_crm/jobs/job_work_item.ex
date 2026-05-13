@@ -8,6 +8,7 @@ defmodule RompCrm.Jobs.JobWorkItem do
     field :title, :string
     field :sort_order, :integer, default: 0
     field :scheduled_on, :date
+    field :completed, :boolean, default: false
 
     has_many :materials, RompCrm.Jobs.JobMaterial, foreign_key: :job_work_item_id
     has_many :photos, RompCrm.Jobs.JobPhoto, foreign_key: :job_work_item_id
@@ -17,7 +18,7 @@ defmodule RompCrm.Jobs.JobWorkItem do
 
   def changeset(item, attrs) do
     item
-    |> cast(attrs, [:job_id, :title, :sort_order, :scheduled_on])
+    |> cast(attrs, [:job_id, :title, :sort_order, :scheduled_on, :completed])
     |> validate_length(:title, max: 8000)
   end
 end
