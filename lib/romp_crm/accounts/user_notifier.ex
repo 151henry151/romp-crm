@@ -86,7 +86,8 @@ defmodule RompCrm.Accounts.UserNotifier do
   end
 
   @doc """
-  Sends CSV attachments (jobs, employees, time log, SMS interaction log) for **owner** businesses only.
+  Sends CSV attachments for **owner** businesses only. **`files`** is a list of **`{filename, body}`**
+  (UTF-8 CSV); the email body lists only those filenames.
   """
   def deliver_data_export_csvs(%User{email: to_email}, files)
       when is_list(files) and is_binary(to_email) do
@@ -99,16 +100,7 @@ defmodule RompCrm.Accounts.UserNotifier do
         Swoosh.Attachment.new({:data, body}, filename: filename, content_type: "text/csv")
       end)
 
-    intro = """
-    Your Romp CRM data export is attached as UTF-8 CSV files:
-
-    - jobs.csv — jobs for businesses you created (owner only)
-    - employees.csv — employees for those businesses
-    - time_log.csv — job time entries and employee clock entries
-    - audit_log.csv — append-only log of business-scoped changes (web and SMS) with actor user id and email
-
-    Rows never include businesses where you are only a member (non-owner).
-    """
+    intro = data_export_email_intro(files)
 
     email_built =
       new()
@@ -120,6 +112,35 @@ defmodule RompCrm.Accounts.UserNotifier do
 
     Mailer.deliver(email_built)
   end
+
+  defp data_export_email_intro(files) do
+    bullets =
+      files
+      |> Enum.map(fn {fname, _} -> "  - #{fname} — #{data_export_file_blurb(fname)}" end)
+      |> Enum.join("\n")
+
+    """
+    Your Romp CRM data export is attached as UTF-8 CSV file(s):
+
+    #{bullets}
+
+    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page, or all workspaces you own for scheduled automatic sends). They never include businesses where you are only a member (non-owner).
+    """
+    |> String.trim()
+  end
+
+  defp data_export_file_blurb("jobs.csv"),
+    do: "jobs for businesses you created (owner only)"
+
+  defp data_export_file_blurb("employees.csv"), do: "employees for those businesses"
+
+  defp data_export_file_blurb("time_log.csv"),
+    do: "job time entries and employee clock entries"
+
+  defp data_export_file_blurb("audit_log.csv"),
+    do: "append-only log of business-scoped changes (web and SMS) with actor user id and email"
+
+  defp data_export_file_blurb(fname), do: fname
 
   defp attach_all_csv(email, attachments) do
     Enum.reduce(attachments, email, fn att, em -> attachment(em, att) end)

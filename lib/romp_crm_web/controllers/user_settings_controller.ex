@@ -17,29 +17,107 @@ defmodule RompCrmWeb.UserSettingsController do
     render(conn, :edit)
   end
 
-  def update(conn, %{"action" => "export_data_now"} = _params) do
+  def update(conn, %{"action" => "export_email_now"} = params) do
     user = conn.assigns.current_scope.user
 
-    case DataExport.deliver_email_export(user) do
-      {:ok, :sent} ->
+    with {:ok, kinds} <- DataExport.normalize_export_kinds(params),
+         {:ok, business_ids} <- DataExport.normalize_export_business_ids(user, params) do
+      case DataExport.deliver_email_export(user, kinds, business_ids) do
+        {:ok, :sent} ->
+          conn
+          |> put_flash(:info, export_email_sent_flash(kinds, length(business_ids)))
+          |> redirect(to: ~p"/users/settings")
+
+        {:ok, :skipped_no_owned_businesses} ->
+          conn
+          |> put_flash(
+            :info,
+            "We sent a short email: this account does not own any businesses yet, so there were no CSV rows to attach."
+          )
+          |> redirect(to: ~p"/users/settings")
+
+        {:error, reason} ->
+          conn
+          |> put_flash(:error, "Could not send export right now. (#{inspect(reason)})")
+          |> redirect(to: ~p"/users/settings")
+      end
+    else
+      {:error, :none_selected} ->
         conn
         |> put_flash(
-          :info,
-          "Check your email for CSV attachments: jobs, employees, time log, and SMS interaction log."
+          :error,
+          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
         )
         |> redirect(to: ~p"/users/settings")
 
-      {:ok, :skipped_no_owned_businesses} ->
+      {:error, :no_business_selected} ->
         conn
         |> put_flash(
-          :info,
-          "We sent a short email: this account does not own any businesses yet, so there were no CSV rows to attach."
+          :error,
+          "Choose at least one workspace to export (only businesses you create as owner are listed)."
         )
         |> redirect(to: ~p"/users/settings")
 
-      {:error, reason} ->
+      {:error, :no_owned_businesses} ->
         conn
-        |> put_flash(:error, "Could not send export right now. (#{inspect(reason)})")
+        |> put_flash(
+          :error,
+          "You do not own any businesses yet, so there is nothing to export. Create a business first."
+        )
+        |> redirect(to: ~p"/users/settings")
+    end
+  end
+
+  def update(conn, %{"action" => "export_download"} = params) do
+    user = conn.assigns.current_scope.user
+
+    with {:ok, kinds} <- DataExport.normalize_export_kinds(params),
+         {:ok, business_ids} <- DataExport.normalize_export_business_ids(user, params) do
+      files = DataExport.build_export_files(business_ids, kinds)
+
+      case DataExport.build_download_payload(files) do
+        {:ok, {:one, name, body}} ->
+          conn
+          |> put_resp_content_type("text/csv; charset=utf-8")
+          |> put_resp_header("content-disposition", ~s(attachment; filename="#{name}"))
+          |> send_resp(200, body)
+
+        {:ok, {:zip, body}} ->
+          zip_name = "romp-crm-export-#{Date.utc_today()}.zip"
+
+          conn
+          |> put_resp_content_type("application/zip")
+          |> put_resp_header("content-disposition", ~s(attachment; filename="#{zip_name}"))
+          |> send_resp(200, body)
+
+        {:error, reason} ->
+          conn
+          |> put_flash(:error, "Could not build the download. (#{inspect(reason)})")
+          |> redirect(to: ~p"/users/settings")
+      end
+    else
+      {:error, :none_selected} ->
+        conn
+        |> put_flash(
+          :error,
+          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, :no_business_selected} ->
+        conn
+        |> put_flash(
+          :error,
+          "Choose at least one workspace to export (only businesses you create as owner are listed)."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, :no_owned_businesses} ->
+        conn
+        |> put_flash(
+          :error,
+          "You do not own any businesses yet, so there is nothing to download. Create a business first."
+        )
         |> redirect(to: ~p"/users/settings")
     end
   end
@@ -180,6 +258,27 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:show_cancel_subscription, show_cancel_subscription)
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
   end
+
+  defp export_email_sent_flash(kinds, workspace_count) do
+    names =
+      kinds
+      |> Enum.map(&export_csv_filename/1)
+      |> Enum.join(", ")
+
+    ws =
+      if workspace_count == 1 do
+        "1 workspace"
+      else
+        "#{workspace_count} workspaces"
+      end
+
+    "Check your email for CSV attachments: #{names}. (#{ws}.)"
+  end
+
+  defp export_csv_filename(:jobs), do: "jobs.csv"
+  defp export_csv_filename(:employees), do: "employees.csv"
+  defp export_csv_filename(:time_log), do: "time_log.csv"
+  defp export_csv_filename(:audit_log), do: "audit_log.csv"
 
   defp assign_workspace_nav_for_layout(conn, _opts) do
     user = conn.assigns.current_scope.user

@@ -2,6 +2,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
   use RompCrmWeb.ConnCase, async: false
 
   alias RompCrm.Accounts
+  alias RompCrm.Businesses
   alias RompCrm.Repo
   import RompCrm.AccountsFixtures
 
@@ -225,11 +226,128 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       assert %DateTime{} = updated.data_export_next_run_at
     end
 
-    test "one-time export shows flash", %{conn: conn} do
-      conn = put(conn, ~p"/users/settings", %{"action" => "export_data_now"})
+    test "email export shows flash listing selected CSV names", %{conn: conn, user: user} do
+      [biz] = Businesses.list_owned_businesses_for_user(user)
+
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_email_now",
+          "export_kinds" => ["jobs", "employees"],
+          "export_business_ids" => [to_string(biz.id)]
+        })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "email"
+      info = Phoenix.Flash.get(conn.assigns.flash, :info)
+      assert info =~ "jobs.csv"
+      assert info =~ "employees.csv"
+      assert info =~ "1 workspace"
+    end
+
+    test "email export with no kinds selected shows error", %{conn: conn} do
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_email_now",
+          "export_kinds" => []
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one"
+    end
+
+    test "email export with export_kinds omitted shows error", %{conn: conn} do
+      conn = put(conn, ~p"/users/settings", %{"action" => "export_email_now"})
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one"
+    end
+
+    test "email export with no workspace selected shows error", %{conn: conn, user: user} do
+      [_] = Businesses.list_owned_businesses_for_user(user)
+
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_email_now",
+          "export_kinds" => ["jobs"],
+          "export_business_ids" => []
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one workspace"
+    end
+
+    test "email export with export_business_ids omitted shows workspace error", %{conn: conn} do
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_email_now",
+          "export_kinds" => ["jobs"]
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one workspace"
+    end
+
+    test "download single selection returns CSV attachment", %{conn: conn, user: user} do
+      [biz] = Businesses.list_owned_businesses_for_user(user)
+
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_download",
+          "export_kinds" => ["jobs"],
+          "export_business_ids" => [to_string(biz.id)]
+        })
+
+      assert response(conn, 200)
+      [ct | _] = get_resp_header(conn, "content-type")
+      assert ct =~ "text/csv"
+      [cd | _] = get_resp_header(conn, "content-disposition")
+      assert cd =~ "jobs.csv"
+      assert conn.resp_body =~ "business_id"
+    end
+
+    test "download multiple selections returns zip attachment", %{conn: conn, user: user} do
+      [biz] = Businesses.list_owned_businesses_for_user(user)
+
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_download",
+          "export_kinds" => ["jobs", "employees"],
+          "export_business_ids" => [to_string(biz.id)]
+        })
+
+      assert response(conn, 200)
+      [ct | _] = get_resp_header(conn, "content-type")
+      assert ct =~ "application/zip"
+      assert binary_part(conn.resp_body, 0, 2) == "PK"
+    end
+  end
+
+  describe "PUT /users/settings (data export download, no owned business)" do
+    setup :register_and_log_in_user
+
+    test "redirects with error when user owns no businesses", %{conn: conn} do
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_download",
+          "export_kinds" => ["jobs"]
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "nothing to download"
+    end
+  end
+
+  describe "PUT /users/settings (data export email, no owned business)" do
+    setup :register_and_log_in_user
+
+    test "redirects with error when user owns no businesses", %{conn: conn} do
+      conn =
+        put(conn, ~p"/users/settings", %{
+          "action" => "export_email_now",
+          "export_kinds" => ["jobs"]
+        })
+
+      assert redirected_to(conn) == ~p"/users/settings"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "nothing to export"
     end
   end
 end

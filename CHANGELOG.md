@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.30] - 2026-05-08
+
+### Added
+
+- **`DataExport.normalize_export_business_ids/2`**: restrict manual export to owner workspace IDs parsed from **`export_business_ids[]`**
+- **`DataExport.deliver_email_export/3`**: email CSVs for chosen kinds and chosen owner business IDs (scheduled **`deliver_email_export/1`** still sends all kinds and all owned workspaces)
+
+### Changed
+
+- **User settings export form**: add workspace checkboxes; validate kinds and workspaces together for email and download
+- **`UserNotifier.deliver_data_export_csvs`**: clarify body copy for manual vs scheduled export workspace scope
+- **Success flash after email export**: mention how many workspaces were included
+
 ## [0.9.29] - 2026-05-12
 
 ### Fixed

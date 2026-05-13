@@ -7,6 +7,98 @@ defmodule RompCrm.DataExportTest do
   alias RompCrm.DataExportSchedule
   alias RompCrm.JobsFixtures
 
+  describe "normalize_export_kinds/1" do
+    test "returns error when nothing valid is selected" do
+      assert {:error, :none_selected} == DataExport.normalize_export_kinds(%{})
+      assert {:error, :none_selected} == DataExport.normalize_export_kinds(%{"export_kinds" => []})
+      assert {:error, :none_selected} == DataExport.normalize_export_kinds(%{"export_kinds" => ["nope"]})
+    end
+
+    test "returns kinds in canonical order and dedupes" do
+      params = %{
+        "export_kinds" => ["audit_log", "jobs", "jobs", "employees"]
+      }
+
+      assert {:ok, [:jobs, :employees, :audit_log]} == DataExport.normalize_export_kinds(params)
+    end
+
+    test "accepts a single string export_kinds" do
+      assert {:ok, [:time_log]} ==
+               DataExport.normalize_export_kinds(%{"export_kinds" => "time_log"})
+    end
+  end
+
+  describe "build_export_files/2" do
+    test "returns only requested filenames in order" do
+      assert [{"jobs.csv", _}, {"audit_log.csv", _}] =
+               DataExport.build_export_files([1, 2], [:jobs, :audit_log])
+    end
+  end
+
+  describe "build_download_payload/1" do
+    test "returns one tuple for a single file" do
+      body = "a,b\n1,2\n"
+      assert {:ok, {:one, "jobs.csv", ^body}} =
+               DataExport.build_download_payload([{"jobs.csv", body}])
+    end
+
+    test "returns error for empty list" do
+      assert {:error, :empty} == DataExport.build_download_payload([])
+    end
+
+    test "returns zip bytes for multiple files" do
+      files = [{"a.csv", "x\n"}, {"b.csv", "y\n"}]
+      assert {:ok, {:zip, zip}} = DataExport.build_download_payload(files)
+      assert is_binary(zip)
+      assert binary_part(zip, 0, 2) == "PK"
+    end
+  end
+
+  describe "normalize_export_business_ids/2" do
+    test "returns error when user owns no businesses" do
+      user = AccountsFixtures.user_fixture()
+      assert {:error, :no_owned_businesses} == DataExport.normalize_export_business_ids(user, %{})
+    end
+
+    test "returns error when no workspace is selected" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, _} = Businesses.create_business(owner, %{name: "Co"})
+      assert {:error, :no_business_selected} == DataExport.normalize_export_business_ids(owner, %{})
+      assert {:error, :no_business_selected} ==
+               DataExport.normalize_export_business_ids(owner, %{"export_business_ids" => []})
+    end
+
+    test "ignores ids that are not owned and returns sorted subset" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, b1} = Businesses.create_business(owner, %{name: "Zed"})
+      {:ok, b2} = Businesses.create_business(owner, %{name: "Aye"})
+      junk = 999_999_999
+
+      params = %{
+        "export_business_ids" => [to_string(b2.id), to_string(b1.id), to_string(junk)]
+      }
+
+      assert {:ok, ids} = DataExport.normalize_export_business_ids(owner, params)
+      assert ids == Enum.sort([b1.id, b2.id])
+    end
+
+    test "accepts a single string export_business_ids" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, biz} = Businesses.create_business(owner, %{name: "Solo"})
+      assert {:ok, ids} = DataExport.normalize_export_business_ids(owner, %{"export_business_ids" => to_string(biz.id)})
+      assert ids == [biz.id]
+    end
+
+    test "returns no_business_selected when only non-owned ids are given" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, _} = Businesses.create_business(owner, %{name: "Mine"})
+      assert {:error, :no_business_selected} ==
+               DataExport.normalize_export_business_ids(owner, %{
+                 "export_business_ids" => ["999999999"]
+               })
+    end
+  end
+
   describe "compute_next_run_at/2" do
     test "advances by one interval" do
       from = ~U[2026-05-10 12:00:00Z]
@@ -42,6 +134,33 @@ defmodule RompCrm.DataExportTest do
       csv = DataExport.build_jobs_csv([biz.id])
       assert csv =~ "A"
       refute csv =~ "Secret"
+      assert csv =~ to_string(j1.id)
+    end
+
+    test "includes only jobs for the given business id subset" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, biz1} = Businesses.create_business(owner, %{name: "One"})
+      {:ok, biz2} = Businesses.create_business(owner, %{name: "Two"})
+
+      {:ok, j1} =
+        RompCrm.Jobs.create_job(%{
+          "business_id" => biz1.id,
+          "client_name" => "OnlyOne",
+          "priority" => "normal",
+          "status" => "lead"
+        })
+
+      {:ok, _} =
+        RompCrm.Jobs.create_job(%{
+          "business_id" => biz2.id,
+          "client_name" => "OnlyTwo",
+          "priority" => "normal",
+          "status" => "lead"
+        })
+
+      csv = DataExport.build_jobs_csv([biz1.id])
+      assert csv =~ "OnlyOne"
+      refute csv =~ "OnlyTwo"
       assert csv =~ to_string(j1.id)
     end
   end
