@@ -103,6 +103,8 @@ defmodule RompCrmWeb.Router do
 
     post "/business/switch", BusinessSwitchController, :update
 
+    post "/jobs/:job_id/photos", JobPhotoController, :create
+
     live_session :authenticated_business_pages,
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},

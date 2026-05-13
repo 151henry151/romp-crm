@@ -77,6 +77,22 @@
       />
     <% end %>
 
+    <div class="mt-6 rounded-lg border border-base-300 bg-base-200/30 p-4 text-left">
+      <p class="font-semibold text-base-content mb-1">SMS reminders</p>
+      <p class="text-sm text-base-content/70 mb-3">
+        Opt in to texts about upcoming jobs (from each job’s scheduled date) and one-off reminders you create by messaging the assistant.
+        Preferences are a JSON object: <code class="text-xs">job_offsets</code> lists how many days before the job date to ping (for example
+        <code class="text-xs">[1,0]</code> means the day before and the day of). <code class="text-xs">send_hour_utc</code> is the UTC hour (0–23) when job pings may be sent.
+      </p>
+      <.input field={f[:sms_reminders_enabled]} type="checkbox" label="Send me SMS reminders" />
+      <.input
+        field={f[:sms_reminder_prefs_json]}
+        type="textarea"
+        label="Reminder preferences (JSON, optional)"
+        placeholder='{"job_offsets":[1,0],"send_hour_utc":13}'
+      />
+    </div>
+
     <.button variant="primary" phx-disable-with="Saving...">Save profile</.button>
   </.form>
 

@@ -1,6 +1,6 @@
 defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
   @moduledoc """
-  Single-call extraction for inbound contractor SMS: jobs, job time tracking, and employee time.
+  Single-call extraction for inbound contractor SMS: jobs, job time tracking, employee time, and optional reminder scheduling.
 
   One Anthropic request receives **jobs**, **open job time entries**, and **employees** snapshots so the model
   can align the SMS with live rows (same judgment-based matching as job updates — **no** server-side fuzzy name scripts).
@@ -13,12 +13,13 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
 
   alias RompCrm.Ai.SmsEmployeeTimeExtractor
   alias RompCrm.Ai.SmsJobExtractor
+  alias RompCrm.Ai.SmsReminderExtractor
   alias RompCrm.Ai.SmsTimeExtractor
 
   @doc """
   Returns:
 
-    * **`{:ok, %{assistant_sms, job_operations, time_operations, emp_operations}}`**
+    * **`{:ok, %{assistant_sms, job_operations, time_operations, emp_operations, reminder_operations}}`**
     * **`{:error, reason}`**
 
   **`prior_turns`** — list of **`{:contractor | :assistant, String.t()}`** oldest-first (same phone / business);
@@ -72,15 +73,20 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
     time_actions = if is_list(time_actions), do: time_actions, else: []
     employee_actions = if is_list(employee_actions), do: employee_actions, else: []
 
+    reminder_actions = Map.get(map, "reminder_actions")
+    reminder_actions = if is_list(reminder_actions), do: reminder_actions, else: []
+
     with {:ok, job_ops} <- SmsJobExtractor.parse_actions_list(job_actions),
          {:ok, time_ops} <- SmsTimeExtractor.parse_actions_list(time_actions),
-         {:ok, emp_ops} <- SmsEmployeeTimeExtractor.parse_actions_list(employee_actions) do
+         {:ok, emp_ops} <- SmsEmployeeTimeExtractor.parse_actions_list(employee_actions),
+         {:ok, rem_ops} <- SmsReminderExtractor.parse_actions_list(reminder_actions) do
       {:ok,
        %{
          assistant_sms: assistant,
          job_operations: job_ops,
          time_operations: time_ops,
-         emp_operations: emp_ops
+         emp_operations: emp_ops,
+         reminder_operations: rem_ops
        }}
     end
   end

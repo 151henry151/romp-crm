@@ -29,6 +29,9 @@ defmodule RompCrm.Accounts.User do
     field :data_export_next_run_at, :utc_datetime
     field :data_export_last_sent_at, :utc_datetime
 
+    field :sms_reminders_enabled, :boolean, default: false
+    field :sms_reminder_prefs_json, :string
+
     has_many :business_memberships, RompCrm.Businesses.BusinessMembership
 
     timestamps(type: :utc_datetime)
@@ -147,10 +150,36 @@ defmodule RompCrm.Accounts.User do
   """
   def profile_changeset(user, attrs) do
     user
-    |> cast(attrs, [:phone, :sms_business_id])
+    |> cast(attrs, [:phone, :sms_business_id, :sms_reminders_enabled, :sms_reminder_prefs_json])
     |> validate_length(:phone, max: 40)
+    |> validate_sms_reminder_prefs_json()
     |> maybe_normalize_phone()
     |> validate_phone_normalized_unique()
+  end
+
+  defp validate_sms_reminder_prefs_json(changeset) do
+    case get_change(changeset, :sms_reminder_prefs_json) do
+      nil ->
+        changeset
+
+      "" ->
+        put_change(changeset, :sms_reminder_prefs_json, nil)
+
+      s when is_binary(s) ->
+        t = String.trim(s)
+
+        if t == "" do
+          put_change(changeset, :sms_reminder_prefs_json, nil)
+        else
+          case Jason.decode(t) do
+            {:ok, %{} = _} -> put_change(changeset, :sms_reminder_prefs_json, t)
+            _ -> add_error(changeset, :sms_reminder_prefs_json, "must be a JSON object")
+          end
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   defp maybe_normalize_phone(changeset) do

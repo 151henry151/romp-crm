@@ -10,7 +10,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
   alias RompCrm.Jobs
+  alias RompCrm.Reminders
   alias RompCrm.Jobs.Job
+  alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
@@ -94,8 +96,69 @@ defmodule RompCrmWeb.TwilioWebhookController do
     :ok
   end
 
+  defp inbound_sms_body_for_extraction(body_text, params)
+       when is_binary(body_text) and is_map(params) do
+    trimmed = String.trim(body_text)
+
+    base =
+      if trimmed == "" do
+        "(Inbound SMS body empty.)"
+      else
+        trimmed
+      end
+
+    case twilio_media_url_suffix_for_prompt(params) do
+      "" -> base
+      suffix -> base <> suffix
+    end
+  end
+
+  defp twilio_media_url_suffix_for_prompt(params) when is_map(params) do
+    case parse_twilio_num_media(params) do
+      n when n > 0 ->
+        urls =
+          for i <- 0..(n - 1) do
+            k = "MediaUrl#{i}"
+
+            case params[k] do
+              u when is_binary(u) ->
+                t = String.trim(u)
+                if t != "", do: t, else: nil
+
+              _ ->
+                nil
+            end
+          end
+          |> Enum.reject(&is_nil/1)
+
+        if urls == [] do
+          ""
+        else
+          lines =
+            urls
+            |> Enum.with_index(1)
+            |> Enum.map_join("", fn {u, ix} -> "\n#{ix}. #{u}" end)
+
+          "\n\n[Twilio MMS with #{length(urls)} attachment URL(s) — use each exact URL in attach_photo actions:]#{lines}\nEach job_actions entry: {\"intent\":\"attach_photo\",\"job_id\":<id from jobs snapshot>,\"media_url\":\"<url>\",\"work_item_title\":\"<optional substring of a work item title>\"}"
+        end
+
+      _ ->
+        ""
+    end
+  end
+
+  defp parse_twilio_num_media(params) do
+    raw = params["NumMedia"] || ""
+
+    case Integer.parse(to_string(raw)) do
+      {n, _} -> min(max(n, 0), 10)
+      :error -> 0
+    end
+  end
+
   defp deliver_inbound_sms(conn, user, business_id) do
     body_text = (conn.body_params["Body"] || "") |> to_string()
+    body_for_ai = inbound_sms_body_for_extraction(body_text, conn.body_params)
     from = conn.body_params["From"] |> to_string()
     to_num = conn.body_params["To"] |> to_string()
     message_sid = conn.body_params["MessageSid"] |> to_string()
@@ -120,7 +183,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
       end
 
     case SmsUnifiedInboundExtractor.extract(
-           body_text,
+           body_for_ai,
            jobs_snapshot,
            open_time_entries,
            employees_snapshot,
@@ -131,23 +194,31 @@ defmodule RompCrmWeb.TwilioWebhookController do
          assistant_sms: assistant,
          job_operations: job_ops_raw,
          time_operations: time_ops_raw,
-         emp_operations: emp_ops_raw
+         emp_operations: emp_ops_raw,
+         reminder_operations: rem_ops_raw
        }} ->
         caps = EmployeePermissions.for(user, business_id)
 
-        {job_ops, time_ops, emp_ops} =
-          filter_sms_operations_by_permissions(job_ops_raw, time_ops_raw, emp_ops_raw, caps)
+        {job_ops, time_ops, emp_ops, rem_ops} =
+          filter_sms_operations_by_permissions(
+            job_ops_raw,
+            time_ops_raw,
+            emp_ops_raw,
+            rem_ops_raw,
+            caps
+          )
 
         had_extracted_ops =
-          job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != []
+          job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != []
 
-        all_ops = job_ops ++ time_ops ++ emp_ops
+        all_ops = job_ops ++ time_ops ++ emp_ops ++ rem_ops
 
         log_base = %{
           message_sid: message_sid,
           planned_job_ops: job_ops_raw,
           planned_time_ops: time_ops_raw,
-          planned_emp_ops: emp_ops_raw
+          planned_emp_ops: emp_ops_raw,
+          planned_reminder_ops: rem_ops_raw
         }
 
         cond do
@@ -179,10 +250,18 @@ defmodule RompCrmWeb.TwilioWebhookController do
               message_sid: message_sid,
               from: from,
               business_id: business_id,
-              allowed_job_ids: allowed_job_ids
+              allowed_job_ids: allowed_job_ids,
+              user_id: user.id
             }
 
-            case run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
+            case run_all_operations(
+                   job_ops,
+                   time_ops,
+                   emp_ops,
+                   rem_ops,
+                   job_ctx,
+                   allowed_employee_ids
+                 ) do
               {:clarify, msg} ->
                 sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg,
                   Map.merge(log_base, %{outcome: "clarify", results: []})
@@ -212,6 +291,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
           planned_job_ops: [],
           planned_time_ops: [],
           planned_emp_ops: [],
+          planned_reminder_ops: [],
           extraction_error: inspect(reason),
           results: []
         })
@@ -233,7 +313,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
     twiml_ok(conn)
   end
 
-  defp filter_sms_operations_by_permissions(job_ops, time_ops, emp_ops, caps) do
+  defp filter_sms_operations_by_permissions(job_ops, time_ops, emp_ops, rem_ops, caps) do
     job_ops =
       if EmployeePermissions.can_edit_jobs?(caps), do: job_ops, else: []
 
@@ -246,7 +326,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
         EmployeePermissions.can_log_employee_time?(caps, id)
       end)
 
-    {job_ops, time_ops, emp_ops}
+    {job_ops, time_ops, emp_ops, rem_ops}
   end
 
   defp emp_op_target_employee_id({:emp_clock_in_by_id, id, _}), do: id
@@ -360,6 +440,34 @@ defmodule RompCrmWeb.TwilioWebhookController do
     })
   end
 
+  defp record_one_sms_audit(bid, uid, base, {:photos_saved, %Job{} = job, saved, attempted}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "job_photos.create",
+      entity_type: "jobs",
+      entity_id: job.id,
+      metadata: Map.merge(base, %{client_name: job.client_name, saved: saved, attempted: attempted})
+    })
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:reminder_created, %Reminder{} = r}) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: "reminders.create",
+      entity_type: "reminders",
+      entity_id: r.id,
+      metadata:
+        Map.merge(base, %{
+          fire_at: DateTime.to_iso8601(r.fire_at),
+          job_id: r.job_id
+        })
+    })
+  end
+
   defp record_one_sms_audit(_, _, _, _), do: :ok
 
   defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)
@@ -384,7 +492,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp maybe_record_sms_exchange(_, _, "", _, _), do: :ok
 
   # Runs all operation lists and collects results. Job fuzzy-match errors trigger clarification.
-  defp run_all_operations(job_ops, time_ops, emp_ops, job_ctx, allowed_employee_ids) do
+  defp run_all_operations(job_ops, time_ops, emp_ops, rem_ops, job_ctx, allowed_employee_ids) do
     with {:ok, job_results} <- run_job_operations(job_ops, job_ctx),
          {:ok, time_results} <- run_time_operations(time_ops, job_ctx),
          {:ok, emp_results} <-
@@ -394,8 +502,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
              job_ctx.from,
              job_ctx.business_id,
              allowed_employee_ids
-           ) do
-      {:ok, job_results ++ time_results ++ emp_results}
+           ),
+         {:ok, rem_results} <- run_reminder_operations(rem_ops, job_ctx) do
+      {:ok, job_results ++ time_results ++ emp_results ++ rem_results}
     end
   end
 
@@ -694,7 +803,135 @@ defmodule RompCrmWeb.TwilioWebhookController do
     end
   end
 
-  # ── Existing job operation (kept as-is) ──────────────────────────────────
+  # ── Reminders (SMS-scheduled rows; not gated by job/time employee permissions) ──
+
+  defp run_reminder_operations([], _ctx), do: {:ok, []}
+
+  defp run_reminder_operations(ops, ctx) do
+    results =
+      ops
+      |> Enum.with_index(1)
+      |> Enum.map(fn {op, idx} -> apply_reminder_op(op, idx, ctx) end)
+
+    {:ok, results}
+  end
+
+  defp apply_reminder_op(
+         {:reminder_schedule, %DateTime{} = fire_at, body, job_id, meta},
+         idx,
+         %{message_sid: sid, from: from, business_id: business_id, allowed_job_ids: allowed, user_id: user_id}
+       ) do
+    Logger.info(
+      "Twilio SMS reminder schedule: sid=#{sid} from=#{from} op_index=#{idx} user_id=#{user_id} job_id=#{inspect(job_id)}"
+    )
+
+    verified_job_id =
+      cond do
+        is_nil(job_id) ->
+          nil
+
+        not MapSet.member?(allowed, job_id) ->
+          :invalid
+
+        Jobs.get_job(job_id, business_id) == nil ->
+          :invalid
+
+        true ->
+          job_id
+      end
+
+    cond do
+      verified_job_id == :invalid ->
+        Logger.info(
+          "Twilio SMS reminder skipped: sid=#{sid} op_index=#{idx} reason=:invalid_job_id job_id=#{inspect(job_id)}"
+        )
+
+        {:skipped, :invalid_job_id}
+
+      true ->
+        meta = if is_map(meta), do: meta, else: %{}
+
+        attrs = %{
+          user_id: user_id,
+          business_id: business_id,
+          job_id: verified_job_id,
+          body: body,
+          fire_at: DateTime.truncate(fire_at, :second),
+          source: "sms",
+          metadata_json: Jason.encode!(meta)
+        }
+
+        case Reminders.create_reminder(attrs) do
+          {:ok, %Reminder{} = r} ->
+            Logger.info("Twilio SMS reminder created: sid=#{sid} reminder_id=#{r.id}")
+            {:reminder_created, r}
+
+          {:error, cs} ->
+            Logger.warning("Twilio SMS reminder insert failed: #{inspect(cs.errors)}")
+            {:error, :reminder_create_failed}
+        end
+    end
+  end
+
+  # ── Job photos (MMS) ─────────────────────────────────────────────────────
+
+  defp apply_sms_operation_ret(
+         {:attach_photos, job_id, work_item_title_hint, urls},
+         idx,
+         message_sid,
+         from,
+         business_id,
+         allowed_job_ids
+       )
+       when is_list(urls) do
+    Logger.info(
+      "Twilio SMS attach_photos: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job_id} count=#{length(urls)}"
+    )
+
+    cond do
+      not MapSet.member?(allowed_job_ids, job_id) ->
+        Logger.info(
+          "Twilio SMS attach_photos skipped: sid=#{message_sid} op_index=#{idx} reason=:invalid_job_id job_id=#{job_id}"
+        )
+
+        {:skipped, :invalid_job_id}
+
+      true ->
+        case Jobs.get_job(job_id, business_id) do
+          nil ->
+            Logger.info(
+              "Twilio SMS attach_photos skipped: sid=#{message_sid} op_index=#{idx} reason=:job_not_found job_id=#{job_id}"
+            )
+
+            {:skipped, :job_not_found}
+
+          job ->
+            wi_id =
+              case work_item_title_hint do
+                nil -> nil
+                "" -> nil
+                hint -> Jobs.find_work_item_id_by_title_substring(job, hint)
+              end
+
+            results = Enum.map(urls, fn url -> Jobs.add_job_photo_from_url(job, business_id, url, wi_id) end)
+            ok_ct = Enum.count(results, &match?({:ok, _}, &1))
+
+            if ok_ct > 0 do
+              Logger.info(
+                "Twilio SMS attach_photos applied: sid=#{message_sid} op_index=#{idx} job_id=#{job.id} saved=#{ok_ct}/#{length(urls)}"
+              )
+
+              {:photos_saved, job, ok_ct, length(urls)}
+            else
+              Logger.warning(
+                "Twilio SMS attach_photos failed: sid=#{message_sid} op_index=#{idx} job_id=#{job.id} results=#{inspect(results)}"
+              )
+
+              {:error, :attach_photo_all_failed}
+            end
+        end
+    end
+  end
 
   defp apply_sms_operation_ret(
          {:create, attrs},
@@ -838,6 +1075,10 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   defp sms_extraction_failed_reply({:invalid_action, _, _}) do
     "Couldn't apply one of the actions in that text. Open Romp CRM or simplify the message."
+  end
+
+  defp sms_extraction_failed_reply({:invalid_reminder_action, _, _}) do
+    "Couldn't parse a reminder in that text. Open Romp CRM or say the date/time more explicitly."
   end
 
   defp sms_extraction_failed_reply({:anthropic_http, status, _}) when is_integer(status) do

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.9.31] - 2026-05-08
+
+### Added
+
+- **Reminders**: `reminders` and `job_reminder_send_logs` tables; `users.sms_reminders_enabled` and `users.sms_reminder_prefs_json`; **`RompCrm.Reminders`** for row delivery and scheduled-job SMS nudges; **`RompCrm.ReminderScheduler`** GenServer
+- **SMS unified extraction**: `reminder_actions` with **`RompCrm.Ai.SmsReminderExtractor`**; Anthropic prompts for work items, materials, job dates, MMS **`attach_photo`**, and reminder scheduling
+- **Account settings**: opt-in checkbox and JSON preferences textarea for SMS reminders
+- **`Jobs.list_upcoming_scheduled_jobs/2`**: query for calendar nudge delivery
+
+### Changed
+
+- **`SmsJobExtractor.infer_intent/1`**: treat MMS URLs plus **`job_id`** as **`attach_photo`**
+- **`TwilioWebhookController.twilio_media_url_suffix_for_prompt/1`**: avoid **`String.trim/1`** in guards (compile on Elixir 1.19)
+
 ## [0.9.30] - 2026-05-08
 
 ### Added
