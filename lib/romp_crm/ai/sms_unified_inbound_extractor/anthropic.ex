@@ -211,10 +211,11 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       "assistant_sms": "<short SMS ≤480 chars to send back; past tense confirmations or one clarifying question>",
       "job_actions": [ ... ],
       "time_actions": [ ... ],
-      "employee_actions": [ ... ]
+      "employee_actions": [ ... ],
+      "reminder_actions": [ ... ]
     }
 
-    Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all three action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
+    Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
 
     ---
 
@@ -222,13 +223,31 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     Each element is one action object:
 
-    **Create lead:** `"intent": "create"` plus `"job": { "client_name", "address", "phone", ... }` (see job field rules you already know).
+    **Create lead:** `"intent": "create"` plus `"job": { "client_name", "address", "phone", ... }`.
 
     **Update job:** `"intent": "update"`, `"job_id": <int from jobs snapshot>`, `"updates": { only changed fields }`.
+
+    **Work items (tasks):** In **create** `job` or **update** `updates`, include `"work_items": [ { "title": "...", "scheduled_on": "YYYY-MM-DD" or null, "sort_order": 0 } ]` when the SMS lists multiple distinct tasks (e.g. dishwasher, sink leak, shower valve). Prefer separate work item rows instead of one long `work_description` when the message clearly enumerates tasks.
+
+    **Job-level date:** `"scheduled_on": "YYYY-MM-DD"` on create/update for the overall job start or primary visit date when stated.
+
+    **Materials:** `"materials": [ { "description": "...", "job_work_item_id": <int from snapshot work_items> or omit for whole job, "work_item_index": <0-based index in snapshot work_items list> } ]`. Materials tied to a work item also appear in the combined job list in the app.
+
+    **Attach photo (MMS):** When the inbound message includes Twilio image URL(s) and the user is adding a picture to an existing job, include `"intent": "attach_photo"`, `"job_id": <int>`, `"media_url": "<exact URL from message>"` (or `"media_urls": [...]`), optional `"work_item_title": "<substring of a work item title>"` to attach to that line item.
 
     Optional fallback when you truly cannot pick an id: `"match"` + `"updates"` (same as job-only flow).
 
     Prefer **`job_id`** from the snapshot whenever one row is the clear semantic fit.
+
+    ---
+
+    ## reminder_actions — personal reminders for the texting user
+
+    Each element:
+    - `{ "intent": "schedule", "fire_at": "<ISO 8601 UTC or Z>", "body": "<short reminder text>", "job_id": <optional int from jobs snapshot>, "metadata": { ... } }`
+    - Use when the contractor asks to be reminded later (e.g. "remind me Tuesday 11am to call Suzy"). Put the human-readable task in **`body`**. If a snapshot job clearly matches (same customer name), set **`job_id`**. Otherwise omit **`job_id`** and set metadata like `{ "no_customer_match": true, "suggested_name": "Suzy" }` when appropriate.
+
+    Return `[]` when there is no reminder intent.
 
     ---
 
@@ -264,6 +283,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     - One SMS may produce actions in more than one array.
     - **`assistant_sms`** should summarize everything you applied or ask one focused question if ambiguous.
+    - **`reminder_actions`** are independent of job permissions; still require valid `fire_at` and `body` when used.
     """
   end
 end

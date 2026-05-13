@@ -7,9 +7,10 @@ defmodule RompCrm.Ai.SmsJobExtractor do
   compare the SMS against live CRM rows (names, addresses, work text, typos, informal references).
 
   - `{:ok, %{assistant_sms: String.t() | nil, operations: list}}` where `operations` contains zero or more:
-    - `{:create, attrs}` — attrs match `RompCrm.Jobs.create_job/1`.
+    - `{:create, attrs}` — attrs match `RompCrm.Jobs.create_job/1` (optional **`scheduled_on`**, **`work_items`**, **`materials`**).
     - `{:update_by_id, job_id, patch}` — `RompCrm.Jobs.update_job/2` after validating `job_id`.
     - `{:update, match, patch}` — fallback: resolve via `RompCrm.Jobs.find_job_for_sms_update/1`.
+    - `{:attach_photos, job_id, work_item_title_hint, urls}` — download each URL and store under the job (Twilio MMS).
   """
 
   alias RompCrm.Jobs.Job
@@ -116,6 +117,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
       end
 
     case intent do
+      "attach_photo" -> parse_attach_photo_intent(map)
       "update" -> parse_update_intent(map)
       _ -> parse_create_intent(map)
     end
@@ -125,12 +127,16 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     Map.new(map, fn {k, v} -> {to_string(k), v} end)
   end
 
-  defp infer_intent(map) do
+    defp infer_intent(map) do
+    urls = collect_media_urls(map)
     match = Map.get(map, "match")
     updates = Map.get(map, "updates")
     job_id_present? = job_id_present_in_map?(map)
 
     cond do
+      urls != [] and job_id_present? ->
+        "attach_photo"
+
       job_id_present? and is_map(updates) and map_size(updates) > 0 ->
         "update"
 
@@ -249,8 +255,153 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     |> maybe_put_string(:referred_by, m["referred_by"])
     |> maybe_put_string(:notes, m["notes"])
     |> maybe_put_string(:next_action, m["next_action"])
+    |> maybe_put_date(:scheduled_on, m["scheduled_on"])
+    |> maybe_put_work_items(:work_items, m["work_items"])
+    |> maybe_put_materials(:materials, m["materials"])
     |> maybe_put_enum(:priority, m["priority"], Job.priorities())
     |> maybe_put_enum(:status, m["status"], Job.statuses())
+  end
+
+  defp maybe_put_date(acc, key, raw) do
+    case parse_iso_date(raw) do
+      nil -> acc
+      %Date{} = d -> Map.put(acc, key, d)
+    end
+  end
+
+  defp maybe_put_work_items(acc, key, raw) do
+    list = normalize_work_items_for_patch(raw)
+    if list == [], do: acc, else: Map.put(acc, key, list)
+  end
+
+  defp maybe_put_materials(acc, key, raw) do
+    list = normalize_materials_for_patch(raw)
+    if list == [], do: acc, else: Map.put(acc, key, list)
+  end
+
+  defp normalize_work_items_for_patch(nil), do: []
+
+  defp normalize_work_items_for_patch(list) when is_list(list) do
+    list
+    |> Enum.with_index()
+    |> Enum.map(fn {row, i} ->
+      row = stringify_top_level_keys(row)
+      title = nilify_blank(row["title"])
+
+      if title do
+        %{
+          "title" => title,
+          "sort_order" => Map.get(row, "sort_order") || i,
+          "scheduled_on" => parse_iso_date(row["scheduled_on"])
+        }
+        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+        |> Map.new()
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp normalize_work_items_for_patch(_), do: []
+
+  defp normalize_materials_for_patch(nil), do: []
+
+  defp normalize_materials_for_patch(list) when is_list(list) do
+    list
+    |> Enum.with_index()
+    |> Enum.map(fn {row, i} ->
+      row = stringify_top_level_keys(row)
+      desc = nilify_blank(row["description"])
+
+      if desc do
+        wi_id = parse_optional_int(row["job_work_item_id"])
+        wi_idx = parse_optional_int(row["work_item_index"])
+
+        %{"description" => desc, "sort_order" => i}
+        |> maybe_put_int("job_work_item_id", wi_id)
+        |> maybe_put_int("work_item_index", wi_idx)
+      else
+        nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp normalize_materials_for_patch(_), do: []
+
+  defp maybe_put_int(map, _key, nil), do: map
+
+  defp maybe_put_int(map, key, n) when is_integer(n) do
+    Map.put(map, key, n)
+  end
+
+  defp parse_optional_int(nil), do: nil
+
+  defp parse_optional_int(v) when is_integer(v), do: v
+
+  defp parse_optional_int(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {n, _} -> n
+      :error -> nil
+    end
+  end
+
+  defp parse_optional_int(_), do: nil
+
+  defp parse_iso_date(nil), do: nil
+  defp parse_iso_date(v) when v == "", do: nil
+
+  defp parse_iso_date(%Date{} = d), do: d
+
+  defp parse_iso_date(v) when is_binary(v) do
+    s = String.trim(v)
+
+    case Date.from_iso8601(s) do
+      {:ok, d} -> d
+      _ -> nil
+    end
+  end
+
+  defp parse_iso_date(_), do: nil
+
+  defp parse_attach_photo_intent(map) do
+    urls = collect_media_urls(map)
+
+    if urls == [] do
+      {:error, :attach_photo_missing_url}
+    else
+      title_hint = nilify_blank(map["work_item_title"])
+
+      case coerce_job_id(Map.get(map, "job_id")) do
+        {:ok, job_id} ->
+          {:ok, {:attach_photos, job_id, title_hint, urls}}
+
+        :missing ->
+          {:error, :attach_photo_needs_job_id}
+
+        {:error, _} ->
+          {:error, :invalid_job_id}
+      end
+    end
+  end
+
+  defp collect_media_urls(map) do
+    one = nilify_blank(map["media_url"])
+
+    rest =
+      case map["media_urls"] do
+        list when is_list(list) ->
+          list
+          |> Enum.filter(&is_binary/1)
+          |> Enum.map(&String.trim/1)
+          |> Enum.reject(&(&1 == ""))
+
+        _ ->
+          []
+      end
+
+    (if(one, do: [one], else: []) ++ rest) |> Enum.uniq()
   end
 
   defp maybe_put_string(acc, key, v) do
@@ -290,7 +441,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
         String.trim(m["client_name"])
       end
 
-    %{
+    base = %{
       client_name: client_name,
       address: nilify_blank(m["address"]),
       phone: nilify_blank(m["phone"]),
@@ -301,7 +452,21 @@ defmodule RompCrm.Ai.SmsJobExtractor do
       notes: nilify_blank(m["notes"]),
       next_action: nilify_blank(m["next_action"])
     }
+
+    extras =
+      %{}
+      |> put_optional(:scheduled_on, parse_iso_date(m["scheduled_on"]))
+      |> put_optional_list(:work_items, normalize_work_items_for_patch(m["work_items"]))
+      |> put_optional_list(:materials, normalize_materials_for_patch(m["materials"]))
+
+    Map.merge(base, extras)
   end
+
+  defp put_optional(map, _key, nil), do: map
+  defp put_optional(map, key, val), do: Map.put(map, key, val)
+
+  defp put_optional_list(map, _key, []), do: map
+  defp put_optional_list(map, key, list) when is_list(list), do: Map.put(map, key, list)
 
   defp trim_fields(map) do
     Map.new(map, fn {k, v} -> {k, trim_val(v)} end)

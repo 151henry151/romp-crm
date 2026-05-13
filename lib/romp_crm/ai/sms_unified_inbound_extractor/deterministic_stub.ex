@@ -56,7 +56,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
            "assistant_sms" => if(msg != "", do: msg, else: "Which job did you mean?"),
            "job_actions" => [],
            "time_actions" => [],
-           "employee_actions" => []
+           "employee_actions" => [],
+           "reminder_actions" => []
          }}
 
       true ->
@@ -74,7 +75,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
            "time_actions" => [
              %{"intent" => "clock_in", "job_id" => job_id, "started_at" => started_at}
            ],
-           "employee_actions" => []
+           "employee_actions" => [],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -95,7 +97,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
            "time_actions" => [
              %{"intent" => "clock_out", "job_id" => job_id, "ended_at" => ended_at}
            ],
-           "employee_actions" => []
+           "employee_actions" => [],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -120,7 +123,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
                "employee_id" => employee_id,
                "clocked_in_at" => clocked_in_at
              }
-           ]
+           ],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -145,7 +149,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
                "employee_id" => employee_id,
                "clocked_out_at" => clocked_out_at
              }
-           ]
+           ],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -176,7 +181,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
                "lunch_start_at" => lunch_start_at,
                "lunch_end_at" => lunch_end_at
              }
-           ]
+           ],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -197,7 +203,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
              %{"intent" => "update", "job_id" => job_id, "updates" => updates}
            ],
            "time_actions" => [],
-           "employee_actions" => []
+           "employee_actions" => [],
+           "reminder_actions" => []
          }}
 
       {:ok, %{"match" => %{} = match, "updates" => %{} = updates}} ->
@@ -208,7 +215,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
              %{"intent" => "update", "match" => match, "updates" => updates}
            ],
            "time_actions" => [],
-           "employee_actions" => []
+           "employee_actions" => [],
+           "reminder_actions" => []
          }}
 
       {:ok, _} ->
@@ -228,6 +236,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
           |> Map.put_new("job_actions", [])
           |> Map.put_new("time_actions", [])
           |> Map.put_new("employee_actions", [])
+          |> Map.put_new("reminder_actions", [])
 
         {:ok, map}
 
@@ -264,7 +273,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
         }
       ],
       "time_actions" => [],
-      "employee_actions" => []
+      "employee_actions" => [],
+      "reminder_actions" => []
     }
   end
 end

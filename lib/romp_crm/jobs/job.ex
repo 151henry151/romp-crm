@@ -20,6 +20,11 @@ defmodule RompCrm.Jobs.Job do
     field :referred_by, :string
     field :notes, :string
     field :next_action, :string
+    field :scheduled_on, :date
+
+    has_many :work_items, RompCrm.Jobs.JobWorkItem, on_replace: :delete
+    has_many :materials, RompCrm.Jobs.JobMaterial
+    has_many :photos, RompCrm.Jobs.JobPhoto
 
     timestamps(type: :utc_datetime)
   end
@@ -36,8 +41,14 @@ defmodule RompCrm.Jobs.Job do
       :status,
       :referred_by,
       :notes,
-      :next_action
+      :next_action,
+      :scheduled_on
     ])
+    |> cast_assoc(:work_items,
+      with: &RompCrm.Jobs.JobWorkItem.changeset/2,
+      sort_param: :work_items_sort,
+      drop_param: :work_items_drop
+    )
     |> validate_required([:business_id, :client_name, :priority, :status])
   end
 end

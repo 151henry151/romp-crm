@@ -6,6 +6,7 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
   """
 
   alias RompCrm.Jobs.Job
+  alias RompCrm.Reminders.Reminder
 
   @max_len 320
 
@@ -56,6 +57,13 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
         {:updated, %Job{} = j, fields} when is_list(fields) ->
           fs = fields |> Enum.map(&to_string/1) |> Enum.join(", ")
           ["updated #{short_client(j)} (#{fs})"]
+
+        {:photos_saved, %Job{} = j, saved, attempted} ->
+          ["saved #{saved}/#{attempted} photo(s) for #{short_client(j)}"]
+
+        {:reminder_created, %Reminder{} = r} ->
+          t = DateTime.to_iso8601(r.fire_at)
+          ["saved a reminder for #{t}"]
 
         {:skipped, _} ->
           []

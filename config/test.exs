@@ -49,4 +49,5 @@ config :romp_crm,
   twilio_account_sid: nil,
   twilio_messaging_from_number: "+15551234567",
   twilio_sms_replies_enabled: false,
-  data_export_scheduler_enabled: false
+  data_export_scheduler_enabled: false,
+  reminder_scheduler_enabled: false

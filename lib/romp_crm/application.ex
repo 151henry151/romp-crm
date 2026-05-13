@@ -17,7 +17,7 @@ defmodule RompCrm.Application do
         {Phoenix.PubSub, name: RompCrm.PubSub},
         {Finch, name: RompCrm.Finch},
         RompCrmWeb.Endpoint
-      ] ++ data_export_scheduler_child()
+      ] ++ data_export_scheduler_child() ++ reminder_scheduler_child()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -41,6 +41,14 @@ defmodule RompCrm.Application do
   defp data_export_scheduler_child do
     if Application.get_env(:romp_crm, :data_export_scheduler_enabled, true) do
       [{RompCrm.DataExportScheduler, []}]
+    else
+      []
+    end
+  end
+
+  defp reminder_scheduler_child do
+    if Application.get_env(:romp_crm, :reminder_scheduler_enabled, true) do
+      [{RompCrm.ReminderScheduler, []}]
     else
       []
     end

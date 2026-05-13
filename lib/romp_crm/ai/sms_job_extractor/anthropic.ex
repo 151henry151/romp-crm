@@ -136,6 +136,9 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     - "job": object with:
       - "client_name" (required): person or business name for the customer (never null for creates).
       - "address", "phone", "work_description", "referred_by", "notes", "next_action": strings or null.
+      - optional "scheduled_on": `YYYY-MM-DD` for the main job visit/start when the SMS states it.
+      - optional "work_items": array of `{ "title": "...", "scheduled_on": "YYYY-MM-DD" or null }` — use when the SMS clearly lists multiple distinct tasks for the same customer; prefer this over one long `work_description`.
+      - optional "materials": array of `{ "description": "...", "work_item_index": <0-based> }` or `{ "description", "job_work_item_id" }` for parts/supplies.
       - "priority": "normal" | "high"
       - "status": "lead" | "pending" | "in_progress" | "done"
 
@@ -143,7 +146,14 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     Use keys on an action object:
     - "intent": "update"
     - "job_id": integer — MUST be exactly one `"id"` from the snapshot JSON that matches the SMS (your semantic judgment).
-    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`).
+    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`), plus optional **`scheduled_on`** (date string `YYYY-MM-DD`), **`work_items`** (array of `{ "title", "scheduled_on"?, "sort_order"? }` matching snapshot work item ids/titles where applicable), and **`materials`** (array of `{ "description", "job_work_item_id"?, "work_item_index"? }`).
+
+    ## Action type: attach_photo (MMS)
+    When the user message lists Twilio media URLs and the intent is to store photos on an existing job:
+    - "intent": "attach_photo"
+    - "job_id": integer from snapshot
+    - "media_url": a single URL string, or "media_urls": [ ... ]
+    - optional "work_item_title": substring matching a snapshot work item title for that job
 
     Never invent `job_id` values not present in the snapshot.
 

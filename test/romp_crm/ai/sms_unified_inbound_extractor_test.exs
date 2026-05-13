@@ -14,7 +14,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractorTest do
                 assistant_sms: "Stub: clocked in.",
                 job_operations: [],
                 time_operations: [{:clock_in_by_id, 9, ~N[2026-05-11 08:00:00]}],
-                emp_operations: []
+                emp_operations: [],
+                reminder_operations: []
               }} =
                SmsUnifiedInboundExtractor.extract(raw, [], [], [])
     end
@@ -31,7 +32,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractorTest do
               %{
                 job_operations: [{:update_by_id, 3, patch}],
                 time_operations: [],
-                emp_operations: []
+                emp_operations: [],
+                reminder_operations: []
               }} =
                SmsUnifiedInboundExtractor.extract(raw, [], [], [])
 
