@@ -121,34 +121,8 @@
                   <span class="text-base-content">{Date.to_iso8601(job.scheduled_on)}</span>
                 </p>
               <% end %>
-              <%= if job.work_items != [] && job.work_items do %>
-                <div class="pt-1">
-                  <p class="font-medium text-base-content/90">Work items</p>
-                  <ul class="list-disc pl-5 text-base-content space-y-0.5">
-                    <%= for wi <- job.work_items do %>
-                      <li>
-                        {wi.title}
-                        <%= if wi.scheduled_on do %>
-                          <span class="text-base-content/70"> — {Date.to_iso8601(wi.scheduled_on)}</span>
-                        <% end %>
-                      </li>
-                    <% end %>
-                  </ul>
-                </div>
-              <% end %>
-              <% mc = RompCrm.Jobs.materials_combined(job) %>
-              <%= if mc != [] do %>
-                <div class="pt-1">
-                  <p class="font-medium text-base-content/90">Materials</p>
-                  <ul class="list-disc pl-5 text-base-content text-sm space-y-0.5">
-                    <%= for m <- mc do %>
-                      <li>
-                        <span class="text-base-content/60">{m.scope_label}:</span> {m.description}
-                      </li>
-                    <% end %>
-                  </ul>
-                </div>
-              <% end %>
+              <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} />
+              <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} />
               <%= if job.photos != [] && job.photos do %>
                 <div class="pt-2 flex flex-wrap gap-2">
                   <%= for ph <- job.photos do %>
@@ -414,34 +388,16 @@
                         <span class="text-base-content">{Date.to_iso8601(job.scheduled_on)}</span>
                       </p>
                     <% end %>
-                    <%= if job.work_items != [] && job.work_items do %>
-                      <div class="lg:col-span-2 pt-1">
-                        <p class="font-medium text-base-content/90">Work items</p>
-                        <ul class="list-disc pl-5 text-base-content space-y-0.5">
-                          <%= for wi <- job.work_items do %>
-                            <li>
-                              {wi.title}
-                              <%= if wi.scheduled_on do %>
-                                <span class="text-base-content/70"> — {Date.to_iso8601(wi.scheduled_on)}</span>
-                              <% end %>
-                            </li>
-                          <% end %>
-                        </ul>
-                      </div>
-                    <% end %>
-                    <% mc = RompCrm.Jobs.materials_combined(job) %>
-                    <%= if mc != [] do %>
-                      <div class="lg:col-span-2 pt-1">
-                        <p class="font-medium text-base-content/90">Materials</p>
-                        <ul class="list-disc pl-5 text-base-content text-sm space-y-0.5">
-                          <%= for m <- mc do %>
-                            <li>
-                              <span class="text-base-content/60">{m.scope_label}:</span> {m.description}
-                            </li>
-                          <% end %>
-                        </ul>
-                      </div>
-                    <% end %>
+                    <.job_work_items_section
+                      job={job}
+                      can_edit_jobs={@can_edit_jobs}
+                      wrapper_class="lg:col-span-2 pt-1"
+                    />
+                    <.job_materials_section
+                      job={job}
+                      can_edit_jobs={@can_edit_jobs}
+                      wrapper_class="lg:col-span-2 pt-1"
+                    />
                     <%= if job.photos != [] && job.photos do %>
                       <div class="lg:col-span-2 pt-2 flex flex-wrap gap-2">
                         <%= for ph <- job.photos do %>
