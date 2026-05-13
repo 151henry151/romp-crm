@@ -79,7 +79,7 @@
                 <p class="font-semibold text-base-content break-words">{job.client_name}</p>
                 <%= if not mob_expanded? do %>
                   <p class="text-sm text-base-content/80 break-words line-clamp-2">
-                    <span class="font-medium text-base-content/90">Work:</span>
+                    <span class="font-medium text-base-content/90">Work description:</span>
                     {display(job.work_description)}
                   </p>
                 <% end %>
@@ -110,7 +110,7 @@
                 <span class="text-base-content">{display(job.phone)}</span>
               </p>
               <p>
-                <span class="font-medium text-base-content/90">Work:</span>
+                <span class="font-medium text-base-content/90">Work description:</span>
                 <span class="block mt-0.5 break-words text-base-content">
                   {display(job.work_description)}
                 </span>
@@ -377,7 +377,7 @@
                       )}
                     </p>
                     <p class="lg:col-span-2">
-                      <span class="font-medium text-base-content/90">Work:</span>
+                      <span class="font-medium text-base-content/90">Work description:</span>
                       <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">
                         {display(job.work_description)}
                       </span>

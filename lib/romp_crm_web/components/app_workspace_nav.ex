@@ -1,7 +1,7 @@
 defmodule RompCrmWeb.AppWorkspaceNav do
   @moduledoc """
-  Shared workspace navigation (jobs area): time log, timeclock, employees, businesses, settings.
-  Desktop: inline links. Mobile: `<details>` “hamburger” panel with the same links.
+  Shared workspace navigation (jobs area): job list, time log, timeclock, employees, businesses, settings.
+  Desktop: pill-style links (same visual language as **Support**). Mobile: `<details>` panel with the same links.
   """
   use Phoenix.Component
   use Gettext, backend: RompCrmWeb.Gettext
@@ -22,11 +22,11 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     ~H"""
     <div class="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
       <%!-- Desktop --%>
-      <div class="hidden flex-wrap items-center gap-x-3 gap-y-1 lg:flex">
+      <div class="hidden flex-wrap items-center gap-x-2 gap-y-1.5 lg:flex">
         <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
           <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} />
         <% end %>
-        <.nav_links class="text-sm font-medium text-blue-600 hover:text-blue-800" is_business_owner={@is_business_owner} />
+        <.nav_links is_business_owner={@is_business_owner} />
       </div>
 
       <%!-- Mobile menu --%>
@@ -38,17 +38,13 @@ defmodule RompCrmWeb.AppWorkspaceNav do
           <.icon name="hero-bars-3" class="size-5" />
           <span class="text-sm font-medium">Menu</span>
         </summary>
-        <div class="absolute right-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+        <div class="absolute right-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1.5 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
           <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
             <div class="mb-1 border-b border-base-300 pb-2">
               <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} compact={true} />
             </div>
           <% end %>
-          <.nav_links
-            class="block rounded-md px-2 py-2 text-sm font-medium text-base-content hover:bg-base-200"
-            is_business_owner={@is_business_owner}
-            mobile={true}
-          />
+          <.nav_links is_business_owner={@is_business_owner} mobile={true} />
         </div>
       </details>
     </div>
@@ -94,7 +90,6 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     """
   end
 
-  attr :class, :any, required: true
   attr :is_business_owner, :boolean, default: false
   attr :mobile, :boolean, default: false
 
@@ -104,30 +99,54 @@ defmodule RompCrmWeb.AppWorkspaceNav do
         do: %{"onclick" => "this.closest('details')?.removeAttribute('open')"},
         else: %{}
 
-    assigns = assign(assigns, :mobile_attrs, mobile_attrs)
+    pill = pill_nav_classes(assigns.mobile)
+    assigns = assigns |> assign(:mobile_attrs, mobile_attrs) |> assign(:pill, pill)
 
     ~H"""
-    <.link navigate={~p"/time-log"} class={nav_link_classes(@class, false)} {@mobile_attrs}>
+    <.link navigate={~p"/"} class={@pill} {@mobile_attrs}>
+      Job list
+    </.link>
+    <.link navigate={~p"/time-log"} class={@pill} {@mobile_attrs}>
       Job time log
     </.link>
-    <.link navigate={~p"/my-timeclock"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+    <.link navigate={~p"/my-timeclock"} class={@pill} {@mobile_attrs}>
       Workday timeclock
     </.link>
     <%= if @is_business_owner do %>
-      <.link navigate={~p"/employees"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+      <.link navigate={~p"/employees"} class={@pill} {@mobile_attrs}>
         Employees
       </.link>
     <% end %>
-    <.link navigate={~p"/businesses"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+    <.link navigate={~p"/businesses"} class={@pill} {@mobile_attrs}>
       Businesses
     </.link>
-    <.link href={~p"/users/settings"} class={nav_link_classes(@class, @mobile)} {@mobile_attrs}>
+    <.link href={~p"/users/settings"} class={@pill} {@mobile_attrs}>
       Settings
     </.link>
     """
   end
 
-  defp nav_link_classes(base, mobile?) do
-    if mobile?, do: [base, "mt-0.5"], else: base
+  defp pill_nav_classes(true) do
+    Enum.join(
+      [
+        "block w-full text-center no-underline rounded-lg border border-emerald-600/35",
+        "bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-800",
+        "hover:bg-emerald-500/15",
+        "dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100 dark:hover:bg-emerald-500/25"
+      ],
+      " "
+    )
+  end
+
+  defp pill_nav_classes(false) do
+    Enum.join(
+      [
+        "inline-flex shrink-0 items-center justify-center no-underline rounded-lg border border-emerald-600/35",
+        "bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-800",
+        "hover:bg-emerald-500/15",
+        "dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100 dark:hover:bg-emerald-500/25"
+      ],
+      " "
+    )
   end
 end
