@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.29] - 2026-05-12
+
+### Fixed
+
+- **`config/runtime.exs`**: pass **`tls_options`** for Swoosh SMTP (**`:verify_peer`**, **`:cacerts`**, **`customize_hostname_check`** with **`:public_key.pkix_verify_hostname_match_fun(:https)`**, **`depth`**, **`server_name_indication`**) so STARTTLS to SpaceMail verifies wildcard SMTP certs instead of returning **`:tls_failed`**
+
 ## [0.9.28] - 2026-05-12
 
 ### Fixed
