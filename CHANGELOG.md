@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.9.35] - 2026-05-13
+
+### Changed
+
+- **`jobs_live.html.heex`**: label **Work:** → **Work description:** in job summary and expanded views
+- **`JobExpandLists`**: section title **Work items** → **Work items:**; compact row spacing; move work item date to the right behind a small calendar control (show ISO date only when set); align materials list density with work items
+- **`AppWorkspaceNav`**: style workspace links as emerald pill buttons (match **Support**); add **Job list** link to **`/`**; tighten desktop link spacing
+
 ## [0.9.34] - 2026-05-13
 
 ### Added
