@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.58] - 2026-05-08
+
+### Changed
+
+- **Transactional email**: send **multipart HTML + plain text** for magic link, confirmation, email change, data export, gift subscription, and workspace invitations; add **`RompCrm.EmailHtml`** layout with **logo**, **rompcrm.com** palette (navy panel, sky CTA), and configurable **`email_logo_url`** / **`email_brand_base_url`** (optional production overrides **`EMAIL_LOGO_URL`**, **`EMAIL_BRAND_BASE_URL`**)
+
 ## [0.9.57] - 2026-05-08
 
 ### Changed
