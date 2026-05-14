@@ -2,9 +2,11 @@
 
 Run these steps **on the server**. This repo’s OTP application name is **`:romp_crm`** (release binary **`romp_crm`**); public URLs use **`/romp-crm`**.
 
+The hosted product is also served at **`https://rompcrm.com/romp-crm/`** with the same reverse-proxy pattern. For **self-hosting on your own domain**, use the end-user guide **[docs/self-hosting-rompcrm.com.html](../docs/self-hosting-rompcrm.com.html)** (synced to **https://rompcrm.com/self-hosting.html**) and keep **`SUBSCRIPTION_PAYWALL_ENABLED`** unset or **`false`** unless you intentionally replicate PayPal billing (then set **`true`** and supply every **`PAYPAL_*`** variable required by **`config/runtime.exs`**).
+
 ## Step 1 — Nginx
 
-1. Edit the TLS `server { ... }` block for **hromp.com**.
+1. Edit the TLS `server { ... }` block for **hromp.com** (or your own `server_name` if self-hosting).
 2. Use **`nginx-location-romp-crm.conf`** as the `location` block (same pattern as other proxied apps).
 3. Redirect any legacy alternate mount URLs to **`/romp-crm`** (see comments in `nginx/conf.d/00-hromp.com.conf` in the webserver repo).
 4. Validate and reload:
@@ -57,9 +59,9 @@ sudo systemctl enable --now romp-crm
 sudo systemctl status romp-crm
 ```
 
-5. **Twilio:** point **“A message comes in”** at:
+5. **Twilio:** point **“A message comes in”** at your public URL with the **`/romp-crm`** prefix stripped upstream, for example:
 
-`https://hromp.com/romp-crm/webhooks/twilio/sms` (HTTP POST).
+`https://hromp.com/romp-crm/webhooks/twilio/sms` or `https://rompcrm.com/romp-crm/webhooks/twilio/sms` (HTTP POST).
 
 Either set it in the Twilio Console on your SMS-capable number (**+18022780965** recommended), or from the repo with secrets exported:
 
