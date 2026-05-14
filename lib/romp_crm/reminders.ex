@@ -79,7 +79,7 @@ defmodule RompCrm.Reminders do
   end
 
   defp deliver_one_row_reminder(%Reminder{user: %User{} = u} = r) do
-    case phone_e164(u.phone_normalized) do
+    case Phone.to_e164(u.phone_normalized) do
       nil ->
         :skipped
 
@@ -97,21 +97,6 @@ defmodule RompCrm.Reminders do
         end
     end
   end
-
-  defp phone_e164(nil), do: nil
-
-  defp phone_e164(norm) when is_binary(norm) and norm != "" do
-    if String.starts_with?(norm, "1") and byte_size(norm) == 11 do
-      "+" <> norm
-    else
-      case Phone.normalize_us(norm) do
-        "" -> nil
-        n -> if String.starts_with?(n, "1") and byte_size(n) == 11, do: "+" <> n, else: nil
-      end
-    end
-  end
-
-  defp phone_e164(_), do: nil
 
   defp deliver_job_schedule_nudges(%DateTime{} = now) do
     hour = now.hour
@@ -154,7 +139,9 @@ defmodule RompCrm.Reminders do
     offsets =
       offsets
       |> Enum.flat_map(fn
-        n when is_integer(n) -> [n]
+        n when is_integer(n) ->
+          [n]
+
         n when is_binary(n) ->
           case Integer.parse(String.trim(n)) do
             {i, _} -> [i]
@@ -214,12 +201,13 @@ defmodule RompCrm.Reminders do
     Repo.exists?(
       from l in JobReminderSendLog,
         where:
-          l.user_id == ^user_id and l.job_id == ^job_id and l.kind == ^kind and l.anchor_on == ^anchor
+          l.user_id == ^user_id and l.job_id == ^job_id and l.kind == ^kind and
+            l.anchor_on == ^anchor
     )
   end
 
   defp send_job_nudge_sms(user, biz, %Job{} = job, offset) do
-    case phone_e164(user.phone_normalized) do
+    case Phone.to_e164(user.phone_normalized) do
       nil ->
         :skipped
 

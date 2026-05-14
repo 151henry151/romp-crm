@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
-## [0.9.45] - 2026-05-14
+## [0.9.46] - 2026-05-08
+
+### Added
+
+- **First-login SMS assistant intro**: modal on paid LiveView pages asks for a mobile number (or skip); on save, send welcome SMS via Twilio when outbound SMS is enabled
+- **`users.sms_assistant_intro_completed_at`**: migration backfills existing users so only new accounts see the intro
+- **`RompCrm.SmsAssistantIntro`**: welcome SMS body and **`send_welcome_sms/1`**
+- **`RompCrmWeb.SmsAssistantIntroComponent`**, **`UserAuth.on_mount :assign_sms_assistant_intro`**, **`UserAuth.apply_sms_assistant_intro_assigns/2`**
+- **`Twilio.Phone.to_e164/1`**: shared E.164 helper for outbound SMS
+
+### Changed
+
+- **`Accounts`**: add **`skip_sms_assistant_intro/1`**, **`complete_sms_assistant_intro_with_phone/2`**, **`mark_sms_assistant_intro_completed/1`**
+- **`Reminders`**: use **`Phone.to_e164/1`** instead of a private helper
+- **`Layouts.app`**: optional **`socket`** and **`show_sms_assistant_intro_modal`**; render intro **`live_component`** when both apply
+- **Authenticated `live_session`s**: mount **`assign_sms_assistant_intro`** after subscription check
+- **`JobsLive`**, **`BusinessesLive`**, **`TimeLogLive`**, **`MyTimeclockLive`**, **`EmployeesLive`**, **`EmployeeDetailLive`**: handle **`{:sms_assistant_intro, :updated, user}`** and pass new layout assigns
+- **`UserSessionControllerTest`**: stop asserting signed-in jobs HTML includes the account email (header does not render it)
 
 ### Added
 

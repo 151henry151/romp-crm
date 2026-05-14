@@ -7,7 +7,7 @@ This is a web application written using the Phoenix web framework.
 
 ### Phoenix v1.8 guidelines
 
-- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
+- **Always** begin your **LiveView** templates with `<Layouts.app flash={@flash} current_scope={@current_scope} socket={@socket} show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal} ...>` which wraps all inner content (controller templates omit **`socket`** / **`show_sms_assistant_intro_modal`**; they default to no intro modal)
 - The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
 - Anytime you run into errors with no `current_scope` assign:
   - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`

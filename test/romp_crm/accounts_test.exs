@@ -6,6 +6,7 @@ defmodule RompCrm.AccountsTest do
   import RompCrm.AccountsFixtures
   alias RompCrm.Accounts.{User, UserToken}
   alias RompCrm.Businesses
+  alias RompCrm.Repo
 
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
@@ -529,6 +530,56 @@ defmodule RompCrm.AccountsTest do
       other = user_fixture()
       {:ok, biz} = Businesses.create_business(owner, %{name: "Solo"})
       assert {:error, :not_member} == Accounts.put_jobs_workspace_selection(other, biz.id)
+    end
+  end
+
+  describe "SMS assistant intro" do
+    defp clear_sms_intro(%User{} = user) do
+      {:ok, u} =
+        user
+        |> Ecto.Changeset.change(sms_assistant_intro_completed_at: nil)
+        |> Repo.update()
+
+      u
+    end
+
+    defp unique_nanp_phone do
+      n =
+        System.unique_integer([:positive])
+        |> rem(10_000)
+        |> Integer.to_string()
+        |> String.pad_leading(4, "0")
+
+      "+1555555" <> n
+    end
+
+    test "skip_sms_assistant_intro sets completed_at" do
+      user = user_fixture() |> clear_sms_intro()
+      assert is_nil(user.sms_assistant_intro_completed_at)
+      assert {:ok, %User{} = u} = Accounts.skip_sms_assistant_intro(user)
+      assert %DateTime{} = u.sms_assistant_intro_completed_at
+    end
+
+    test "complete_sms_assistant_intro_with_phone saves phone, completes intro, returns sms result" do
+      user = user_fixture() |> clear_sms_intro()
+      phone = unique_nanp_phone()
+
+      assert {:ok, %User{} = u, sms} =
+               Accounts.complete_sms_assistant_intro_with_phone(user, %{"phone" => phone})
+
+      refute is_nil(u.sms_assistant_intro_completed_at)
+      assert u.phone == phone
+      assert sms == {:ok, :skipped}
+    end
+
+    test "complete_sms_assistant_intro_with_phone returns error when phone is taken" do
+      u1 = user_fixture() |> clear_sms_intro()
+      u2 = user_fixture() |> clear_sms_intro()
+      phone = unique_nanp_phone()
+      assert {:ok, _} = Accounts.update_user_profile(u1, %{"phone" => phone})
+
+      assert {:error, %Ecto.Changeset{}} =
+               Accounts.complete_sms_assistant_intro_with_phone(u2, %{"phone" => phone})
     end
   end
 

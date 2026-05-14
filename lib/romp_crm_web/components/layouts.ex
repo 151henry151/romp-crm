@@ -46,6 +46,14 @@ defmodule RompCrmWeb.Layouts do
   attr :my_businesses, :list, default: []
   attr :is_business_owner, :boolean, default: false
 
+  attr :socket, :any,
+    default: nil,
+    doc: "LiveView socket when rendering from LiveView (for embedded LiveComponents)"
+
+  attr :show_sms_assistant_intro_modal, :boolean,
+    default: false,
+    doc: "first-login SMS assistant intro modal"
+
   slot :inner_block, required: true
   slot :header_extras
 
@@ -132,6 +140,15 @@ defmodule RompCrmWeb.Layouts do
         {render_slot(@inner_block)}
       </div>
     </main>
+
+    <%= if @socket && @show_sms_assistant_intro_modal do %>
+      <.live_component
+        module={RompCrmWeb.SmsAssistantIntroComponent}
+        id="global-sms-assistant-intro"
+        current_scope={@current_scope}
+        show={@show_sms_assistant_intro_modal}
+      />
+    <% end %>
 
     <.legal_footer />
 

@@ -98,10 +98,9 @@ defmodule RompCrmWeb.UserSessionControllerTest do
 
       {:ok, _} = Businesses.create_business(user, %{name: "Session Test Biz"})
 
-      # Now do a logged in request and assert on the menu
+      # Now do a logged in request and assert on the workspace chrome
       conn = get(conn, ~p"/")
       response = html_response(conn, 200)
-      assert response =~ user.email
       assert response =~ ~p"/users/settings"
       assert response =~ ~p"/users/log-out"
     end
@@ -175,10 +174,9 @@ defmodule RompCrmWeb.UserSessionControllerTest do
 
       {:ok, _} = Businesses.create_business(user, %{name: "Magic Link Biz"})
 
-      # Now do a logged in request and assert on the menu
+      # Now do a logged in request and assert on the workspace chrome
       conn = get(conn, ~p"/")
       response = html_response(conn, 200)
-      assert response =~ user.email
       assert response =~ ~p"/users/settings"
       assert response =~ ~p"/users/log-out"
     end
@@ -201,10 +199,9 @@ defmodule RompCrmWeb.UserSessionControllerTest do
 
       {:ok, _} = Businesses.create_business(user, %{name: "Confirmed User Biz"})
 
-      # Now do a logged in request and assert on the menu
+      # Now do a logged in request and assert on the workspace chrome
       conn = get(conn, ~p"/")
       response = html_response(conn, 200)
-      assert response =~ user.email
       assert response =~ ~p"/users/settings"
       assert response =~ ~p"/users/log-out"
     end

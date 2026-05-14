@@ -38,6 +38,10 @@ defmodule RompCrmWeb.MyTimeclockLive do
   end
 
   @impl true
+  def handle_info({:sms_assistant_intro, :updated, user}, socket) do
+    {:noreply, RompCrmWeb.UserAuth.apply_sms_assistant_intro_assigns(socket, user)}
+  end
+
   def handle_info({:employee_time_entry_created, _}, socket), do: {:noreply, refresh(socket)}
   def handle_info({:employee_time_entry_updated, _}, socket), do: {:noreply, refresh(socket)}
   def handle_info({:employee_time_entry_deleted, _}, socket), do: {:noreply, refresh(socket)}
