@@ -2,8 +2,13 @@ defmodule RompCrmWeb.JobExpandLists do
   @moduledoc false
   use Phoenix.Component
 
+  import RompCrmWeb.CoreComponents, only: [icon: 1]
+
+  alias RompCrmWeb.JobExpandEditKeys, as: EK
+
   attr :job, :any, required: true
   attr :can_edit_jobs, :boolean, default: false
+  attr :edit_keys, :any, required: true
   attr :wrapper_class, :string, default: "pt-1"
 
   def job_work_items_section(assigns) do
@@ -39,52 +44,114 @@ defmodule RompCrmWeb.JobExpandLists do
               </div>
               <div class="flex min-w-0 flex-1 flex-nowrap items-center gap-x-1.5 overflow-hidden">
                 <%= if @can_edit_jobs do %>
-                  <input
-                    type="text"
-                    name={"work_item_#{wi.id}_title"}
-                    value={wi.title}
-                    phx-change="work_item_title"
-                    phx-value-job_id={@job.id}
-                    phx-value-work_item_id={wi.id}
-                    phx-debounce="400"
-                    class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
-                    title={wi.title}
-                  />
+                  <%= if editing?(@edit_keys, EK.wi_title(wi.id)) do %>
+                    <form
+                      phx-submit="job_expand_commit_wi_title"
+                      class="flex min-w-0 flex-1 items-center gap-1"
+                    >
+                      <input type="hidden" name="job_id" value={@job.id} />
+                      <input type="hidden" name="work_item_id" value={wi.id} />
+                      <input
+                        type="text"
+                        name="value"
+                        value={wi.title}
+                        class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
+                      />
+                      <button
+                        type="submit"
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Save work item title"
+                      >
+                        <.icon name="hero-check" class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_cancel"
+                        phx-value-key={EK.wi_title(wi.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
+                        aria-label="Cancel"
+                      >
+                        <.icon name="hero-x-mark" class="size-3.5" />
+                      </button>
+                    </form>
+                  <% else %>
+                    <div class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                      <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
+                        {wi.title}
+                      </span>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_start"
+                        phx-value-key={EK.wi_title(wi.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Edit work item title"
+                      >
+                        <.icon name="hero-pencil-square" class="size-4" />
+                      </button>
+                    </div>
+                  <% end %>
                 <% else %>
                   <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
                     {wi.title}
                   </span>
                 <% end %>
-                <%= if wi.scheduled_on do %>
-                  <span class="shrink-0 text-[11px] tabular-nums text-base-content/65 whitespace-nowrap">
-                    {Date.to_iso8601(wi.scheduled_on)}
-                  </span>
-                <% end %>
                 <%= if @can_edit_jobs do %>
-                  <label
-                    class="relative inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded border border-base-content/20 bg-base-300/20 text-base-content/50 hover:border-base-content/35 hover:bg-base-300/35 hover:text-base-content/75"
-                    title="Set date"
-                  >
-                    <input
-                      type="date"
-                      name={"work_item_#{wi.id}_scheduled_on"}
-                      value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
-                      class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                      phx-change="work_item_scheduled_on"
-                      phx-value-job_id={@job.id}
-                      phx-value-work_item_id={wi.id}
-                      aria-label={"Scheduled date for: #{wi.title}"}
-                    />
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 16 16"
-                      fill="currentColor"
-                      class="pointer-events-none h-3.5 w-3.5"
-                      aria-hidden="true"
+                  <%= if editing?(@edit_keys, EK.wi_scheduled(wi.id)) do %>
+                    <form
+                      phx-submit="job_expand_commit_wi_scheduled"
+                      class="flex shrink-0 items-center gap-0.5"
                     >
-                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
-                    </svg>
-                  </label>
+                      <input type="hidden" name="job_id" value={@job.id} />
+                      <input type="hidden" name="work_item_id" value={wi.id} />
+                      <input
+                        type="date"
+                        name="value"
+                        value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
+                        class="input input-bordered input-xs h-7 w-[10.5rem] shrink-0 px-1 text-[11px] tabular-nums"
+                      />
+                      <button
+                        type="submit"
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Save scheduled date"
+                      >
+                        <.icon name="hero-check" class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_cancel"
+                        phx-value-key={EK.wi_scheduled(wi.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
+                        aria-label="Cancel date edit"
+                      >
+                        <.icon name="hero-x-mark" class="size-3.5" />
+                      </button>
+                    </form>
+                  <% else %>
+                    <div class="flex shrink-0 items-center gap-0.5">
+                      <span class="text-[11px] tabular-nums text-base-content/65 whitespace-nowrap">
+                        <%= if wi.scheduled_on do %>
+                          {Date.to_iso8601(wi.scheduled_on)}
+                        <% else %>
+                          —
+                        <% end %>
+                      </span>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_start"
+                        phx-value-key={EK.wi_scheduled(wi.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Edit scheduled date"
+                      >
+                        <.icon name="hero-pencil-square" class="size-4" />
+                      </button>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <%= if wi.scheduled_on do %>
+                    <span class="shrink-0 text-[11px] tabular-nums text-base-content/65 whitespace-nowrap">
+                      {Date.to_iso8601(wi.scheduled_on)}
+                    </span>
+                  <% end %>
                 <% end %>
               </div>
               <div class="shrink-0 flex items-center leading-none">
@@ -112,6 +179,7 @@ defmodule RompCrmWeb.JobExpandLists do
 
   attr :job, :any, required: true
   attr :can_edit_jobs, :boolean, default: false
+  attr :edit_keys, :any, required: true
   attr :wrapper_class, :string, default: "pt-1"
 
   def job_materials_section(assigns) do
@@ -150,18 +218,54 @@ defmodule RompCrmWeb.JobExpandLists do
               </div>
               <span class="shrink-0 text-xs font-medium text-base-content/70">Qty:</span>
               <%= if @can_edit_jobs do %>
-                <input
-                  type="number"
-                  step="any"
-                  min="0.0001"
-                  name={"material_#{m.id}_quantity"}
-                  value={format_qty_value(m.quantity)}
-                  size={material_qty_input_size(m.quantity)}
-                  phx-change="material_quantity"
-                  phx-value-job_id={@job.id}
-                  phx-value-material_id={m.id}
-                  class="input input-bordered input-xs box-border h-6 w-9 max-w-[2.75rem] shrink-0 px-0.5 py-0 text-center text-xs leading-none tabular-nums sm:max-w-[4rem] sm:[field-sizing:content]"
-                />
+                <%= if editing?(@edit_keys, EK.mat_quantity(m.id)) do %>
+                  <form
+                    phx-submit="job_expand_commit_material_qty"
+                    class="flex shrink-0 items-center gap-0.5"
+                  >
+                    <input type="hidden" name="job_id" value={@job.id} />
+                    <input type="hidden" name="material_id" value={m.id} />
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.0001"
+                      name="value"
+                      value={format_qty_value(m.quantity)}
+                      class="input input-bordered input-xs box-border h-6 w-12 max-w-[4rem] shrink-0 px-0.5 py-0 text-center text-xs leading-none tabular-nums"
+                    />
+                    <button
+                      type="submit"
+                      class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                      aria-label="Save quantity"
+                    >
+                      <.icon name="hero-check" class="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="job_expand_edit_cancel"
+                      phx-value-key={EK.mat_quantity(m.id)}
+                      class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
+                      aria-label="Cancel"
+                    >
+                      <.icon name="hero-x-mark" class="size-3.5" />
+                    </button>
+                  </form>
+                <% else %>
+                  <div class="flex shrink-0 items-center gap-0.5">
+                    <span class="text-[11px] tabular-nums text-base-content">
+                      {format_qty_value(m.quantity)}
+                    </span>
+                    <button
+                      type="button"
+                      phx-click="job_expand_edit_start"
+                      phx-value-key={EK.mat_quantity(m.id)}
+                      class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                      aria-label="Edit quantity"
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </button>
+                  </div>
+                <% end %>
               <% else %>
                 <span class="shrink-0 text-[11px] tabular-nums text-base-content">
                   {format_qty_value(m.quantity)}
@@ -172,17 +276,53 @@ defmodule RompCrmWeb.JobExpandLists do
                   <span class="shrink-0 text-base-content/55 text-xs">{m.scope_label}:</span>
                 <% end %>
                 <%= if @can_edit_jobs do %>
-                  <input
-                    type="text"
-                    name={"material_#{m.id}_description"}
-                    value={m.description}
-                    phx-change="material_description"
-                    phx-value-job_id={@job.id}
-                    phx-value-material_id={m.id}
-                    phx-debounce="400"
-                    class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
-                    title={material_line_title(m)}
-                  />
+                  <%= if editing?(@edit_keys, EK.mat_description(m.id)) do %>
+                    <form
+                      phx-submit="job_expand_commit_material_desc"
+                      class="flex min-w-0 flex-1 items-center gap-1"
+                    >
+                      <input type="hidden" name="job_id" value={@job.id} />
+                      <input type="hidden" name="material_id" value={m.id} />
+                      <input
+                        type="text"
+                        name="value"
+                        value={m.description}
+                        class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
+                        title={material_line_title(m)}
+                      />
+                      <button
+                        type="submit"
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Save description"
+                      >
+                        <.icon name="hero-check" class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_cancel"
+                        phx-value-key={EK.mat_description(m.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
+                        aria-label="Cancel"
+                      >
+                        <.icon name="hero-x-mark" class="size-3.5" />
+                      </button>
+                    </form>
+                  <% else %>
+                    <div class="flex min-w-0 flex-1 items-center gap-1">
+                      <p class="min-w-0 flex-1 truncate text-sm" title={material_line_title(m)}>
+                        <span class="text-base-content">{m.description}</span>
+                      </p>
+                      <button
+                        type="button"
+                        phx-click="job_expand_edit_start"
+                        phx-value-key={EK.mat_description(m.id)}
+                        class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+                        aria-label="Edit material description"
+                      >
+                        <.icon name="hero-pencil-square" class="size-4" />
+                      </button>
+                    </div>
+                  <% end %>
                 <% else %>
                   <p class="min-w-0 flex-1 truncate text-sm" title={material_line_title(m)}>
                     <span class="text-base-content">{m.description}</span>
@@ -210,6 +350,9 @@ defmodule RompCrmWeb.JobExpandLists do
     """
   end
 
+  defp editing?(keys, key) when is_struct(keys, MapSet), do: MapSet.member?(keys, key)
+  defp editing?(_, _), do: false
+
   defp material_line_title(m) do
     if m.scope_label != "Job" do
       "#{m.scope_label}: #{m.description}"
@@ -225,9 +368,4 @@ defmodule RompCrmWeb.JobExpandLists do
 
   defp format_qty_value(n) when is_integer(n), do: Integer.to_string(n)
   defp format_qty_value(_), do: "1"
-
-  defp material_qty_input_size(qty) do
-    n = qty |> format_qty_value() |> String.length()
-    min(max(n + 1, 2), 8)
-  end
 end
