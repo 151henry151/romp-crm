@@ -239,9 +239,9 @@ defmodule RompCrmWeb.JobFormComponent do
               <.input field={wi[:completed]} type="checkbox" label="Completed" />
             </div>
           </.inputs_for>
-          <p class="text-xs text-base-content/60">
-            Each line is its own task. SMS can also split work into items automatically.
-          </p>
+        <p class="text-xs text-base-content/60">
+          One row per task. SMS can add lines too.
+        </p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -283,7 +283,7 @@ defmodule RompCrmWeb.JobFormComponent do
             placeholder="e.g. Copper elbow&#10;Teflon tape"
           ><%= material_lines_value(@job) %></textarea>
           <p class="text-xs text-base-content/60 mt-1">
-            Per–work-item materials can be added via SMS; they also appear in the combined list on the job.
+            Per-task materials: add via SMS; they appear in the list below.
           </p>
         </div>
 

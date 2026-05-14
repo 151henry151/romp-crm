@@ -9,7 +9,7 @@
   <div class="text-center">
     <.header>
       Account Settings
-      <:subtitle>Manage your profile, email address, and password</:subtitle>
+      <:subtitle>Profile, email, password</:subtitle>
     </.header>
   </div>
 
@@ -18,28 +18,24 @@
       <p class="font-semibold">Subscription billing (PayPal)</p>
       <%= if @paypal_trial_days > 0 do %>
         <p class="mt-2 text-base-content/80">
-          You have a {@paypal_trial_days}-day trial period before recurring billing begins. To cancel before you are
-          charged for the plan, turn off or cancel this agreement in PayPal before the trial ends.
+          {@paypal_trial_days}-day trial—cancel in PayPal before billing starts.
         </p>
       <% end %>
       <p class="mt-2 text-base-content/80">
-        Manage or cancel automatic payments in your PayPal account:
-      </p>
-      <p class="mt-2">
         <a
           href="https://www.paypal.com/myaccount/autopay/"
           target="_blank"
           rel="noopener noreferrer"
           class="font-semibold text-brand hover:underline"
         >
-          Open PayPal automatic payments
+          PayPal automatic payments
         </a>
       </p>
       <%= if @show_cancel_subscription do %>
         <div class="mt-4 border-t border-base-300 pt-4">
-          <p class="font-semibold text-base-content">Cancel from Romp CRM</p>
+          <p class="font-semibold text-base-content">Cancel here</p>
           <p class="mt-1 text-base-content/80">
-            End recurring billing here — you don’t need to hunt through PayPal’s menus.
+            Stops recurring billing (access until PayPal shows the period end).
           </p>
           <form action={~p"/users/settings"} method="post" class="mt-3">
             <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
@@ -48,7 +44,7 @@
             <button
               type="submit"
               class="btn btn-outline btn-error btn-sm"
-              onclick="return confirm('Cancel your Romp CRM subscription in PayPal? You keep access through the end of the period PayPal shows for your plan. This cannot be undone from here.');"
+              onclick="return confirm('Cancel subscription? Access continues through the end of your paid period.');"
             >
               Cancel subscription
             </button>
@@ -64,14 +60,14 @@
     <.input field={f[:phone]} type="tel" label="Your mobile number (SMS)" autocomplete="tel" />
 
     <p class="text-sm text-base-content/70 -mt-2 mb-4">
-      Set this to the same number you text from so inbound SMS routes to the correct workspace.
+      Use the number you text from so inbound SMS matches your account.
     </p>
 
     <%= if assigns[:profile_businesses] && length(@profile_businesses) > 1 do %>
       <.input
         field={f[:sms_business_id]}
         type="select"
-        label="SMS workspace (when you belong to several businesses)"
+        label="SMS workspace (if you belong to several)"
         prompt="Choose automatically"
         options={Enum.map(@profile_businesses, &{&1.name, &1.id})}
       />
@@ -91,8 +87,7 @@
     <div class="mt-6 rounded-lg border border-base-300 bg-base-200/30 p-4 text-left">
       <p class="font-semibold text-base-content mb-1">SMS reminders</p>
       <p class="text-sm text-base-content/70 mb-3">
-        Opt in to texts about upcoming jobs (from each job’s scheduled date) and one-off reminders you create by messaging the assistant.
-        Job pings go out once per day at the hour you pick, in the time zone you choose (handles daylight saving automatically).
+        Job reminders: once daily at the hour below, in your time zone. Assistant reminders follow the same toggle.
       </p>
       <.input field={f[:sms_reminders_enabled]} type="checkbox" label="Send me SMS reminders" />
 
@@ -114,7 +109,7 @@
       <fieldset class="mt-4 space-y-2 rounded-lg border border-base-300/70 bg-base-100/40 p-3">
         <legend class="mb-1 text-sm font-medium text-base-content">Remind me about upcoming jobs</legend>
         <p class="text-xs text-base-content/60 mb-2">
-          Choose which calendar days get a text (relative to the job’s scheduled date).
+          Days relative to the job’s scheduled date.
         </p>
         <%= for {days, label} <- [
               {7, "1 week before"},
@@ -138,7 +133,7 @@
 
       <div class="mt-4">
         <label for="sms_reminder_send_hour_local" class="mb-1 block text-sm font-medium text-base-content">
-          Send job reminder texts around this local hour
+          Send job reminders around this local hour
         </label>
         <select
           id="sms_reminder_send_hour_local"
@@ -152,7 +147,7 @@
           <% end %>
         </select>
         <p class="mt-1 text-xs text-base-content/60">
-          Uses the time zone above (for example Eastern includes EST and EDT).
+          Uses the time zone above (DST applies automatically).
         </p>
       </div>
     </div>
@@ -164,11 +159,11 @@
 
   <h2 class="text-lg font-semibold text-base-content mb-1">Data export (CSV)</h2>
   <p class="text-sm text-base-content/70 mb-4 max-w-lg mx-auto text-left">
-    Choose which workspaces and which tables to include. Only businesses you <span class="font-semibold">created</span> (owner) appear here. Workspaces where you are only a member or invitee are never included.
-    <span class="font-medium text-base-content/90">Jobs</span> (jobs.csv),
-    <span class="font-medium text-base-content/90">Employees</span> (employees.csv),
-    <span class="font-medium text-base-content/90">Time log</span> (job clocks and employee clocks),
-    <span class="font-medium text-base-content/90">Audit log</span> (business-scoped changes from the web UI and SMS, with which user made each change).
+    Owner workspaces only (not invited-only memberships).
+    <span class="font-medium text-base-content/90">Jobs</span>,
+    <span class="font-medium text-base-content/90">Employees</span>,
+    <span class="font-medium text-base-content/90">Time log</span>,
+    <span class="font-medium text-base-content/90">Audit log</span> (who changed what, web + SMS).
   </p>
 
   <.form
@@ -185,7 +180,7 @@
       <legend class="text-sm font-medium text-base-content px-1">Workspaces to include</legend>
       <%= if @owned_businesses_for_export == [] do %>
         <p class="text-sm text-base-content/70">
-          You do not own any workspaces yet — create one under Jobs to export data.
+          No owned workspace yet—create one under Jobs first.
         </p>
       <% else %>
         <%= for biz <- @owned_businesses_for_export do %>
@@ -233,7 +228,7 @@
           checked={"time_log" in @export_selected_kind_strings}
           class="checkbox checkbox-sm mt-0.5"
         />
-        <span><span class="font-medium">Time log</span> — job clocks and employee clocks</span>
+        <span><span class="font-medium">Time log</span> — clocks</span>
       </label>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
         <input
@@ -243,7 +238,7 @@
           checked={"audit_log" in @export_selected_kind_strings}
           class="checkbox checkbox-sm mt-0.5"
         />
-        <span><span class="font-medium">Audit log</span> — business-scoped changes from the web UI and SMS</span>
+        <span><span class="font-medium">Audit log</span> — web + SMS changes</span>
       </label>
     </fieldset>
 
@@ -260,9 +255,8 @@
     />
 
     <p class="text-xs text-base-content/60 mb-1 max-w-lg mx-auto text-left">
-      When a schedule is enabled, the server emails you on each interval (UTC from the last successful send), using the
-      <span class="font-semibold">same workspaces and tables</span> you select above. Save your choices with
-      <span class="font-semibold">Save export preferences</span> (that also stores the schedule).
+      Scheduled sends use the selections above (UTC cadence from last success).
+      <span class="font-semibold">Save export preferences</span> stores schedule + checkboxes.
     </p>
 
     <div class="flex flex-wrap items-center gap-2">
@@ -280,8 +274,7 @@
       </span>
     </div>
     <p class="text-xs text-base-content/60">
-      Browser download: one CSV for a single table, or a ZIP when you pick more than one. Email: when you select
-      <span class="font-semibold">more than two</span> tables, the message has one ZIP attachment instead of separate CSV files.
+      Download: one CSV or a ZIP if multiple tables. Email with 3+ tables: one ZIP.
     </p>
   </.form>
 

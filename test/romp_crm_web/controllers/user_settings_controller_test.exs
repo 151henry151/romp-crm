@@ -84,7 +84,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       assert redirected_to(conn) == ~p"/users/settings"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "A link to confirm your email"
+               "Confirm link sent"
 
       assert Accounts.get_user_by_email(user.email)
     end
@@ -156,7 +156,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
       assert redirected_to(conn) == ~p"/users/settings"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
-               "no active hosted subscription"
+               "No active hosted"
     end
 
     test "shows cancel subscription button when paywall on and PayPal subscription stored", %{
@@ -202,7 +202,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
 
       assert redirected_to(conn) == ~p"/users/settings"
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "PayPal could not cancel"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "PayPal couldn't cancel"
 
       updated = Repo.get!(RompCrm.Accounts.User, user.id)
       assert updated.subscription_status == "active"
@@ -244,6 +244,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
 
       assert redirected_to(conn) == ~p"/users/settings"
       info = Phoenix.Flash.get(conn.assigns.flash, :info)
+      assert info =~ "Export emailed"
       assert info =~ "jobs.csv"
       assert info =~ "employees.csv"
       assert info =~ "1 workspace"
@@ -257,14 +258,14 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Pick an export"
     end
 
     test "email export with export_kinds omitted shows error", %{conn: conn} do
       conn = put(conn, ~p"/users/settings", %{"action" => "export_email_now"})
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Pick an export"
     end
 
     test "email export with no workspace selected shows error", %{conn: conn, user: user} do
@@ -278,7 +279,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one workspace"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Pick a workspace"
     end
 
     test "email export with export_business_ids omitted shows workspace error", %{conn: conn} do
@@ -289,7 +290,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Choose at least one workspace"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Pick a workspace"
     end
 
     test "download single selection returns CSV attachment", %{conn: conn, user: user} do
@@ -338,7 +339,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "nothing to download"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Nothing to download"
     end
   end
 
@@ -353,7 +354,7 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "nothing to export"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Nothing to export"
     end
   end
 

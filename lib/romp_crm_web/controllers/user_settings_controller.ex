@@ -32,7 +32,7 @@ defmodule RompCrmWeb.UserSettingsController do
           conn
           |> put_flash(
             :info,
-            "We sent a short email: this account does not own any businesses yet, so there were no CSV rows to attach."
+            "Email sent: nothing to export yet (no owned workspaces)."
           )
           |> redirect(to: ~p"/users/settings")
 
@@ -46,7 +46,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
+          "Pick an export: Jobs, Employees, Time log, or Audit log."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -54,7 +54,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one workspace to export (only businesses you create as owner are listed)."
+          "Pick a workspace (owners only)."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -62,7 +62,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "You do not own any businesses yet, so there is nothing to export. Create a business first."
+          "Nothing to export—create an owned workspace first."
         )
         |> redirect(to: ~p"/users/settings")
     end
@@ -100,7 +100,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
+          "Pick an export: Jobs, Employees, Time log, or Audit log."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -108,7 +108,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one workspace to export (only businesses you create as owner are listed)."
+          "Pick a workspace (owners only)."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -116,7 +116,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "You do not own any businesses yet, so there is nothing to download. Create a business first."
+          "Nothing to download—create an owned workspace first."
         )
         |> redirect(to: ~p"/users/settings")
     end
@@ -139,7 +139,7 @@ defmodule RompCrmWeb.UserSettingsController do
       case Accounts.update_user_export_settings(user, merged) do
         {:ok, _} ->
           conn
-          |> put_flash(:info, "Scheduled data export settings saved.")
+          |> put_flash(:info, "Export schedule saved.")
           |> redirect(to: ~p"/users/settings")
 
         {:error, %Ecto.Changeset{} = cs} ->
@@ -150,7 +150,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
+          "Pick an export: Jobs, Employees, Time log, or Audit log."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -158,7 +158,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "Choose at least one workspace to export (only businesses you create as owner are listed)."
+          "Pick a workspace (owners only)."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -166,7 +166,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :error,
-          "You do not own any businesses yet, so there is nothing to export. Create a business first."
+          "Nothing to export—create an owned workspace first."
         )
         |> redirect(to: ~p"/users/settings")
     end
@@ -180,20 +180,20 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :info,
-          "Your PayPal subscription has been cancelled. You can resubscribe anytime from the subscription page."
+          "Subscription cancelled. Resubscribe anytime from Subscribe."
         )
         |> redirect(to: ~p"/subscribe")
 
       {:error, :not_cancellable} ->
         conn
-        |> put_flash(:error, "There is no active hosted subscription to cancel on this account.")
+        |> put_flash(:error, "No active hosted subscription to cancel.")
         |> redirect(to: ~p"/users/settings")
 
       {:error, {:paypal_cancel_failed, _reason}} ->
         conn
         |> put_flash(
           :error,
-          "PayPal could not cancel the subscription right now. Try again in a few minutes, or cancel automatic payments in your PayPal account."
+          "PayPal couldn't cancel yet—retry shortly or stop the payment in PayPal."
         )
         |> redirect(to: ~p"/users/settings")
     end
@@ -229,7 +229,7 @@ defmodule RompCrmWeb.UserSettingsController do
         conn
         |> put_flash(
           :info,
-          "A link to confirm your email change has been sent to the new address."
+          "Confirm link sent to the new email address."
         )
         |> redirect(to: ~p"/users/settings")
 
@@ -313,12 +313,12 @@ defmodule RompCrmWeb.UserSettingsController do
 
     zip_note =
       if length(kinds) > 2 do
-        " The email uses one ZIP attachment when more than two tables are selected."
+        " ZIP attachment."
       else
         ""
       end
 
-    "Check your email for CSV export: #{names}. (#{ws}.)#{zip_note}"
+    "Export emailed: #{names} (#{ws}).#{zip_note}"
   end
 
   defp export_csv_filename(:jobs), do: "jobs.csv"

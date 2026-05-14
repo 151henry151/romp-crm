@@ -145,11 +145,11 @@ defmodule RompCrm.Accounts.UserNotifier do
       |> Enum.join("\n")
 
     """
-    Your Romp CRM data export is attached as one ZIP archive (UTF-8 CSV files inside):
+    Export attached as one ZIP (UTF-8 CSVs inside):
 
     #{bullets}
 
-    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page). They never include businesses where you are only a member (non-owner).
+    Owner workspaces only (from Settings)—not businesses where you're only a member.
     """
     |> String.trim()
   end
@@ -161,25 +161,22 @@ defmodule RompCrm.Accounts.UserNotifier do
       |> Enum.join("\n")
 
     """
-    Your Romp CRM data export is attached as UTF-8 CSV file(s):
+    Export attached as UTF-8 CSV(s):
 
     #{bullets}
 
-    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page). They never include businesses where you are only a member (non-owner).
+    Owner workspaces only (from Settings)—not businesses where you're only a member.
     """
     |> String.trim()
   end
 
-  defp data_export_file_blurb("jobs.csv"),
-    do: "jobs for businesses you created (owner only)"
+  defp data_export_file_blurb("jobs.csv"), do: "jobs (owner businesses)"
 
-  defp data_export_file_blurb("employees.csv"), do: "employees for those businesses"
+  defp data_export_file_blurb("employees.csv"), do: "employees"
 
-  defp data_export_file_blurb("time_log.csv"),
-    do: "job time entries and employee clock entries"
+  defp data_export_file_blurb("time_log.csv"), do: "job + employee time"
 
-  defp data_export_file_blurb("audit_log.csv"),
-    do: "append-only log of business-scoped changes (web and SMS) with actor user id and email"
+  defp data_export_file_blurb("audit_log.csv"), do: "business-scoped changes (actor id + email)"
 
   defp data_export_file_blurb(fname), do: fname
 
@@ -193,11 +190,9 @@ defmodule RompCrm.Accounts.UserNotifier do
     from_address = Application.get_env(:romp_crm, :mail_from_address, "contact@example.com")
 
     body = """
-    You asked for a Romp CRM data export, but this account does not own any businesses yet.
+    No export yet—this account doesn't own any workspaces.
 
-    Exports only include businesses you created (owner). Businesses where you were invited as a member are not included.
-
-    Create a business in Romp CRM, then run an export again.
+    Create a business, then export again.
     """
 
     email =
