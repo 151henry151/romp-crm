@@ -93,6 +93,44 @@ defmodule RompCrm.Jobs do
   end
 
   @doc """
+  Work items with their own **`scheduled_on`** in **`within_days`**, for SMS schedule reminders.
+
+  Excludes items whose date matches the parent job’s **`scheduled_on`** when the job has a date,
+  so the job-level reminder covers that day without a duplicate.
+  """
+  def list_work_items_for_schedule_reminders(business_id, within_days \\ 90)
+      when is_integer(business_id) and is_integer(within_days) do
+    today = Date.utc_today()
+    last = Date.add(today, within_days)
+
+    Repo.all(
+      from wi in JobWorkItem,
+        join: j in Job,
+        on: j.id == wi.job_id,
+        where: j.business_id == ^business_id,
+        where: wi.completed == false,
+        where: not is_nil(wi.scheduled_on),
+        where: wi.scheduled_on >= ^today and wi.scheduled_on <= ^last,
+        where: is_nil(j.scheduled_on) or j.scheduled_on != wi.scheduled_on,
+        order_by: [asc: wi.scheduled_on, asc: wi.id],
+        select: {j, wi}
+    )
+  end
+
+  @doc """
+  Formats **`scheduled_on`** with optional **`scheduled_time`** as ISO date plus 24h **HH:MM** when present.
+  """
+  def format_schedule_date_time(nil, _), do: nil
+
+  def format_schedule_date_time(%Date{} = d, nil), do: Date.to_iso8601(d)
+
+  def format_schedule_date_time(%Date{} = d, %Time{} = t) do
+    hh = t.hour |> Integer.to_string() |> String.pad_leading(2, "0")
+    mm = t.minute |> Integer.to_string() |> String.pad_leading(2, "0")
+    Date.to_iso8601(d) <> " " <> hh <> ":" <> mm
+  end
+
+  @doc """
   Returns jobs as plain maps suitable for embedding in an SMS-extraction LLM prompt.
 
   Each row includes integer `"id"` (database primary key). Fields may be `null` when empty.
@@ -111,12 +149,14 @@ defmodule RompCrm.Jobs do
         "status" => Atom.to_string(j.status),
         "priority" => Atom.to_string(j.priority),
         "scheduled_on" => date_to_iso(j.scheduled_on),
+        "scheduled_time" => time_to_hhmm(j.scheduled_time),
         "work_items" =>
           Enum.map(j.work_items || [], fn wi ->
             %{
               "id" => wi.id,
               "title" => wi.title,
               "scheduled_on" => date_to_iso(wi.scheduled_on),
+              "scheduled_time" => time_to_hhmm(wi.scheduled_time),
               "completed" => wi.completed
             }
           end),
@@ -137,6 +177,14 @@ defmodule RompCrm.Jobs do
 
   defp date_to_iso(nil), do: nil
   defp date_to_iso(%Date{} = d), do: Date.to_iso8601(d)
+
+  defp time_to_hhmm(nil), do: nil
+
+  defp time_to_hhmm(%Time{} = t) do
+    hh = t.hour |> Integer.to_string() |> String.pad_leading(2, "0")
+    mm = t.minute |> Integer.to_string() |> String.pad_leading(2, "0")
+    hh <> ":" <> mm
+  end
 
   def create_job(attrs) when is_map(attrs) do
     attrs = normalize_job_nested_attrs(attrs)
@@ -322,12 +370,7 @@ defmodule RompCrm.Jobs do
   Materials on the job plus materials tied to work items (deduped by id), sorted for display.
   """
   def materials_combined(%Job{} = job) do
-    job =
-      Repo.preload(job,
-        work_items: work_items_preload_query(),
-        materials: materials_preload_query()
-      )
-
+    job = Repo.preload(job, work_items: work_items_preload_query(), materials: materials_preload_query())
     item_by_id = Map.new(job.work_items || [], &{&1.id, &1})
 
     (job.materials || [])
@@ -452,6 +495,7 @@ defmodule RompCrm.Jobs do
     attrs = stringify_keys_shallow(attrs)
     attrs = maybe_add_work_item_sort_orders(attrs)
     attrs = maybe_parse_job_date(attrs, "scheduled_on")
+    attrs = maybe_parse_job_time(attrs)
     attrs
   end
 
@@ -494,8 +538,7 @@ defmodule RompCrm.Jobs do
     end
   end
 
-  defp merge_or_append_work_items_no_ids(existing, list)
-       when is_list(existing) and is_list(list) do
+  defp merge_or_append_work_items_no_ids(existing, list) when is_list(existing) and is_list(list) do
     existing_sorted = Enum.sort_by(existing, &{&1.sort_order, &1.id})
 
     incoming_sorted =
@@ -533,9 +576,7 @@ defmodule RompCrm.Jobs do
 
   defp incoming_work_item_sort_key(row) when is_map(row) do
     case Map.get(row, "sort_order") do
-      i when is_integer(i) ->
-        i
-
+      i when is_integer(i) -> i
       s when is_binary(s) ->
         case Integer.parse(String.trim(s)) do
           {n, _} -> n
@@ -616,15 +657,9 @@ defmodule RompCrm.Jobs do
     m = stringify_keys_shallow(row)
 
     case Map.get(m, "id") do
-      nil ->
-        false
-
-      "" ->
-        false
-
-      n when is_integer(n) and n > 0 ->
-        true
-
+      nil -> false
+      "" -> false
+      n when is_integer(n) and n > 0 -> true
       s when is_binary(s) ->
         case Integer.parse(String.trim(s)) do
           {i, _} when i > 0 -> true
@@ -665,33 +700,113 @@ defmodule RompCrm.Jobs do
   end
 
   defp maybe_parse_work_item_date(row) do
-    case Map.get(row, "scheduled_on") do
-      nil -> row
-      "" -> Map.delete(row, "scheduled_on")
-      %Date{} = d -> Map.put(row, "scheduled_on", d)
-      s when is_binary(s) -> parse_date_into_row(row, String.trim(s))
-      _ -> row
-    end
+    row =
+      case Map.get(row, "scheduled_on") do
+        nil -> row
+        "" -> row |> Map.delete("scheduled_on") |> Map.delete("scheduled_time")
+        %Date{} = d -> Map.put(row, "scheduled_on", d)
+        s when is_binary(s) -> parse_date_into_row(row, String.trim(s))
+        _ -> row
+      end
+
+    maybe_parse_work_item_time(row)
   end
 
   defp parse_date_into_row(row, "") do
-    Map.delete(row, "scheduled_on")
+    row |> Map.delete("scheduled_on") |> Map.delete("scheduled_time")
   end
 
   defp parse_date_into_row(row, s) do
     case Date.from_iso8601(s) do
       {:ok, d} -> Map.put(row, "scheduled_on", d)
-      _ -> Map.delete(row, "scheduled_on")
+      _ -> row |> Map.delete("scheduled_on") |> Map.delete("scheduled_time")
     end
   end
 
   defp maybe_parse_job_date(attrs, key) do
     case Map.get(attrs, key) do
-      nil -> attrs
-      "" -> Map.delete(attrs, key)
-      s when is_binary(s) -> parse_date_into_row(attrs, String.trim(s))
-      %Date{} = _ -> attrs
-      _ -> attrs
+      nil ->
+        attrs
+
+      "" ->
+        attrs |> Map.delete(key) |> Map.delete("scheduled_time")
+
+      s when is_binary(s) ->
+        parse_date_into_row(attrs, String.trim(s))
+
+      %Date{} = _ ->
+        attrs
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp maybe_parse_job_time(attrs) do
+    case Map.get(attrs, "scheduled_time") do
+      nil ->
+        attrs
+
+      "" ->
+        Map.delete(attrs, "scheduled_time")
+
+      %Time{} = _t ->
+        attrs
+
+      s when is_binary(s) ->
+        case parse_time_string_hhmm(s) do
+          {:ok, nil} -> Map.delete(attrs, "scheduled_time")
+          {:ok, t} -> Map.put(attrs, "scheduled_time", t)
+          :error -> Map.delete(attrs, "scheduled_time")
+        end
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp maybe_parse_work_item_time(row) do
+    case Map.get(row, "scheduled_time") do
+      nil ->
+        row
+
+      "" ->
+        Map.delete(row, "scheduled_time")
+
+      %Time{} = _t ->
+        row
+
+      s when is_binary(s) ->
+        case parse_time_string_hhmm(s) do
+          {:ok, nil} -> Map.delete(row, "scheduled_time")
+          {:ok, t} -> Map.put(row, "scheduled_time", t)
+          :error -> Map.delete(row, "scheduled_time")
+        end
+
+      _ ->
+        row
+    end
+  end
+
+  defp parse_time_string_hhmm(s) when is_binary(s) do
+    t = String.trim(s)
+
+    if t == "" do
+      {:ok, nil}
+    else
+      candidate =
+        case String.split(t, ":") do
+          [h, m] ->
+            "#{String.pad_leading(h, 2, "0")}:#{String.pad_leading(m, 2, "0")}:00"
+
+          _ ->
+            t
+        end
+
+      case Time.from_iso8601(candidate) do
+        {:ok, tm} -> {:ok, tm}
+        :error -> :error
+      end
     end
   end
 
@@ -721,15 +836,9 @@ defmodule RompCrm.Jobs do
 
       wi_id =
         case m["job_work_item_id"] do
-          nil ->
-            nil
-
-          "" ->
-            nil
-
-          id when is_integer(id) ->
-            id
-
+          nil -> nil
+          "" -> nil
+          id when is_integer(id) -> id
           id when is_binary(id) ->
             case Integer.parse(String.trim(id)) do
               {n, _} -> n
@@ -742,12 +851,8 @@ defmodule RompCrm.Jobs do
 
       wi_index =
         case m["work_item_index"] do
-          nil ->
-            nil
-
-          n when is_integer(n) ->
-            n
-
+          nil -> nil
+          n when is_integer(n) -> n
           n when is_binary(n) ->
             case Integer.parse(String.trim(n)) do
               {x, _} -> x
@@ -834,11 +939,9 @@ defmodule RompCrm.Jobs do
 
     Enum.find_value(wis, fn wi ->
       t = wi.title |> to_string() |> String.downcase()
-
-      if String.contains?(t, h) or
-           String.contains?(h, String.slice(t, 0, min(12, String.length(t)))),
-         do: wi.id,
-         else: nil
+      if String.contains?(t, h) or String.contains?(h, String.slice(t, 0, min(12, String.length(t)))),
+        do: wi.id,
+        else: nil
     end)
   end
 

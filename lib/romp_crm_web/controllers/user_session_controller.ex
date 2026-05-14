@@ -8,11 +8,38 @@ defmodule RompCrmWeb.UserSessionController do
 
   defp auth_pages_no_store(conn, _opts), do: UserAuth.put_auth_pages_no_store(conn)
 
-  def new(conn, _params) do
-    email = get_in(conn.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+  def new(conn, params) do
+    conn = maybe_put_gift_return_to(conn, params["gift"])
+
+    email_from_query = login_prefill_email(params["email"])
+    email_from_scope = get_in(conn.assigns, [:current_scope, Access.key(:user), Access.key(:email)])
+
+    email =
+      if email_from_query != "" do
+        email_from_query
+      else
+        email_from_scope || ""
+      end
+
+    after_gift? = params["after_gift"] == "1"
     form = Phoenix.Component.to_form(%{"email" => email}, as: "user")
 
-    render(conn, :new, form: form)
+    render(conn, :new, form: form, after_gift: after_gift?)
+  end
+
+  defp login_prefill_email(email) when is_binary(email),
+    do: email |> String.trim() |> String.slice(0, 200)
+
+  defp login_prefill_email(_), do: ""
+
+  defp maybe_put_gift_return_to(conn, gift_raw) do
+    token = gift_raw |> to_string() |> String.trim()
+
+    if token != "" and RompCrm.Gifts.claimable_gift_token?(token) do
+      put_session(conn, :user_return_to, ~p"/gift/claim/#{token}")
+    else
+      conn
+    end
   end
 
   # magic link login
@@ -32,7 +59,7 @@ defmodule RompCrmWeb.UserSessionController do
       {:error, :not_found} ->
         conn
         |> put_flash(:error, "The link is invalid or it has expired.")
-        |> render(:new, form: Phoenix.Component.to_form(%{}, as: "user"))
+        |> render(:new, form: Phoenix.Component.to_form(%{}, as: "user"), after_gift: false)
     end
   end
 
@@ -48,7 +75,7 @@ defmodule RompCrmWeb.UserSessionController do
       # In order to prevent user enumeration attacks, don't disclose whether the email is registered.
       conn
       |> put_flash(:error, "Invalid email or password")
-      |> render(:new, form: form)
+      |> render(:new, form: form, after_gift: false)
     end
   end
 

@@ -17,6 +17,33 @@ defmodule RompCrmWeb.UserSessionControllerTest do
       assert get_resp_header(conn, "pragma") == ["no-cache"]
     end
 
+    test "prefills email from query string", %{conn: conn} do
+      conn = get(conn, ~p"/users/log-in?#{[email: "prefilled@example.com"]}")
+      html = html_response(conn, 200)
+
+      assert html =~
+               ~s(<input type="email" name="user[email]" id="login_form_magic_email" value="prefilled@example.com")
+    end
+
+    test "sets user_return_to when gift query is a pending token", %{conn: conn} do
+      admin = user_fixture()
+
+      {:ok, gift} =
+        RompCrm.Gifts.create_and_email(
+          admin,
+          %{
+            recipient_email: "gift_login_return@example.com",
+            duration_days: 14,
+            admin_message: nil
+          },
+          fn _t -> "https://example.test/x" end
+        )
+
+      conn = get(conn, ~p"/users/log-in?#{[gift: gift.token]}")
+      assert html_response(conn, 200)
+      assert get_session(conn, :user_return_to) == ~p"/gift/claim/#{gift.token}"
+    end
+
     test "renders login page", %{conn: conn} do
       conn = get(conn, ~p"/users/log-in")
       response = html_response(conn, 200)

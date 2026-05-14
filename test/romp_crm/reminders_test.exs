@@ -3,6 +3,21 @@ defmodule RompCrm.RemindersTest do
 
   alias RompCrm.Reminders
 
+  describe "compose_fire_at_utc/4" do
+    test "builds UTC from Eastern wall time" do
+      assert {:ok, utc} = Reminders.compose_fire_at_utc("2026-07-04", "10:30", "America/New_York", 9)
+      assert utc.time_zone == "Etc/UTC"
+      assert String.contains?(DateTime.to_iso8601(utc), "2026-07-04")
+    end
+
+    test "uses default hour when time blank" do
+      assert {:ok, utc} = Reminders.compose_fire_at_utc("2026-01-15", "", "America/New_York", 14)
+      {:ok, local} = DateTime.shift_zone(utc, "America/New_York")
+      assert local.hour == 14
+      assert local.minute == 0
+    end
+  end
+
   describe "decode_prefs_json/1" do
     test "defaults to Eastern 09:00" do
       assert Reminders.decode_prefs_json(nil) == %{

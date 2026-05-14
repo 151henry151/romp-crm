@@ -21,6 +21,7 @@ defmodule RompCrm.Jobs.Job do
     field :notes, :string
     field :next_action, :string
     field :scheduled_on, :date
+    field :scheduled_time, :time
 
     has_many :work_items, RompCrm.Jobs.JobWorkItem, on_replace: :delete
     has_many :materials, RompCrm.Jobs.JobMaterial
@@ -42,7 +43,8 @@ defmodule RompCrm.Jobs.Job do
       :referred_by,
       :notes,
       :next_action,
-      :scheduled_on
+      :scheduled_on,
+      :scheduled_time
     ])
     |> cast_assoc(:work_items,
       with: &RompCrm.Jobs.JobWorkItem.changeset/2,

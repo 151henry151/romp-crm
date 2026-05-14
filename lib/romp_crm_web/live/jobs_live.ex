@@ -334,6 +334,13 @@ defmodule RompCrmWeb.JobsLive do
       field = to_string(params["field"] || "")
       raw = Map.get(params, "value")
 
+      attrs =
+        if field == "scheduled_on" do
+          build_job_schedule_update_attrs(params)
+        else
+          build_inline_job_update_attrs(field, raw)
+        end
+
       cond do
         job_id == nil ->
           {:noreply, put_flash(socket, :error, "Invalid request.")}
@@ -343,7 +350,6 @@ defmodule RompCrmWeb.JobsLive do
 
         true ->
           edit_key = JEK.job(job_id, field)
-          attrs = build_inline_job_update_attrs(field, raw)
           bid = socket.assigns.current_business_id
 
           if attrs == %{} do
@@ -375,6 +381,13 @@ defmodule RompCrmWeb.JobsLive do
       wi_id = parse_id_param(params["work_item_id"])
       title = params |> Map.get("title", "") |> to_string() |> String.trim()
       scheduled_on = parse_scheduled_on_form_param(params["scheduled_on"])
+      scheduled_time_raw = params |> Map.get("scheduled_time", "") |> to_string() |> String.trim()
+
+      scheduled_time =
+        case scheduled_time_raw do
+          "" -> nil
+          s -> parse_time_for_work_item(s)
+        end
 
       cond do
         job_id == nil or wi_id == nil ->
@@ -392,7 +405,11 @@ defmodule RompCrmWeb.JobsLive do
               {:noreply, put_flash(socket, :error, "Job not found.")}
 
             job ->
-              case Jobs.update_job_work_item(job, wi_id, %{title: title, scheduled_on: scheduled_on}) do
+              case Jobs.update_job_work_item(job, wi_id, %{
+                     title: title,
+                     scheduled_on: scheduled_on,
+                     scheduled_time: scheduled_time
+                   }) do
                 {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
                 {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
@@ -601,6 +618,48 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  defp build_job_schedule_update_attrs(params) do
+    date_raw = params |> Map.get("value", "") |> to_string() |> String.trim()
+    time_raw = params |> Map.get("scheduled_time", "") |> to_string() |> String.trim()
+
+    cond do
+      date_raw == "" ->
+        %{"scheduled_on" => "", "scheduled_time" => ""}
+
+      match?({:ok, _}, Date.from_iso8601(date_raw)) ->
+        %{"scheduled_on" => date_raw, "scheduled_time" => time_raw}
+
+      true ->
+        %{}
+    end
+  end
+
+  defp parse_time_for_work_item(s) when is_binary(s) do
+    t = String.trim(s)
+
+    cond do
+      t == "" ->
+        nil
+
+      true ->
+        case String.split(t, ":") do
+          [hs, ms | _] ->
+            with {h, _} <- Integer.parse(String.trim(hs)),
+                 {m, _} <- Integer.parse(String.trim(ms)),
+                 {:ok, time} <- Time.new(h, m, 0) do
+              time
+            else
+              _ -> nil
+            end
+
+          _ ->
+            nil
+        end
+    end
+  end
+
+  defp parse_time_for_work_item(_), do: nil
+
   defp parse_id_param(v) do
     case Integer.parse(to_string(v || "")) do
       {n, _} -> n
@@ -622,21 +681,6 @@ defmodule RompCrmWeb.JobsLive do
        do: %{"status" => raw}
 
   defp build_inline_job_update_attrs("status", _), do: %{}
-
-  defp build_inline_job_update_attrs("scheduled_on", raw) do
-    s = raw |> to_string() |> String.trim()
-
-    case s do
-      "" ->
-        %{"scheduled_on" => ""}
-
-      _ ->
-        case Date.from_iso8601(s) do
-          {:ok, _} -> %{"scheduled_on" => s}
-          _ -> %{}
-        end
-    end
-  end
 
   defp build_inline_job_update_attrs(field, raw)
        when field in ~w(client_name address phone work_description notes referred_by next_action) do

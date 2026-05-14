@@ -16,6 +16,24 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       assert get_resp_header(conn, "pragma") == ["no-cache"]
     end
 
+    test "redirects to gift claim when gift query is a pending token", %{conn: conn} do
+      admin = user_fixture()
+
+      {:ok, gift} =
+        RompCrm.Gifts.create_and_email(
+          admin,
+          %{
+            recipient_email: "gift_reg_redirect@example.com",
+            duration_days: 14,
+            admin_message: nil
+          },
+          fn _t -> "https://example.test/x" end
+        )
+
+      conn = get(conn, ~p"/users/register?#{[gift: gift.token]}")
+      assert redirected_to(conn) == ~p"/gift/claim/#{gift.token}"
+    end
+
     test "renders registration page", %{conn: conn} do
       conn = get(conn, ~p"/users/register")
       response = html_response(conn, 200)

@@ -31,11 +31,10 @@
       <% end %>
     <% else %>
       <p class="text-sm text-base-content/80">
-        Log in (or create an account) with <span class="font-medium">{@gift.recipient_email}</span>, then return here and tap Redeem.
+        Use the gift link from your email in this browser, or sign in below with <span class="font-medium">{@gift.recipient_email}</span> if you already have an account.
       </p>
       <div class="flex flex-wrap gap-2 pt-1">
-        <.link navigate={~p"/users/log-in"} class="btn btn-primary btn-sm">Log in</.link>
-        <.link navigate={~p"/users/register?gift=#{@token}"} class="btn btn-outline btn-sm">Create account</.link>
+        <.link navigate={~p"/users/log-in?#{[email: @gift.recipient_email, after_gift: "1"]}"} class="btn btn-primary btn-sm">Log in</.link>
       </div>
     <% end %>
   </div>

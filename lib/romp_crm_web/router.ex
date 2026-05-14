@@ -87,7 +87,8 @@ defmodule RompCrmWeb.Router do
     get "/subscribe/paypal/return", SubscribeController, :paypal_return
     get "/subscribe/paypal/cancel", SubscribeController, :paypal_cancel
 
-    get "/gift/redeem/:token", GiftRedeemController, :show
+    get "/gift/redeem/:token", GiftRedeemController, :redirect_claim
+    get "/gift/claim/:token", GiftRedeemController, :claim
 
     get "/invitations/:token", InvitationController, :show
 
@@ -158,6 +159,7 @@ defmodule RompCrmWeb.Router do
 
       live "/time-log", TimeLogLive, :index
       live "/my-timeclock", MyTimeclockLive, :index
+      live "/reminders", RemindersLive, :index
     end
 
     live_session :authenticated_employees_owner,
