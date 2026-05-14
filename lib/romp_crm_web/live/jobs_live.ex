@@ -2,6 +2,7 @@ defmodule RompCrmWeb.JobsLive do
   use RompCrmWeb, :live_view
 
   import RompCrmWeb.JobExpandLists
+  import RompCrmWeb.JobExpandedInlineFields
 
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
@@ -292,6 +293,39 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  def handle_event("inline_job_update", params, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      job_id = String.to_integer(params["job_id"])
+      field = to_string(params["field"] || "")
+      bid = socket.assigns.current_business_id
+
+      if inline_job_field_allowed?(field) do
+        key = "job_#{job_id}_#{field}"
+        raw = Map.get(params, key)
+        attrs = build_inline_job_update_attrs(field, raw)
+
+        if attrs == %{} do
+          {:noreply, socket}
+        else
+          case Jobs.get_job(job_id, bid) do
+            nil ->
+              {:noreply, put_flash(socket, :error, "Job not found.")}
+
+            job ->
+              case Jobs.update_job(job, attrs) do
+                {:ok, _} -> {:noreply, refresh_jobs(socket)}
+                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not save that change.")}
+              end
+          end
+        end
+      else
+        {:noreply, put_flash(socket, :error, "Invalid field.")}
+      end
+    end
+  end
+
   def handle_event("toggle_row", %{"id" => id}, socket) do
     id = String.to_integer(id)
     bid = socket.assigns.current_business_id
@@ -523,6 +557,43 @@ defmodule RompCrmWeb.JobsLive do
       end
     end
   end
+
+  defp inline_job_field_allowed?(f)
+       when f in ~w(client_name address phone work_description notes referred_by next_action priority status scheduled_on),
+       do: true
+
+  defp inline_job_field_allowed?(_), do: false
+
+  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal), do: %{"priority" => raw}
+  defp build_inline_job_update_attrs("priority", _), do: %{}
+
+  defp build_inline_job_update_attrs("status", raw)
+       when raw in ~w(lead pending in_progress done),
+       do: %{"status" => raw}
+
+  defp build_inline_job_update_attrs("status", _), do: %{}
+
+  defp build_inline_job_update_attrs("scheduled_on", raw) do
+    s = raw |> to_string() |> String.trim()
+
+    case s do
+      "" ->
+        %{"scheduled_on" => ""}
+
+      _ ->
+        case Date.from_iso8601(s) do
+          {:ok, _} -> %{"scheduled_on" => s}
+          _ -> %{}
+        end
+    end
+  end
+
+  defp build_inline_job_update_attrs(field, raw)
+       when field in ~w(client_name address phone work_description notes referred_by next_action) do
+    %{field => raw |> to_string()}
+  end
+
+  defp build_inline_job_update_attrs(_, _), do: %{}
 
   defp visible_jobs(jobs, :all), do: jobs
   defp visible_jobs(jobs, status), do: Enum.filter(jobs, &(&1.status == status))
