@@ -15,7 +15,55 @@ defmodule RompCrm.Reminders do
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
 
-  @default_prefs %{"job_offsets" => [1, 0], "send_hour_utc" => 13}
+  @default_prefs %{
+    "job_offsets" => [1, 0],
+    "timezone" => "America/New_York",
+    "send_hour_local" => 9
+  }
+
+  @doc """
+  Time zone options for the SMS reminder profile form (IANA IDs).
+  """
+  def profile_timezone_select_options do
+    [
+      {"Eastern (US & Canada)", "America/New_York"},
+      {"Central (US & Canada)", "America/Chicago"},
+      {"Mountain (US & Canada)", "America/Denver"},
+      {"Arizona (no DST)", "America/Phoenix"},
+      {"Pacific (US & Canada)", "America/Los_Angeles"},
+      {"Alaska", "America/Anchorage"},
+      {"Hawaii", "Pacific/Honolulu"},
+      {"UTC", "Etc/UTC"}
+    ]
+  end
+
+  @doc """
+  Returns true if **`tz`** is one of **`profile_timezone_select_options/0`** values.
+  """
+  def valid_profile_timezone?(tz) when is_binary(tz) do
+    tz in Enum.map(profile_timezone_select_options(), fn {_, id} -> id end)
+  end
+
+  def valid_profile_timezone?(_), do: false
+
+  @doc """
+  Returns true when **`utc_now`** falls in the same clock hour (0–23) as **`send_hour_local`**
+  in **`decoded_prefs`** (`timezone`, `send_hour_local`). **`decoded_prefs`** must be the map
+  returned by **`decode_prefs_json/1`** (or equivalent shape).
+  """
+  def local_send_hour_matches_now?(%DateTime{} = utc_now, prefs) when is_map(prefs) do
+    tz = prefs |> Map.get("timezone", "America/New_York") |> to_string() |> String.trim()
+    tz = if valid_profile_timezone?(tz), do: tz, else: "America/New_York"
+    hour = parse_hour_0_23(Map.get(prefs, "send_hour_local"))
+
+    case DateTime.shift_zone(utc_now, tz) do
+      {:ok, local} ->
+        local.hour == hour
+
+      {:error, _} ->
+        false
+    end
+  end
 
   @doc """
   Inserts a pending reminder for **`fire_at`** (UTC).
@@ -27,21 +75,94 @@ defmodule RompCrm.Reminders do
   end
 
   @doc """
-  Returns merged reminder preferences (defaults plus decoded JSON from `users.sms_reminder_prefs_json`).
+  Returns normalized reminder preferences from `users.sms_reminder_prefs_json`.
+
+  Legacy JSON that only stored **`send_hour_utc`** is treated as **`Etc/UTC`** with that hour
+  so existing schedules stay the same. New defaults use **Eastern (`America/New_York`)** and
+  **9:00** local time.
   """
   def decode_prefs_json(nil), do: @default_prefs
   def decode_prefs_json(""), do: @default_prefs
 
   def decode_prefs_json(s) when is_binary(s) do
     case Jason.decode(String.trim(s)) do
-      {:ok, %{} = m} -> Map.merge(@default_prefs, stringify_keys(m))
-      _ -> @default_prefs
+      {:ok, %{} = raw} ->
+        raw
+        |> stringify_keys()
+        |> coalesce_prefs_from_raw()
+        |> finalize_prefs_map()
+
+      _ ->
+        @default_prefs
     end
   end
 
   defp stringify_keys(m) do
     Map.new(m, fn {k, v} -> {to_string(k), v} end)
   end
+
+  defp coalesce_prefs_from_raw(raw) do
+    cond do
+      Map.has_key?(raw, "send_hour_local") ->
+        Map.merge(@default_prefs, raw)
+
+      Map.has_key?(raw, "send_hour_utc") ->
+        h = parse_hour_0_23(Map.get(raw, "send_hour_utc"))
+
+        @default_prefs
+        |> Map.merge(Map.take(raw, ["job_offsets"]))
+        |> Map.put("timezone", "Etc/UTC")
+        |> Map.put("send_hour_local", h)
+
+      true ->
+        Map.merge(@default_prefs, Map.take(raw, ["job_offsets"]))
+    end
+  end
+
+  defp finalize_prefs_map(prefs) do
+    %{
+      "job_offsets" => normalize_job_offsets_list(Map.get(prefs, "job_offsets")),
+      "timezone" => normalize_profile_timezone(Map.get(prefs, "timezone")),
+      "send_hour_local" => parse_hour_0_23(Map.get(prefs, "send_hour_local"))
+    }
+  end
+
+  defp normalize_profile_timezone(tz) do
+    tz = tz |> to_string() |> String.trim()
+    if valid_profile_timezone?(tz), do: tz, else: "America/New_York"
+  end
+
+  defp normalize_job_offsets_list(raw) do
+    list =
+      (raw || [1, 0])
+      |> List.wrap()
+      |> Enum.flat_map(fn
+        n when is_integer(n) -> [n]
+        n when is_binary(n) ->
+          case Integer.parse(String.trim(n)) do
+            {i, _} -> [i]
+            :error -> []
+          end
+
+        _ ->
+          []
+      end)
+      |> Enum.filter(&(&1 in [0, 1, 2, 3, 7]))
+      |> Enum.uniq()
+
+    if list == [], do: [1, 0], else: Enum.sort(list, :desc)
+  end
+
+  defp parse_hour_0_23(v) when is_integer(v) and v >= 0 and v <= 23, do: v
+
+  defp parse_hour_0_23(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {n, _} when n >= 0 and n <= 23 -> n
+      _ -> 9
+    end
+  end
+
+  defp parse_hour_0_23(_), do: 9
 
   @doc """
   Lists users who opted in and have a normalized phone on file (for outbound SMS).
@@ -56,7 +177,8 @@ defmodule RompCrm.Reminders do
 
   @doc """
   Delivers pending **`reminders`** whose **`fire_at`** is in the past, then sends job-date nudges
-  (once per user/job/offset) when the current UTC hour matches prefs.
+  (once per user/job/offset) when the current instant matches the user’s **local send hour**
+  in their configured **IANA time zone**.
   """
   def run_scheduled_deliveries(opts \\ []) do
     now = Keyword.get(opts, :now, DateTime.utc_now(:second))
@@ -101,7 +223,6 @@ defmodule RompCrm.Reminders do
   end
 
   defp deliver_job_schedule_nudges(%DateTime{} = now) do
-    hour = now.hour
     today = DateTime.to_date(now)
 
     users =
@@ -113,47 +234,17 @@ defmodule RompCrm.Reminders do
 
     Enum.reduce(users, 0, fn user, acc ->
       prefs = decode_prefs_json(user.sms_reminder_prefs_json)
-      send_hour = parse_send_hour_utc(Map.get(prefs, "send_hour_utc"))
 
-      if hour != send_hour do
-        acc
-      else
+      if local_send_hour_matches_now?(now, prefs) do
         acc + send_job_nudges_for_user(user, prefs, today)
+      else
+        acc
       end
     end)
   end
 
-  defp parse_send_hour_utc(v) when is_integer(v) and v >= 0 and v <= 23, do: v
-
-  defp parse_send_hour_utc(v) when is_binary(v) do
-    case Integer.parse(String.trim(v)) do
-      {n, _} when n >= 0 and n <= 23 -> n
-      _ -> 13
-    end
-  end
-
-  defp parse_send_hour_utc(_), do: 13
-
   defp send_job_nudges_for_user(%User{} = user, prefs, %Date{} = today) do
     offsets = Map.get(prefs, "job_offsets") || [1, 0]
-    offsets = if is_list(offsets), do: offsets, else: [1, 0]
-
-    offsets =
-      offsets
-      |> Enum.flat_map(fn
-        n when is_integer(n) -> [n]
-        n when is_binary(n) ->
-          case Integer.parse(String.trim(n)) do
-            {i, _} -> [i]
-            :error -> []
-          end
-
-        _ ->
-          []
-      end)
-      |> Enum.uniq()
-
-    offsets = if offsets == [], do: [1, 0], else: offsets
 
     businesses = Businesses.list_businesses_for_user(user)
 

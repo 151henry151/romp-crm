@@ -367,13 +367,14 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
-  def handle_event("job_expand_commit_wi_title", params, socket) do
+  def handle_event("job_expand_commit_wi_row", params, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
       job_id = parse_id_param(params["job_id"])
       wi_id = parse_id_param(params["work_item_id"])
-      title = params |> Map.get("value", "") |> to_string() |> String.trim()
+      title = params |> Map.get("title", "") |> to_string() |> String.trim()
+      scheduled_on = parse_scheduled_on_form_param(params["scheduled_on"])
 
       cond do
         job_id == nil or wi_id == nil ->
@@ -383,7 +384,7 @@ defmodule RompCrmWeb.JobsLive do
           {:noreply, put_flash(socket, :error, "Work item title cannot be empty.")}
 
         true ->
-          edit_key = JEK.wi_title(wi_id)
+          edit_key = JEK.wi_edit(wi_id)
           bid = socket.assigns.current_business_id
 
           case Jobs.get_job(job_id, bid) do
@@ -391,67 +392,26 @@ defmodule RompCrmWeb.JobsLive do
               {:noreply, put_flash(socket, :error, "Job not found.")}
 
             job ->
-              case Jobs.update_job_work_item(job, wi_id, %{title: title}) do
+              case Jobs.update_job_work_item(job, wi_id, %{title: title, scheduled_on: scheduled_on}) do
                 {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item title.")}
+                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
     end
   end
 
-  def handle_event("job_expand_commit_wi_scheduled", params, socket) do
-    if not socket.assigns.can_edit_jobs do
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
-    else
-      job_id = parse_id_param(params["job_id"])
-      wi_id = parse_id_param(params["work_item_id"])
-      raw = params |> Map.get("value", "") |> to_string() |> String.trim()
-
-      scheduled_on =
-        case raw do
-          "" ->
-            nil
-
-          s ->
-            case Date.from_iso8601(s) do
-              {:ok, d} -> d
-              _ -> nil
-            end
-        end
-
-      cond do
-        job_id == nil or wi_id == nil ->
-          {:noreply, put_flash(socket, :error, "Invalid request.")}
-
-        true ->
-          edit_key = JEK.wi_scheduled(wi_id)
-          bid = socket.assigns.current_business_id
-
-          case Jobs.get_job(job_id, bid) do
-            nil ->
-              {:noreply, put_flash(socket, :error, "Job not found.")}
-
-            job ->
-              case Jobs.update_job_work_item(job, wi_id, %{scheduled_on: scheduled_on}) do
-                {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update date.")}
-              end
-          end
-      end
-    end
-  end
-
-  def handle_event("job_expand_commit_material_qty", params, socket) do
+  def handle_event("job_expand_commit_material_row", params, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
       job_id = parse_id_param(params["job_id"])
       mid = parse_id_param(params["material_id"])
-      raw = params |> Map.get("value", "") |> to_string() |> String.trim()
+      desc = params |> Map.get("description", "") |> to_string() |> String.trim()
+      qty_raw = params |> Map.get("quantity", "") |> to_string() |> String.trim()
 
       qty =
-        case Float.parse(raw) do
+        case Float.parse(qty_raw) do
           {f, _} -> f
           :error -> nil
         end
@@ -460,11 +420,14 @@ defmodule RompCrmWeb.JobsLive do
         job_id == nil or mid == nil ->
           {:noreply, put_flash(socket, :error, "Invalid request.")}
 
+        desc == "" ->
+          {:noreply, put_flash(socket, :error, "Material description cannot be empty.")}
+
         qty == nil or qty <= 0 ->
           {:noreply, put_flash(socket, :error, "Enter a quantity greater than zero.")}
 
         true ->
-          edit_key = JEK.mat_quantity(mid)
+          edit_key = JEK.mat_edit(mid)
           bid = socket.assigns.current_business_id
 
           case Jobs.get_job(job_id, bid) do
@@ -472,42 +435,9 @@ defmodule RompCrmWeb.JobsLive do
               {:noreply, put_flash(socket, :error, "Job not found.")}
 
             job ->
-              case Jobs.update_job_material(job, mid, %{quantity: qty}) do
+              case Jobs.update_job_material(job, mid, %{quantity: qty, description: desc}) do
                 {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Invalid quantity.")}
-              end
-          end
-      end
-    end
-  end
-
-  def handle_event("job_expand_commit_material_desc", params, socket) do
-    if not socket.assigns.can_edit_jobs do
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
-    else
-      job_id = parse_id_param(params["job_id"])
-      mid = parse_id_param(params["material_id"])
-      desc = params |> Map.get("value", "") |> to_string() |> String.trim()
-
-      cond do
-        job_id == nil or mid == nil ->
-          {:noreply, put_flash(socket, :error, "Invalid request.")}
-
-        desc == "" ->
-          {:noreply, put_flash(socket, :error, "Material description cannot be empty.")}
-
-        true ->
-          edit_key = JEK.mat_description(mid)
-          bid = socket.assigns.current_business_id
-
-          case Jobs.get_job(job_id, bid) do
-            nil ->
-              {:noreply, put_flash(socket, :error, "Job not found.")}
-
-            job ->
-              case Jobs.update_job_material(job, mid, %{description: desc}) do
-                {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update material description.")}
+                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update material.")}
               end
           end
       end
@@ -654,6 +584,21 @@ defmodule RompCrmWeb.JobsLive do
 
   defp drop_expand_edit(socket, key) do
     assign(socket, :job_expand_editing, MapSet.delete(socket.assigns.job_expand_editing, key))
+  end
+
+  defp parse_scheduled_on_form_param(raw) do
+    s = raw |> to_string() |> String.trim()
+
+    case s do
+      "" ->
+        nil
+
+      _ ->
+        case Date.from_iso8601(s) do
+          {:ok, d} -> d
+          _ -> nil
+        end
+    end
   end
 
   defp parse_id_param(v) do

@@ -69,6 +69,9 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# IANA time zones for reminder scheduling (`DateTime.shift_zone/2`)
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+
 config :romp_crm, RompCrm.Mailer, adapter: Swoosh.Adapters.Local
 
 config :swoosh, :api_client, Swoosh.ApiClient.Finch

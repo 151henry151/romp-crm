@@ -282,14 +282,25 @@ defmodule RompCrmWeb.UserSettingsController do
 
   defp merge_sms_reminder_prefs_from_form(%{"user" => inner} = params) when is_map(inner) do
     inner =
-      if Map.has_key?(inner, "sms_reminder_send_hour_utc") do
+      if sms_reminder_prefs_form_present?(inner) do
         offsets = normalize_reminder_offsets_param(Map.get(inner, "sms_reminder_offsets"))
-        hour = normalize_reminder_hour_param(Map.get(inner, "sms_reminder_send_hour_utc"))
-        json = Jason.encode!(%{"job_offsets" => offsets, "send_hour_utc" => hour})
+        hour = normalize_reminder_hour_param(Map.get(inner, "sms_reminder_send_hour_local"))
+        tz = normalize_reminder_timezone_param(Map.get(inner, "sms_reminder_timezone"))
+
+        json =
+          Jason.encode!(%{
+            "job_offsets" => offsets,
+            "timezone" => tz,
+            "send_hour_local" => hour
+          })
 
         inner
         |> Map.put("sms_reminder_prefs_json", json)
-        |> Map.drop(["sms_reminder_offsets", "sms_reminder_send_hour_utc"])
+        |> Map.drop([
+          "sms_reminder_offsets",
+          "sms_reminder_send_hour_local",
+          "sms_reminder_timezone"
+        ])
       else
         inner
       end
@@ -298,6 +309,11 @@ defmodule RompCrmWeb.UserSettingsController do
   end
 
   defp merge_sms_reminder_prefs_from_form(params), do: params
+
+  defp sms_reminder_prefs_form_present?(inner) do
+    Map.has_key?(inner, "sms_reminder_send_hour_local") or
+      Map.has_key?(inner, "sms_reminder_timezone")
+  end
 
   defp normalize_reminder_offsets_param(raw) do
     raw
@@ -326,12 +342,22 @@ defmodule RompCrmWeb.UserSettingsController do
   defp normalize_reminder_hour_param(raw) when is_binary(raw) do
     case Integer.parse(String.trim(raw)) do
       {h, _} when h >= 0 and h <= 23 -> h
-      _ -> 13
+      _ -> 9
     end
   end
 
   defp normalize_reminder_hour_param(h) when is_integer(h) and h >= 0 and h <= 23, do: h
-  defp normalize_reminder_hour_param(_), do: 13
+  defp normalize_reminder_hour_param(_), do: 9
+
+  defp normalize_reminder_timezone_param(raw) do
+    tz = raw |> to_string() |> String.trim()
+
+    if RompCrm.Reminders.valid_profile_timezone?(tz) do
+      tz
+    else
+      "America/New_York"
+    end
+  end
 
   defp assign_workspace_nav_for_layout(conn, _opts) do
     user = conn.assigns.current_scope.user
