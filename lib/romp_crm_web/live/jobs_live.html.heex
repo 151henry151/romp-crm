@@ -75,7 +75,7 @@
             class="w-full text-left px-4 py-3"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 space-y-1">
+              <div class="min-w-0 flex-1 space-y-1">
                 <p class="font-semibold text-base-content break-words">{job.client_name}</p>
                 <%= if not mob_expanded? do %>
                   <p class="text-sm text-base-content/80 break-words line-clamp-2">
@@ -90,7 +90,7 @@
                   </p>
                 <% end %>
               </div>
-              <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap #{status_class(job.status)}"}>
+              <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center self-start rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
                 {status_label(job.status)}
               </span>
             </div>
@@ -232,13 +232,13 @@
               </td>
               <td class="px-4 py-3">
                 <%= if job.priority == :high do %>
-                  <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-semibold whitespace-nowrap #{priority_class(job.priority)}"}>
+                  <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-semibold whitespace-nowrap box-border #{priority_class(job.priority)}"}>
                     HIGH
                   </span>
                 <% end %>
               </td>
               <td class="px-4 py-3">
-                <span class={"inline-flex h-6 w-24 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap #{status_class(job.status)}"}>
+                <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
                   {status_label(job.status)}
                 </span>
               </td>
