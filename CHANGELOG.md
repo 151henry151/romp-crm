@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.9.43] - 2026-05-14
+
+### Added
+
+- **`RompCrmWeb.JobExpandEditKeys`**: stable string keys for expanded-job edit mode
+- **`JobsLive`** **`job_expand_editing`** (**`MapSet`**) with **`job_expand_edit_start`**, **`job_expand_edit_cancel`**, and **`job_expand_commit_*`** events
+
+### Changed
+
+- **`JobExpandedInlineFields`** and **`JobExpandLists`**: expanded job fields default to **read-only**; **pencil** (green) enters edit mode, **check** saves via **`phx-submit`**, **×** cancels; pass **`edit_keys`** from **`JobsLive`**
+- **`JobsLive`**: clear **`job_expand_editing`** when toggling expanded row; remove **`inline_job_update`** and immediate **`phx-change`** handlers for job fields, work item title/date, and material qty/description (**checkboxes**, **delete**, and **`material_unit_price`** unchanged)
+
 ## [0.9.42] - 2026-05-13
 
 ### Changed
