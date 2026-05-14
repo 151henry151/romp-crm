@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.52] - 2026-05-14
+
+### Changed
+
+- Shorten in-app helper copy (settings, SMS intro modal/flashes, support, job form, subscribe) and outbound welcome SMS; tighten data-export email bodies and settings/export controller flashes
+
 ## [0.9.51] - 2026-05-08
 
 ### Added

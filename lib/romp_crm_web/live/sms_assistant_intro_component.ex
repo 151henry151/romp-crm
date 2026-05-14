@@ -40,7 +40,7 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
           Text your Romp CRM assistant
         </h2>
         <p class="mt-3 text-sm leading-relaxed text-gray-700">
-          To create jobs, edit customer details, or look up any info from your job list, you can just text your AI assistant who manages your job list for you. If you’d rather enter things yourself, you can skip this feature, but it’s really what makes Romp CRM shine. Enter your phone number to get started.
+          Add your mobile to text the assistant about jobs and lists, or skip and add it later in Account Settings.
         </p>
         <.form
           for={@form}
@@ -52,12 +52,7 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
         >
           <.input field={@form[:phone]} type="tel" label="Phone number" autocomplete="tel" />
           <div class="flex flex-wrap justify-end gap-2 pt-1">
-            <.button
-              type="button"
-              class="btn btn-ghost"
-              phx-click="sms_intro_skip"
-              phx-target={@myself}
-            >
+            <.button type="button" class="btn btn-ghost" phx-click="sms_intro_skip" phx-target={@myself}>
               Skip for now
             </.button>
             <.button type="submit" class="btn btn-primary">
@@ -111,12 +106,11 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
          socket
          |> Phoenix.LiveView.put_flash(
            :info,
-           "You can add your mobile number anytime under Account Settings."
+           "Add your number anytime in Account Settings."
          )}
 
       {:error, _} ->
-        {:noreply,
-         Phoenix.LiveView.put_flash(socket, :error, "Could not save your choice. Try again.")}
+        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Could not save your choice. Try again.")}
     end
   end
 
@@ -126,28 +120,28 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
         Phoenix.LiveView.put_flash(
           socket,
           :info,
-          "Saved your number. Outbound texts are off on this server, so no welcome SMS was sent."
+          "Saved. Outbound SMS is off here—no welcome text sent."
         )
 
       {:ok, :no_e164} ->
         Phoenix.LiveView.put_flash(
           socket,
           :error,
-          "That number could not be used for SMS. Fix the format or update it in Settings."
+          "That number won't work for SMS—fix the format in Settings."
         )
 
       {:error, _} ->
         Phoenix.LiveView.put_flash(
           socket,
           :error,
-          "Your number was saved, but sending the welcome text failed. You can try again from Settings."
+          "Number saved, but the welcome text failed—retry in Settings."
         )
 
       {:ok, _} ->
         Phoenix.LiveView.put_flash(
           socket,
           :info,
-          "Check your phone for a welcome message from Romp CRM."
+          "Welcome text sent—check your phone."
         )
 
       _ ->

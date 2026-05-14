@@ -11,29 +11,28 @@
 
     <%= if !@paywall do %>
       <p class="text-sm text-base-content/90">
-        Billing is not enforced on this server (self-hosted or paywall disabled). You may <.link
+        Paywall off here (self-hosted). <.link
           navigate={~p"/users/log-in"}
           class="font-semibold text-brand hover:underline"
-        >log in</.link>.
+        >Log in</.link>.
       </p>
     <% else %>
       <div class="space-y-2 text-sm text-base-content/90">
         <p>
-          To use the hosted CRM you need an approved PayPal subscription (card on file).
+          Hosted CRM needs an active PayPal subscription.
           <%= if @paypal_trial_days > 0 do %>
-            Your first {@paypal_trial_days} days are a free trial — cancel in PayPal before the trial ends if you do not want to be charged.
+            First {@paypal_trial_days} days free—cancel in PayPal before billing if you don't want to continue.
           <% end %>
         </p>
         <p>
-          Completed PayPal checkout but stuck?
-          Resume here with the same browser session you used during sign-up, or
+          Stuck after checkout? Resume in the same browser, or
           <.link navigate={~p"/users/register"} class="font-semibold text-brand hover:underline">
             register again
           </.link>
           with the same email.
         </p>
         <p class="text-xs text-base-content/70">
-          If you just paid and you’re logged in here, we try to sync your subscription when this page loads — refresh once if you’re still blocked.
+          We sync on page load—refresh once if you're still blocked.
         </p>
       </div>
 
