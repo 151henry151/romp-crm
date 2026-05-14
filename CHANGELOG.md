@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.37] - 2026-05-13
+
+### Changed
+
+- **`Jobs.work_items_preload_query`**: order work items by **`completed`**, then **dated `scheduled_on` before undated**, then **`scheduled_on`**, **`sort_order`**, **`id`**
+
+### Fixed
+
+- **`Jobs.merge_append_only_work_items`**: when SMS/AI sends **`work_items`** without **`id`** and the list length matches or exceeds existing rows, zip-merge onto persisted rows (and append only the tail) instead of concatenating the full snapshot after all existing rows (which duplicated every line item after date-only updates)
+
 ## [0.9.36] - 2026-05-13
 
 ### Changed

@@ -13,7 +13,14 @@ defmodule RompCrm.Jobs do
   defp topic(business_id), do: "jobs:business:#{business_id}"
 
   defp work_items_preload_query do
-    from wi in JobWorkItem, order_by: [asc: wi.completed, asc: wi.sort_order, asc: wi.id]
+    from wi in JobWorkItem,
+      order_by: [
+        asc: wi.completed,
+        asc: fragment("CASE WHEN ? IS NULL THEN 1 ELSE 0 END", wi.scheduled_on),
+        asc: wi.scheduled_on,
+        asc: wi.sort_order,
+        asc: wi.id
+      ]
   end
 
   defp materials_preload_query do
@@ -460,17 +467,17 @@ defmodule RompCrm.Jobs do
 
   # When `cast_assoc(:work_items)` receives only new rows (no `id`), Ecto would replace the
   # association and delete existing line items (`on_replace: :delete`). SMS updates often add a
-  # single new task; merge those onto the preloaded rows. If any row carries a persisted `id`,
-  # the caller (LLM or UI) is responsible for supplying the full intended list — pass through unchanged.
+  # single new task; merge those onto the preloaded rows. If the model returns the same number
+  # of rows without ids (e.g. date-only edits), zip-merge onto existing ids instead of appending
+  # a full duplicate list. If any row carries a persisted `id`, the caller is responsible for
+  # supplying the full intended list — pass through unchanged.
   defp merge_append_only_work_items(%Job{} = job, attrs) when is_map(attrs) do
     existing = job.work_items || []
 
     case Map.get(attrs, "work_items") do
       list when is_list(list) and list != [] ->
         if existing != [] and work_items_all_without_persisted_id?(list) do
-          preserved = Enum.map(existing, &work_item_to_nested_attrs/1)
-          new_rows = Enum.map(list, &strip_work_item_id_for_append/1)
-          merged = renumber_work_item_sort_orders(preserved ++ new_rows)
+          merged = merge_or_append_work_items_no_ids(existing, list)
           Map.put(attrs, "work_items", merged)
         else
           attrs
@@ -478,6 +485,117 @@ defmodule RompCrm.Jobs do
 
       _ ->
         attrs
+    end
+  end
+
+  defp merge_or_append_work_items_no_ids(existing, list) when is_list(existing) and is_list(list) do
+    existing_sorted = Enum.sort_by(existing, &{&1.sort_order, &1.id})
+
+    incoming_sorted =
+      list
+      |> Enum.map(&stringify_keys_shallow/1)
+      |> Enum.sort_by(&incoming_work_item_sort_key/1)
+
+    ex_len = length(existing_sorted)
+    in_len = length(incoming_sorted)
+
+    merged_maps =
+      cond do
+        in_len == ex_len ->
+          Enum.zip(existing_sorted, incoming_sorted)
+          |> Enum.map(fn {ex, inc} -> merge_incoming_onto_existing_wi_row(ex, inc) end)
+
+        in_len > ex_len ->
+          {inc_zip, inc_tail} = Enum.split(incoming_sorted, ex_len)
+
+          front =
+            Enum.zip(existing_sorted, inc_zip)
+            |> Enum.map(fn {ex, inc} -> merge_incoming_onto_existing_wi_row(ex, inc) end)
+
+          tail = Enum.map(inc_tail, &strip_work_item_id_for_append/1)
+          front ++ tail
+
+        true ->
+          preserved = Enum.map(existing_sorted, &work_item_to_nested_attrs/1)
+          new_rows = Enum.map(incoming_sorted, &strip_work_item_id_for_append/1)
+          preserved ++ new_rows
+      end
+
+    renumber_work_item_sort_orders(merged_maps)
+  end
+
+  defp incoming_work_item_sort_key(row) when is_map(row) do
+    case Map.get(row, "sort_order") do
+      i when is_integer(i) -> i
+      s when is_binary(s) ->
+        case Integer.parse(String.trim(s)) do
+          {n, _} -> n
+          :error -> 0
+        end
+
+      _ ->
+        0
+    end
+  end
+
+  defp merge_incoming_onto_existing_wi_row(%JobWorkItem{} = ex, inc) when is_map(inc) do
+    inc = stringify_keys_shallow(inc)
+    base = work_item_to_nested_attrs(ex)
+
+    base
+    |> maybe_merge_title_from_inc(inc)
+    |> maybe_merge_scheduled_on_from_inc(inc)
+    |> maybe_merge_completed_from_inc(inc)
+  end
+
+  defp maybe_merge_title_from_inc(base, inc) do
+    case Map.get(inc, "title") do
+      nil -> base
+      "" -> base
+      t -> Map.put(base, "title", to_string(t))
+    end
+  end
+
+  defp maybe_merge_scheduled_on_from_inc(base, inc) do
+    if Map.has_key?(inc, "scheduled_on") do
+      case Map.get(inc, "scheduled_on") do
+        nil ->
+          Map.put(base, "scheduled_on", nil)
+
+        "" ->
+          Map.put(base, "scheduled_on", nil)
+
+        %Date{} = d ->
+          Map.put(base, "scheduled_on", Date.to_iso8601(d))
+
+        s when is_binary(s) ->
+          t = String.trim(s)
+
+          if t == "" do
+            Map.put(base, "scheduled_on", nil)
+          else
+            case Date.from_iso8601(t) do
+              {:ok, d} -> Map.put(base, "scheduled_on", Date.to_iso8601(d))
+              _ -> base
+            end
+          end
+
+        _ ->
+          base
+      end
+    else
+      base
+    end
+  end
+
+  defp maybe_merge_completed_from_inc(base, inc) do
+    case Map.get(inc, "completed") do
+      nil -> base
+      true -> Map.put(base, "completed", true)
+      false -> Map.put(base, "completed", false)
+      "true" -> Map.put(base, "completed", true)
+      "false" -> Map.put(base, "completed", false)
+      _ -> base
     end
   end
 
