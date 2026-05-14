@@ -283,22 +283,30 @@ defmodule RompCrmWeb.UserAuth do
   @doc false
   def on_mount(:ensure_business_scope, _params, session, socket) do
     user = socket.assigns.current_scope.user
-    businesses = Businesses.list_businesses_for_user(user)
 
-    cond do
-      businesses == [] ->
+    case Businesses.ensure_default_workspace_if_empty(user) do
+      {:ok, []} ->
         {:halt,
          socket
          |> Phoenix.LiveView.put_flash(:info, "Create or join a business to see jobs.")
          |> Phoenix.LiveView.redirect(to: ~p"/businesses")}
 
-      true ->
+      {:ok, businesses} ->
         bid = Businesses.resolve_active_business_id(user, businesses, session)
 
         {:cont,
          socket
          |> Phoenix.Component.assign(:current_business_id, bid)
          |> Phoenix.Component.assign(:my_businesses, businesses)}
+
+      {:error, _} ->
+        {:halt,
+         socket
+         |> Phoenix.LiveView.put_flash(
+           :error,
+           "Could not create your first workspace. Try again from Workspaces."
+         )
+         |> Phoenix.LiveView.redirect(to: ~p"/businesses")}
     end
   end
 

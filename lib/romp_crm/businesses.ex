@@ -13,6 +13,8 @@ defmodule RompCrm.Businesses do
 
   @max_owned_businesses_per_account 3
 
+  @default_first_workspace_name "My workspace"
+
   @doc """
   Maximum businesses one account may create (`owner` memberships). Invited team members do not consume this quota.
   """
@@ -50,6 +52,37 @@ defmodule RompCrm.Businesses do
         order_by: [asc: b.name],
         select: b
     )
+  end
+
+  @doc """
+  Ensures **`user`** has at least one workspace when they may create businesses.
+
+  When **`list_businesses_for_user/1`** is empty and **`User.may_create_business?/1`** is true,
+  creates a business named **`My workspace`** (same rules as **`create_business/2`**) so Jobs and
+  the first-login SMS intro never hit an empty scope. Invited-only accounts (**`may_create_business`**
+  false) are unchanged.
+
+  Returns **`{:ok, businesses}`** or **`create_business/2`** errors.
+  """
+  def ensure_default_workspace_if_empty(%User{} = user) do
+    businesses = list_businesses_for_user(user)
+
+    cond do
+      businesses != [] ->
+        {:ok, businesses}
+
+      not User.may_create_business?(user) ->
+        {:ok, []}
+
+      true ->
+        case create_business(user, %{name: @default_first_workspace_name}) do
+          {:ok, _} ->
+            {:ok, list_businesses_for_user(user)}
+
+          {:error, _} = err ->
+            err
+        end
+    end
   end
 
   @doc """

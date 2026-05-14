@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.62] - 2026-05-08
+
+### Added
+
+- **`Businesses.ensure_default_workspace_if_empty/1`**: when **`User.may_create_business?/1`** and the user has no memberships, create **`My workspace`** (same as **`create_business/2`**) so **`UserAuth.on_mount :ensure_business_scope`** never redirects new owners away from Jobs before the first-login SMS intro finishes
+
 ## [0.9.61] - 2026-05-08
 
 ### Changed

@@ -83,6 +83,35 @@ defmodule RompCrm.BusinessesTest do
     end
   end
 
+  describe "ensure_default_workspace_if_empty/1" do
+    test "creates My workspace when owner has no businesses" do
+      user = user_fixture()
+      assert Businesses.list_businesses_for_user(user) == []
+      assert {:ok, [biz]} = Businesses.ensure_default_workspace_if_empty(user)
+      assert biz.name == "My workspace"
+
+      assert {:ok, [^biz]} =
+               Businesses.ensure_default_workspace_if_empty(Accounts.get_user!(user.id))
+    end
+
+    test "returns empty list without creating when may_create_business is false" do
+      user = user_fixture()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(may_create_business: false)
+        |> Repo.update()
+
+      assert {:ok, []} = Businesses.ensure_default_workspace_if_empty(user)
+    end
+
+    test "returns existing businesses unchanged" do
+      user = user_fixture()
+      {:ok, b} = Businesses.create_business(user, %{name: "Existing"})
+      assert {:ok, [^b]} = Businesses.ensure_default_workspace_if_empty(user)
+    end
+  end
+
   describe "resolve_active_business_id/3" do
     test "returns nil when businesses list is empty" do
       user = user_fixture()
