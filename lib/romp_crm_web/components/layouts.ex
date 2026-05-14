@@ -158,7 +158,7 @@ defmodule RompCrmWeb.Layouts do
       />
     <% end %>
 
-    <.legal_footer />
+    <.legal_footer current_scope={@current_scope} />
 
     <.flash_group flash={@flash} />
     """
@@ -217,7 +217,15 @@ defmodule RompCrmWeb.Layouts do
   @doc """
   Footer links to published Privacy Policy and Terms of Service on rompcrm.com.
   """
+  attr :current_scope, :any, default: nil
+
   def legal_footer(assigns) do
+    show_admin? =
+      match?(%RompCrm.Accounts.Scope{user: %RompCrm.Accounts.User{}}, assigns[:current_scope]) &&
+        RompCrm.Admin.admin?(assigns.current_scope.user)
+
+    assigns = assign(assigns, :show_admin_link, show_admin?)
+
     ~H"""
     <footer class="border-t border-base-300/80 mt-auto px-4 py-8 text-center text-xs text-base-content/65">
       <nav class="flex flex-wrap justify-center gap-x-4 gap-y-1">
@@ -238,6 +246,12 @@ defmodule RompCrmWeb.Layouts do
         >
           Terms of Service
         </a>
+        <%= if @show_admin_link do %>
+          <span aria-hidden="true">·</span>
+          <.link navigate={~p"/admin"} class="link link-hover">
+            Admin
+          </.link>
+        <% end %>
       </nav>
       <p class="mt-2 tabular-nums">© {Date.utc_today().year} Romp CRM</p>
     </footer>

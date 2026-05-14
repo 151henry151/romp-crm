@@ -1,0 +1,42 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-lg space-y-4 text-base-content">
+    <.header>
+      Gift subscription
+      <:subtitle>
+        {@gift.duration_days} days for {@gift.recipient_email}
+      </:subtitle>
+    </.header>
+
+    <%= if is_binary(@gift.admin_message) and String.trim(@gift.admin_message) != "" do %>
+      <div class="rounded-lg border border-base-300 bg-base-200/40 p-3 text-sm whitespace-pre-wrap">{@gift.admin_message}</div>
+    <% end %>
+
+    <%= if @current_scope && @current_scope.user do %>
+      <%= if String.downcase(String.trim(@current_scope.user.email)) == @gift.recipient_email do %>
+        <p class="text-sm text-base-content/80">
+          You are logged in as <span class="font-medium text-base-content">{@current_scope.user.email}</span>.
+          Redeem to activate your gifted time (no payment).
+        </p>
+        <form action={~p"/gift/redeem/#{@token}"} method="post" class="pt-2">
+          <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+          <button type="submit" class="btn btn-primary">Redeem gift</button>
+        </form>
+      <% else %>
+        <p class="text-sm text-error">
+          This gift is for <span class="font-medium">{@gift.recipient_email}</span>.
+          You are signed in as <span class="font-medium">{@current_scope.user.email}</span>.
+          Log out and sign in with the gifted email, or use a private window.
+        </p>
+        <.link href={~p"/users/log-out"} method="delete" class="btn btn-outline btn-sm">Log out</.link>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-base-content/80">
+        Log in (or create an account) with <span class="font-medium">{@gift.recipient_email}</span>, then return here and tap Redeem.
+      </p>
+      <div class="flex flex-wrap gap-2 pt-1">
+        <.link navigate={~p"/users/log-in"} class="btn btn-primary btn-sm">Log in</.link>
+        <.link navigate={~p"/users/register?gift=#{@token}"} class="btn btn-outline btn-sm">Create account</.link>
+      </div>
+    <% end %>
+  </div>
+</Layouts.app>

@@ -14,7 +14,7 @@ defmodule RompCrm.Billing do
 
   @doc """
   When true, new sign-ups start as `pending_payment` and must complete PayPal before the magic link is sent.
-  Authenticated users must have `subscription_status == "active"` to use the CRM.
+  Authenticated users need **`subscription_status`** **`active`** or **`invited_member`**, or an unexpired **`gift_access_until`**, when the paywall is enabled.
   """
   def paywall_enabled? do
     RompCrm.ApplicationConfig.subscription_paywall_enabled?()
@@ -23,6 +23,16 @@ defmodule RompCrm.Billing do
   def subscription_active?(%User{subscription_status: status})
       when status in ["active", "invited_member"],
       do: true
+
+  def subscription_active?(%User{} = user) do
+    case user.gift_access_until do
+      %DateTime{} = until ->
+        DateTime.compare(DateTime.utc_now(:second), until) == :lt
+
+      _ ->
+        false
+    end
+  end
 
   def subscription_active?(_), do: false
 

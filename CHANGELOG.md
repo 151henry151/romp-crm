@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.53] - 2026-05-14
+
+### Added
+
+- **Admin** (`/admin`): dashboard for configured admin emails only — user counts, subscription status breakdown, per-user workspace/job counts, gift-subscription sender
+- **`gift_subscriptions`** table and **`users.gift_access_until`**: gift tokens emailed to recipients; redeem (logged in or at registration) grants access without PayPal; **`Billing.subscription_active?/1`** treats unexpired gift access like an active subscription
+- **Gift redemption** at **`/gift/redeem/:token`** (public page + POST when logged in); registration with **`?gift=`** skips hosted PayPal when the token is valid
+- **`config :romp_crm, :admin_emails`** (default **`151henry151@gmail.com`**); production override via **`ADMIN_EMAILS`** (comma-separated) in **`config/runtime.exs`**
+- Footer **Admin** link for admin users only
+
 ## [0.9.52] - 2026-05-14
 
 ### Changed

@@ -18,6 +18,7 @@ defmodule RompCrm.Accounts.User do
 
     field :paypal_subscription_id, :string
     field :paypal_plan_id, :string
+    field :gift_access_until, :utc_datetime
 
     # `active`: allowed to use the app when paywall is enabled. Others block at the plug/LiveView layer.
     field :subscription_status, :string, default: "active"

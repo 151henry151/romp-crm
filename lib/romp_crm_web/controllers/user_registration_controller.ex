@@ -5,6 +5,8 @@ defmodule RompCrmWeb.UserRegistrationController do
   alias RompCrm.Accounts.User
   alias RompCrm.Billing
   alias RompCrm.Businesses
+  alias RompCrm.Gifts
+  alias RompCrm.Gifts.GiftSubscription
   alias RompCrmWeb.UserAuth
 
   plug :auth_pages_no_store when action in [:new]
@@ -12,11 +14,33 @@ defmodule RompCrmWeb.UserRegistrationController do
   defp auth_pages_no_store(conn, _opts), do: UserAuth.put_auth_pages_no_store(conn)
 
   def new(conn, params) do
+    gift_token_raw = params |> Map.get("gift") |> to_string() |> String.trim()
+
+    {gift_registration?, gift_token, gift_email} = gift_registration_context(gift_token_raw)
+
+    conn =
+      cond do
+        gift_registration? && gift_token != "" ->
+          put_session(conn, :pending_gift_token, gift_token)
+
+        gift_token_raw != "" ->
+          delete_session(conn, :pending_gift_token)
+
+        true ->
+          conn
+      end
+
     initial_email =
-      params
-      |> Map.get("email", "")
-      |> to_string()
-      |> String.trim()
+      cond do
+        gift_email != "" ->
+          gift_email
+
+        true ->
+          params
+          |> Map.get("email", "")
+          |> to_string()
+          |> String.trim()
+      end
 
     changeset = Accounts.change_user_email(%User{email: initial_email})
 
@@ -27,14 +51,23 @@ defmodule RompCrmWeb.UserRegistrationController do
       :new,
       registration_assigns(
         changeset: changeset,
-        invitation_registration: invitation_registration?
+        invitation_registration: invitation_registration?,
+        gift_registration: gift_registration?,
+        gift_token: gift_token
       )
     )
   end
 
-  def create(conn, %{"user" => user_params}) do
+  def create(conn, params) do
+    %{"user" => user_params} = params
     plan = user_params |> Map.get("plan", "monthly") |> to_string()
     attrs = Map.drop(user_params, ["plan"])
+
+    gift_raw =
+      [Map.get(params, "gift"), get_session(conn, :pending_gift_token)]
+      |> Enum.map(&to_string/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.find(&(&1 != ""))
 
     case classify_registration(conn, attrs) do
       {:via_invitation, invitation} ->
@@ -55,12 +88,19 @@ defmodule RompCrmWeb.UserRegistrationController do
           :new,
           registration_assigns(
             changeset: %{cs | action: :insert},
-            invitation_registration: true
+            invitation_registration: true,
+            gift_registration: false,
+            gift_token: ""
           )
         )
 
       :standard_paywall ->
+        gift_ok = gift_raw != nil && gift_pending?(gift_raw)
+
         cond do
+          gift_ok ->
+            finish_create_with_gift(conn, attrs, gift_raw)
+
           Billing.paywall_enabled?() and not Billing.valid_plan?(plan) ->
             conn
             |> put_flash(:error, "Choose monthly or annual billing.")
@@ -77,6 +117,27 @@ defmodule RompCrmWeb.UserRegistrationController do
           true ->
             finish_create(conn, attrs, plan)
         end
+    end
+  end
+
+  defp gift_registration_context(gift_token) when gift_token == "" do
+    {false, "", ""}
+  end
+
+  defp gift_registration_context(gift_token) do
+    case Gifts.get_gift_by_token(gift_token) do
+      %GiftSubscription{redeemed_at: nil} = g ->
+        {true, gift_token, g.recipient_email}
+
+      _ ->
+        {false, "", ""}
+    end
+  end
+
+  defp gift_pending?(token) do
+    case Gifts.get_gift_by_token(token) do
+      %GiftSubscription{redeemed_at: nil} -> true
+      _ -> false
     end
   end
 
@@ -145,7 +206,9 @@ defmodule RompCrmWeb.UserRegistrationController do
           :new,
           registration_assigns(
             changeset: %{changeset | action: :insert},
-            invitation_registration: true
+            invitation_registration: true,
+            gift_registration: false,
+            gift_token: ""
           )
         )
     end
@@ -154,27 +217,35 @@ defmodule RompCrmWeb.UserRegistrationController do
   defp render_register_form(conn, attrs) do
     cs = Accounts.change_user_email(%User{}, attrs)
     changeset = %{cs | action: :insert}
-    {_inv?, invitation_registration?} = invitation_context(conn)
+    {invitation_registration?, _} = invitation_context(conn)
+    gift_token = get_session(conn, :pending_gift_token) |> to_string() |> String.trim()
+    {gift_registration?, gift_token, _} = gift_registration_context(gift_token)
 
     render(
       conn,
       :new,
       registration_assigns(
         changeset: changeset,
-        invitation_registration: invitation_registration?
+        invitation_registration: invitation_registration?,
+        gift_registration: gift_registration?,
+        gift_token: gift_token
       )
     )
   end
 
   defp registration_assigns(extra) do
-    invitation_registration =
-      Keyword.get(extra, :invitation_registration, false)
+    invitation_registration = Keyword.get(extra, :invitation_registration, false)
+    gift_registration = Keyword.get(extra, :gift_registration, false)
+    gift_token = Keyword.get(extra, :gift_token, "")
 
     Keyword.merge(
       [
-        subscription_paywall: Billing.paywall_enabled?() && !invitation_registration,
+        subscription_paywall:
+          Billing.paywall_enabled?() && !invitation_registration && !gift_registration,
         paypal_trial_days: Billing.paypal_trial_days(),
-        invitation_registration: invitation_registration
+        invitation_registration: invitation_registration,
+        gift_registration: gift_registration,
+        gift_token: gift_token
       ],
       extra
     )
@@ -190,6 +261,58 @@ defmodule RompCrmWeb.UserRegistrationController do
       end
     else
       {false, nil}
+    end
+  end
+
+  defp finish_create_with_gift(conn, attrs, gift_token) do
+    case Accounts.register_user(attrs) do
+      {:ok, user} ->
+        case Gifts.apply_after_registration(user, gift_token) do
+          {:ok, user} ->
+            {:ok, _} =
+              Accounts.deliver_login_instructions(
+                user,
+                &url(~p"/users/log-in/#{&1}")
+              )
+
+            conn
+            |> delete_session(:pending_gift_token)
+            |> put_flash(
+              :info,
+              "Check #{user.email} for your sign-in link to activate your gifted subscription (no payment)."
+            )
+            |> redirect(to: ~p"/users/log-in")
+
+          {:error, :email_mismatch} ->
+            conn
+            |> put_flash(:error, "Registration email must match the gift recipient address.")
+            |> render_register_form(attrs)
+
+          {:error, :already_redeemed} ->
+            conn
+            |> put_flash(:error, "That gift was already redeemed.")
+            |> render_register_form(attrs)
+
+          {:error, _} ->
+            conn
+            |> put_flash(:error, "Could not apply the gift. Contact support.")
+            |> render_register_form(attrs)
+        end
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {invitation_registration?, _} = invitation_context(conn)
+        gift_tok = gift_token
+
+        render(
+          conn,
+          :new,
+          registration_assigns(
+            changeset: %{changeset | action: :insert},
+            invitation_registration: invitation_registration?,
+            gift_registration: true,
+            gift_token: gift_tok
+          )
+        )
     end
   end
 
@@ -234,13 +357,17 @@ defmodule RompCrmWeb.UserRegistrationController do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {invitation_registration?, _} = invitation_context(conn)
+        gift_tok = get_session(conn, :pending_gift_token) |> to_string() |> String.trim()
+        {gift_reg?, gift_tok2, _} = gift_registration_context(gift_tok)
 
         render(
           conn,
           :new,
           registration_assigns(
             changeset: %{changeset | action: :insert},
-            invitation_registration: invitation_registration?
+            invitation_registration: invitation_registration?,
+            gift_registration: gift_reg?,
+            gift_token: gift_tok2
           )
         )
     end

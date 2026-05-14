@@ -37,6 +37,7 @@ config :phoenix,
 
 config :romp_crm,
   skip_twilio_signature_validation: true,
+  admin_emails: ["admin.romp.test@example.com"],
   sms_job_extractor_adapter: RompCrm.Ai.SmsJobExtractor.DeterministicStub,
   sms_time_extractor_adapter: RompCrm.Ai.SmsTimeExtractor.DeterministicStub,
   sms_employee_time_extractor_adapter: RompCrm.Ai.SmsEmployeeTimeExtractor.DeterministicStub,

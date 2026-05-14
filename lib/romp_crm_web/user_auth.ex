@@ -7,6 +7,7 @@ defmodule RompCrmWeb.UserAuth do
   alias RompCrm.Accounts
   alias RompCrm.Accounts.Scope
   alias RompCrm.Accounts.User
+  alias RompCrm.Admin
   alias RompCrm.Billing
   alias RompCrm.Businesses
 
@@ -255,6 +256,20 @@ defmodule RompCrmWeb.UserAuth do
            "An active subscription is required to access Romp CRM on this server."
          )
          |> Phoenix.LiveView.redirect(to: ~p"/subscribe")}
+    end
+  end
+
+  @doc false
+  def on_mount(:require_admin, _params, _session, socket) do
+    user = socket.assigns.current_scope.user
+
+    if Admin.admin?(user) do
+      {:cont, socket}
+    else
+      {:halt,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, "Not authorized.")
+       |> Phoenix.LiveView.redirect(to: ~p"/")}
     end
   end
 

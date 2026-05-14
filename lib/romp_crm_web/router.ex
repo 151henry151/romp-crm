@@ -87,12 +87,32 @@ defmodule RompCrmWeb.Router do
     get "/subscribe/paypal/return", SubscribeController, :paypal_return
     get "/subscribe/paypal/cancel", SubscribeController, :paypal_cancel
 
+    get "/gift/redeem/:token", GiftRedeemController, :show
+
     get "/invitations/:token", InvitationController, :show
 
     get "/users/log-in", UserSessionController, :new
     get "/users/log-in/:token", UserSessionController, :confirm
     post "/users/log-in", UserSessionController, :create
     delete "/users/log-out", UserSessionController, :delete
+  end
+
+  scope "/", RompCrmWeb do
+    pipe_through [:browser, :require_logged_in_user]
+
+    post "/gift/redeem/:token", GiftRedeemController, :create
+  end
+
+  scope "/", RompCrmWeb do
+    pipe_through [:browser, :require_logged_in_user]
+
+    live_session :admin,
+      on_mount: [
+        {RompCrmWeb.UserAuth, :require_authenticated},
+        {RompCrmWeb.UserAuth, :require_admin}
+      ] do
+      live "/admin", AdminLive, :index
+    end
   end
 
   # Authenticated routes
