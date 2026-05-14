@@ -208,14 +208,20 @@ defmodule RompCrm.Accounts.User do
   end
 
   defp validate_phone_normalized_unique(changeset) do
+    taken_msg =
+      "is already linked to another account. Remove it in that account's Settings first, or use a different number."
+
     case Ecto.Changeset.get_field(changeset, :phone_normalized) do
       nil ->
         changeset
 
       _norm ->
         changeset
-        |> unsafe_validate_unique(:phone_normalized, RompCrm.Repo)
-        |> unique_constraint(:phone_normalized)
+        |> unsafe_validate_unique(:phone_normalized, RompCrm.Repo, message: taken_msg)
+        |> unique_constraint(:phone_normalized,
+          name: :users_phone_normalized_index,
+          message: taken_msg
+        )
     end
   end
 

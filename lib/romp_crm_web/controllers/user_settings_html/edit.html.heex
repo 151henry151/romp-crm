@@ -60,7 +60,9 @@
     <.input field={f[:phone]} type="tel" label="Your mobile number (SMS)" autocomplete="tel" />
 
     <p class="text-sm text-base-content/70 -mt-2 mb-4">
-      Use the number you text from so inbound SMS matches your account.
+      Use the number you text from so inbound SMS matches your account. One mobile number can only be on
+      <span class="font-medium text-base-content/90">one</span> Romp CRM account at a time. Remove it in the other
+      account's Settings before you can use it here.
     </p>
 
     <%= if assigns[:profile_businesses] && length(@profile_businesses) > 1 do %>

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.63] - 2026-05-08
+
+### Changed
+
+- **`User.profile_changeset`**: clearer **`phone_normalized`** uniqueness copy when the number is already on another account
+- **`SmsAssistantIntroComponent`**: flash the first profile validation error (e.g. duplicate mobile) when **Save and text me** fails
+- **`UserSettingsController`**: flash the first profile validation error on failed **Save profile**
+- **Account Settings** help text: document one mobile number per product account
+
 ## [0.9.62] - 2026-05-08
 
 ### Added

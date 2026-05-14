@@ -210,7 +210,9 @@ defmodule RompCrmWeb.UserSettingsController do
         |> redirect(to: ~p"/users/settings")
 
       {:error, %Ecto.Changeset{} = cs} ->
-        render(conn, :edit, profile_changeset: cs)
+        conn
+        |> put_flash(:error, first_profile_changeset_flash(cs))
+        |> render(:edit, profile_changeset: cs)
     end
   end
 
@@ -417,5 +419,21 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:current_business_id, bid)
     |> assign(:my_businesses, businesses)
     |> assign(:is_business_owner, is_owner)
+  end
+
+  defp first_profile_changeset_flash(%Ecto.Changeset{errors: errors}) do
+    case errors do
+      [{field, {msg, _}} | _] ->
+        label =
+          case field do
+            :phone -> "Mobile number"
+            _ -> field |> to_string() |> String.replace("_", " ")
+          end
+
+        "#{label}: #{msg}"
+
+      _ ->
+        "Could not save profile. Check the form and try again."
+    end
   end
 end
