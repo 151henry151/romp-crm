@@ -16,7 +16,8 @@ defmodule RompCrmWeb.JobTimeLogDefaults do
     %{ndt | minute: m, second: 0, microsecond: {0, 0}}
   end
 
-  defp to_datetime_local(%NaiveDateTime{} = ndt) do
+  @doc "Format a naive datetime as `YYYY-MM-DDTHH:mm` for HTML `datetime-local` inputs."
+  def to_datetime_local(%NaiveDateTime{} = ndt) do
     :io_lib.format("~4..0w-~2..0w-~2..0wT~2..0w:~2..0w", [
       ndt.year,
       ndt.month,

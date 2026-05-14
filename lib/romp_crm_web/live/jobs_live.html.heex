@@ -136,7 +136,10 @@
                         <th class="text-left pr-3 pb-1">Date</th>
                         <th class="text-left pr-3 pb-1">Start</th>
                         <th class="text-left pr-3 pb-1">End</th>
-                        <th class="text-left pb-1">Duration</th>
+                        <th class="text-left pr-3 pb-1">Duration</th>
+                        <%= if @can_log_job_time do %>
+                          <th class="text-right pb-1 w-20"><span class="sr-only">Edit or remove</span></th>
+                        <% end %>
                       </tr>
                     </thead>
                     <tbody>
@@ -151,25 +154,47 @@
                               <span class="text-green-600 font-medium">In progress</span>
                             <% end %>
                           </td>
-                          <td class="py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                          <td class="pr-3 py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                          <%= if @can_log_job_time do %>
+                            <td class="py-0.5 text-right whitespace-nowrap">
+                              <div class="inline-flex items-center gap-1 justify-end">
+                                <button
+                                  type="button"
+                                  phx-click="open_edit_job_time_log"
+                                  phx-value-job_id={job.id}
+                                  phx-value-time_entry_id={te.id}
+                                  class="inline-flex rounded p-1 text-base-content/60 hover:bg-base-200 hover:text-blue-600"
+                                  title="Edit hours"
+                                  aria-label="Edit job hours"
+                                >
+                                  <.icon name="hero-pencil-square" class="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  phx-click="delete_time_entry"
+                                  phx-value-job_id={job.id}
+                                  phx-value-id={te.id}
+                                  data-confirm="Remove these hours from this job?"
+                                  class="inline-flex rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  title="Remove hours"
+                                  aria-label="Remove job hours"
+                                >
+                                  <.icon name="hero-x-mark" class="size-4" />
+                                </button>
+                              </div>
+                            </td>
+                          <% end %>
                         </tr>
                       <% end %>
                     </tbody>
                   </table>
                 <% end %>
               </div>
-              <%= if @can_edit_jobs do %>
-                <div class="pt-2 flex items-center gap-4">
-                  <button
-                    phx-click="delete"
-                    phx-value-id={job.id}
-                    data-confirm="Delete this job?"
-                    class="text-red-500 hover:text-red-700 font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              <% end %>
+              <.job_delete_bar
+                job={job}
+                delete_step={delete_step_for(@job_delete_steps, job.id)}
+                can_edit_jobs={@can_edit_jobs}
+              />
             </div>
           <% end %>
         </div>
@@ -241,20 +266,7 @@
                 {job.next_action}
               </td>
               <%= if @can_edit_jobs do %>
-                <td class="px-4 py-3">
-                  <div class={[
-                    "flex items-center gap-2 transition-opacity",
-                    if(job_expanded?, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
-                  ]}>
-                    <button
-                      phx-click="delete"
-                      phx-value-id={job.id}
-                      data-confirm="Delete this job?"
-                      class="text-red-500 hover:text-red-700 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                <td class="px-4 py-3 w-10" onclick="event.stopPropagation()">
                 </td>
               <% end %>
             </tr>
@@ -320,7 +332,10 @@
                               <th class="text-left pr-4 pb-1">Date</th>
                               <th class="text-left pr-4 pb-1">Start</th>
                               <th class="text-left pr-4 pb-1">End</th>
-                              <th class="text-left pb-1">Duration</th>
+                              <th class="text-left pr-4 pb-1">Duration</th>
+                              <%= if @can_log_job_time do %>
+                                <th class="text-right pb-1 w-20"><span class="sr-only">Edit or remove</span></th>
+                              <% end %>
                             </tr>
                           </thead>
                           <tbody>
@@ -339,12 +354,48 @@
                                     <span class="text-green-600 font-medium">In progress</span>
                                   <% end %>
                                 </td>
-                                <td class="py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                                <td class="pr-4 py-0.5">{TimeEntry.format_duration(te) || "—"}</td>
+                                <%= if @can_log_job_time do %>
+                                  <td class="py-0.5 text-right whitespace-nowrap">
+                                    <div class="inline-flex items-center gap-1 justify-end">
+                                      <button
+                                        type="button"
+                                        phx-click="open_edit_job_time_log"
+                                        phx-value-job_id={job.id}
+                                        phx-value-time_entry_id={te.id}
+                                        class="inline-flex rounded p-1 text-base-content/60 hover:bg-base-200 hover:text-blue-600"
+                                        title="Edit hours"
+                                        aria-label="Edit job hours"
+                                      >
+                                        <.icon name="hero-pencil-square" class="size-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        phx-click="delete_time_entry"
+                                        phx-value-job_id={job.id}
+                                        phx-value-id={te.id}
+                                        data-confirm="Remove these hours from this job?"
+                                        class="inline-flex rounded p-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                        title="Remove hours"
+                                        aria-label="Remove job hours"
+                                      >
+                                        <.icon name="hero-x-mark" class="size-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                <% end %>
                               </tr>
                             <% end %>
                           </tbody>
                         </table>
                       <% end %>
+                    </div>
+                    <div class="lg:col-span-2">
+                      <.job_delete_bar
+                        job={job}
+                        delete_step={delete_step_for(@job_delete_steps, job.id)}
+                        can_edit_jobs={@can_edit_jobs}
+                      />
                     </div>
                   </div>
                 </td>
@@ -368,13 +419,18 @@
   <.modal id="job-time-log-modal" show on_cancel={JS.push("close_job_time_log")}>
     <div class="pr-8">
       <h2 id="job-time-log-modal-title" class="text-lg font-semibold text-gray-900">
-        Add job hours
+        <%= if @log_time_entry_id, do: "Edit job hours", else: "Add job hours" %>
       </h2>
       <p class="mt-1 text-sm text-gray-600">
         For <span class="font-medium text-gray-800">{@log_job_time_client_name}</span>. Enter when you started and
         finished on <span class="font-medium">this job</span> (pickers use 15-minute steps; you can still type any
         minute). This does <span class="font-medium">not</span> start a live timer.
       </p>
+      <%= if @log_time_entry_id && @job_time_ended_at == "" do %>
+        <p class="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+          Leave <span class="font-medium">End</span> empty if this visit is still in progress.
+        </p>
+      <% end %>
       <p class="mt-2 text-xs text-gray-500">
         Workday punch in/out is separate:
         <a href={~p"/my-timeclock"} class="text-blue-600 hover:underline font-medium">Workday timeclock</a>.
@@ -414,7 +470,7 @@
         </div>
         <div class="flex flex-wrap gap-2 pt-2">
           <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
-            Save job hours
+            <%= if @log_time_entry_id, do: "Update job hours", else: "Save job hours" %>
           </button>
           <button type="button" phx-click="close_job_time_log" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
             Cancel
