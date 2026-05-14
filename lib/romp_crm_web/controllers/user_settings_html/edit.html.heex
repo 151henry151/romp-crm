@@ -171,31 +171,14 @@
     <span class="font-medium text-base-content/90">Audit log</span> (business-scoped changes from the web UI and SMS, with which user made each change).
   </p>
 
-  <.form :let={f} for={@export_changeset} action={~p"/users/settings"} method="post" id="update_data_export_schedule">
-    <input type="hidden" name="_method" value="put" />
-    <input type="hidden" name="action" value="update_data_export_schedule" />
-
-    <.input
-      field={f[:data_export_schedule]}
-      type="select"
-      label="Automatic export schedule"
-      options={[
-        {"Off", "none"},
-        {"Daily", "daily"},
-        {"Weekly", "weekly"},
-        {"Monthly", "monthly"}
-      ]}
-    />
-
-    <p class="text-xs text-base-content/60 mb-3 max-w-lg mx-auto text-left">
-      When enabled, the server emails you on each interval (counted in UTC from the last successful send). Scheduled runs always include all four CSVs and all workspaces you own. For a one-off, use the buttons below and pick workspaces and files.
-    </p>
-
-    <.button variant="primary" phx-disable-with="Saving...">Save schedule</.button>
-  </.form>
-
-  <form action={~p"/users/settings"} method="post" class="mt-4 max-w-lg mx-auto text-left space-y-3">
-    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+  <.form
+    :let={f}
+    for={@export_changeset}
+    action={~p"/users/settings"}
+    method="post"
+    id="data_export"
+    class="mt-4 max-w-lg mx-auto text-left space-y-3"
+  >
     <input type="hidden" name="_method" value="put" />
 
     <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
@@ -211,7 +194,7 @@
               type="checkbox"
               name="export_business_ids[]"
               value={biz.id}
-              checked
+              checked={biz.id in @export_selected_business_ids}
               class="checkbox checkbox-sm mt-0.5"
             />
             <span class="font-medium">{biz.name}</span>
@@ -223,24 +206,69 @@
     <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
       <legend class="text-sm font-medium text-base-content px-1">Tables to include</legend>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
-        <input type="checkbox" name="export_kinds[]" value="jobs" checked class="checkbox checkbox-sm mt-0.5" />
+        <input
+          type="checkbox"
+          name="export_kinds[]"
+          value="jobs"
+          checked={"jobs" in @export_selected_kind_strings}
+          class="checkbox checkbox-sm mt-0.5"
+        />
         <span><span class="font-medium">Jobs</span> — jobs.csv</span>
       </label>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
-        <input type="checkbox" name="export_kinds[]" value="employees" checked class="checkbox checkbox-sm mt-0.5" />
+        <input
+          type="checkbox"
+          name="export_kinds[]"
+          value="employees"
+          checked={"employees" in @export_selected_kind_strings}
+          class="checkbox checkbox-sm mt-0.5"
+        />
         <span><span class="font-medium">Employees</span> — employees.csv</span>
       </label>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
-        <input type="checkbox" name="export_kinds[]" value="time_log" checked class="checkbox checkbox-sm mt-0.5" />
-        <span><span class="font-medium">Time log</span> — time_log.csv</span>
+        <input
+          type="checkbox"
+          name="export_kinds[]"
+          value="time_log"
+          checked={"time_log" in @export_selected_kind_strings}
+          class="checkbox checkbox-sm mt-0.5"
+        />
+        <span><span class="font-medium">Time log</span> — job clocks and employee clocks</span>
       </label>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
-        <input type="checkbox" name="export_kinds[]" value="audit_log" checked class="checkbox checkbox-sm mt-0.5" />
-        <span><span class="font-medium">Audit log</span> — audit_log.csv</span>
+        <input
+          type="checkbox"
+          name="export_kinds[]"
+          value="audit_log"
+          checked={"audit_log" in @export_selected_kind_strings}
+          class="checkbox checkbox-sm mt-0.5"
+        />
+        <span><span class="font-medium">Audit log</span> — business-scoped changes from the web UI and SMS</span>
       </label>
     </fieldset>
 
+    <.input
+      field={f[:data_export_schedule]}
+      type="select"
+      label="Automatic export schedule"
+      options={[
+        {"Off", "none"},
+        {"Daily", "daily"},
+        {"Weekly", "weekly"},
+        {"Monthly", "monthly"}
+      ]}
+    />
+
+    <p class="text-xs text-base-content/60 mb-1 max-w-lg mx-auto text-left">
+      When a schedule is enabled, the server emails you on each interval (UTC from the last successful send), using the
+      <span class="font-semibold">same workspaces and tables</span> you select above. Save your choices with
+      <span class="font-semibold">Save export preferences</span> (that also stores the schedule).
+    </p>
+
     <div class="flex flex-wrap items-center gap-2">
+      <button type="submit" name="action" value="update_data_export_schedule" class="btn btn-primary btn-sm">
+        Save export preferences
+      </button>
       <button type="submit" name="action" value="export_email_now" class="btn btn-outline btn-sm">
         Email selected to me
       </button>
@@ -252,9 +280,10 @@
       </span>
     </div>
     <p class="text-xs text-base-content/60">
-      One CSV downloads as that file. If you pick more than one table, you get a single <code class="text-xs">.zip</code> containing the selected CSVs. Rows are limited to the workspaces checked above.
+      Browser download: one CSV for a single table, or a ZIP when you pick more than one. Email: when you select
+      <span class="font-semibold">more than two</span> tables, the message has one ZIP attachment instead of separate CSV files.
     </p>
-  </form>
+  </.form>
 
   <div class="divider" />
 

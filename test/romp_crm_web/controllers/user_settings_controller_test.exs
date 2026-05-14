@@ -213,17 +213,23 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
   describe "PUT /users/settings (data export)" do
     setup :register_and_log_in_user_with_business
 
-    test "saves scheduled export", %{conn: conn, user: user} do
+    test "saves scheduled export and persisted kind and workspace selections", %{conn: conn, user: user} do
+      [biz] = Businesses.list_owned_businesses_for_user(user)
+
       conn =
         put(conn, ~p"/users/settings", %{
           "action" => "update_data_export_schedule",
-          "user" => %{"data_export_schedule" => "daily"}
+          "user" => %{"data_export_schedule" => "daily"},
+          "export_kinds" => ["jobs", "audit_log"],
+          "export_business_ids" => [to_string(biz.id)]
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
       updated = Repo.get!(RompCrm.Accounts.User, user.id)
       assert updated.data_export_schedule == "daily"
       assert %DateTime{} = updated.data_export_next_run_at
+      assert Jason.decode!(updated.data_export_kinds_json) == ["jobs", "audit_log"]
+      assert Jason.decode!(updated.data_export_business_ids_json) == [biz.id]
     end
 
     test "email export shows flash listing selected CSV names", %{conn: conn, user: user} do

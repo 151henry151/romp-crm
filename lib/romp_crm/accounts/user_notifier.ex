@@ -86,34 +86,75 @@ defmodule RompCrm.Accounts.UserNotifier do
   end
 
   @doc """
-  Sends CSV attachments for **owner** businesses only. **`files`** is a list of **`{filename, body}`**
-  (UTF-8 CSV); the email body lists only those filenames.
+  Sends export files for **owner** businesses only. **`files`** is **`{filename, body}`** (UTF-8 CSV).
+
+  When **more than two** files are included, attaches a **single ZIP** instead of separate CSV attachments.
   """
   def deliver_data_export_csvs(%User{email: to_email}, files)
       when is_list(files) and is_binary(to_email) do
     from_name = Application.get_env(:romp_crm, :mail_from_name, "Romp CRM")
     from_address = Application.get_env(:romp_crm, :mail_from_address, "contact@example.com")
 
-    attachments =
+    use_zip? = length(files) > 2
+
+    with {:ok, attachments} <- build_export_attachments(files, use_zip?) do
+      intro = data_export_email_intro(files, use_zip?)
+
+      email_built =
+        new()
+        |> to(to_email)
+        |> from({from_name, from_address})
+        |> subject("Romp CRM — your data export")
+        |> text_body(intro)
+        |> attach_all_csv(attachments)
+
+      Mailer.deliver(email_built)
+    end
+  end
+
+  defp build_export_attachments(files, true) do
+    case RompCrm.DataExport.build_download_payload(files) do
+      {:ok, {:zip, body}} ->
+        {:ok,
+         [
+           Swoosh.Attachment.new({:data, body},
+             filename: "romp-crm-export.zip",
+             content_type: "application/zip"
+           )
+         ]}
+
+      {:error, reason} ->
+        {:error, {:zip_failed, reason}}
+    end
+  end
+
+  defp build_export_attachments(files, false) do
+    atts =
       Enum.map(files, fn {filename, body} ->
         body = body || <<>>
         Swoosh.Attachment.new({:data, body}, filename: filename, content_type: "text/csv")
       end)
 
-    intro = data_export_email_intro(files)
-
-    email_built =
-      new()
-      |> to(to_email)
-      |> from({from_name, from_address})
-      |> subject("Romp CRM — your data export")
-      |> text_body(intro)
-      |> attach_all_csv(attachments)
-
-    Mailer.deliver(email_built)
+    {:ok, atts}
   end
 
-  defp data_export_email_intro(files) do
+  defp data_export_email_intro(files, use_zip?) when use_zip? do
+    bullets =
+      files
+      |> Enum.map(fn {fname, _} -> "  - #{fname} — #{data_export_file_blurb(fname)}" end)
+      |> Enum.join("\n")
+
+    """
+    Your Romp CRM data export is attached as one ZIP archive (UTF-8 CSV files inside):
+
+    #{bullets}
+
+    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page). They never include businesses where you are only a member (non-owner).
+    """
+    |> String.trim()
+  end
+
+  defp data_export_email_intro(files, _use_zip?) do
     bullets =
       files
       |> Enum.map(fn {fname, _} -> "  - #{fname} — #{data_export_file_blurb(fname)}" end)
@@ -124,7 +165,7 @@ defmodule RompCrm.Accounts.UserNotifier do
 
     #{bullets}
 
-    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page, or all workspaces you own for scheduled automatic sends). They never include businesses where you are only a member (non-owner).
+    Rows are limited to owner-only data for the workspaces in this export (those you checked on the settings page). They never include businesses where you are only a member (non-owner).
     """
     |> String.trim()
   end

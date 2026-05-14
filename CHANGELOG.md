@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.9.51] - 2026-05-08
+
+### Added
+
+- **`users.data_export_kinds_json`** and **`users.data_export_business_ids_json`**: persist export checkbox selections for scheduled emails
+
+### Changed
+
+- **`DataExport.deliver_email_export/1`** (scheduled): use saved kinds and workspace ids (same as settings checkboxes); default remains all kinds and all owned workspaces when columns are unset
+- **`UserSettings`**: one **Data export** form saves schedule plus workspace/table checkboxes; update copy for scheduled runs and ZIP email behavior
+- **`UserNotifier.deliver_data_export_csvs/2`**: when **more than two** CSVs are generated, attach a **single ZIP** instead of separate files; refresh email body copy
+
 ## [0.9.50] - 2026-05-08
 
 ### Changed

@@ -17,7 +17,7 @@ defmodule RompCrm.DataExport do
 
   @export_kind_strings ~w(jobs employees time_log audit_log)
 
-  @doc "Ordered export kinds used for scheduled (full) exports and default selection."
+  @doc "Ordered export kinds (canonical); also the default when **`data_export_kinds_json`** is unset."
   def all_export_kinds, do: [:jobs, :employees, :time_log, :audit_log]
 
   @doc """
@@ -101,6 +101,92 @@ defmodule RompCrm.DataExport do
     end
   end
 
+  @doc """
+  Kind strings for the settings checkboxes (canonical order), from **`users.data_export_kinds_json`**.
+  When unset or invalid, defaults to **all** export kinds.
+  """
+  def export_form_selected_kind_strings(%User{} = user) do
+    user |> saved_kind_atoms_from_user() |> Enum.map(&Atom.to_string/1)
+  end
+
+  @doc """
+  Business ids for the settings checkboxes, from **`users.data_export_business_ids_json`**, filtered to
+  workspaces the user still owns. When unset or empty after filtering, defaults to **all** owned ids.
+  """
+  def export_form_selected_business_ids(%User{} = user, owned_businesses) when is_list(owned_businesses) do
+    allowed = MapSet.new(Enum.map(owned_businesses, & &1.id))
+
+    ids =
+      case user.data_export_business_ids_json do
+        nil ->
+          MapSet.to_list(allowed)
+
+        "" ->
+          MapSet.to_list(allowed)
+
+        raw ->
+          case Jason.decode(raw) do
+            {:ok, list} when is_list(list) ->
+              list
+              |> Enum.flat_map(fn
+                i when is_integer(i) ->
+                  if MapSet.member?(allowed, i), do: [i], else: []
+
+                b when is_binary(b) ->
+                  case Integer.parse(String.trim(b)) do
+                    {i, _} -> if(MapSet.member?(allowed, i), do: [i], else: [])
+                    :error -> []
+                  end
+
+                _ ->
+                  []
+              end)
+              |> Enum.uniq()
+
+            _ ->
+              MapSet.to_list(allowed)
+          end
+      end
+      |> Enum.filter(&MapSet.member?(allowed, &1))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    if ids == [], do: MapSet.to_list(allowed) |> Enum.sort(), else: ids
+  end
+
+  defp saved_kind_atoms_from_user(%User{} = user) do
+    case user.data_export_kinds_json do
+      nil ->
+        all_export_kinds()
+
+      "" ->
+        all_export_kinds()
+
+      raw ->
+        case Jason.decode(raw) do
+          {:ok, list} when is_list(list) ->
+            allowed_strings = MapSet.new(@export_kind_strings)
+
+            kept =
+              list
+              |> Enum.map(&to_string/1)
+              |> Enum.filter(&MapSet.member?(allowed_strings, &1))
+              |> MapSet.new()
+
+            if MapSet.size(kept) == 0 do
+              all_export_kinds()
+            else
+              Enum.filter(all_export_kinds(), fn k ->
+                MapSet.member?(kept, Atom.to_string(k))
+              end)
+            end
+
+          _ ->
+            all_export_kinds()
+        end
+    end
+  end
+
   @doc false
   def build_export_files(business_ids, kinds) when is_list(business_ids) and is_list(kinds) do
     for kind <- kinds, reduce: [] do
@@ -168,14 +254,16 @@ defmodule RompCrm.DataExport do
   Builds CSV binaries and emails them. Only includes rows for businesses the user **owns**
   (`BusinessMembership` role **owner**).
 
-  Same as **`deliver_email_export(user, all_export_kinds(), all_owned_business_ids)`** — used by
-  scheduled exports (full kinds, all owned workspaces).
+  Uses **`users.data_export_kinds_json`** and **`users.data_export_business_ids_json`** (same
+  selections as the settings checkboxes). When those columns are unset, behaves like all four
+  kinds and all owned workspaces were selected.
   """
   def deliver_email_export(%User{} = user) do
     user = Repo.get!(User, user.id)
     owned = Businesses.list_owned_businesses_for_user(user)
-    business_ids = Enum.map(owned, & &1.id)
-    do_deliver_email_export(user, all_export_kinds(), business_ids)
+    kinds = saved_kind_atoms_from_user(user)
+    business_ids = export_form_selected_business_ids(user, owned)
+    do_deliver_email_export(user, kinds, business_ids)
   end
 
   @doc """

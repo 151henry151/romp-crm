@@ -126,14 +126,49 @@ defmodule RompCrmWeb.UserSettingsController do
     %{"user" => user_params} = params
     user = conn.assigns.current_scope.user
 
-    case Accounts.update_user_export_settings(user, user_params) do
-      {:ok, _} ->
+    with {:ok, kinds} <- DataExport.normalize_export_kinds(params),
+         {:ok, business_ids} <- DataExport.normalize_export_business_ids(user, params) do
+      kinds_json = Jason.encode!(Enum.map(kinds, &Atom.to_string/1))
+      biz_json = Jason.encode!(business_ids)
+
+      merged =
+        user_params
+        |> Map.put("data_export_kinds_json", kinds_json)
+        |> Map.put("data_export_business_ids_json", biz_json)
+
+      case Accounts.update_user_export_settings(user, merged) do
+        {:ok, _} ->
+          conn
+          |> put_flash(:info, "Scheduled data export settings saved.")
+          |> redirect(to: ~p"/users/settings")
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          render(conn, :edit, export_changeset: cs)
+      end
+    else
+      {:error, :none_selected} ->
         conn
-        |> put_flash(:info, "Scheduled data export settings saved.")
+        |> put_flash(
+          :error,
+          "Choose at least one export: Jobs, Employees, Time log, or Audit log."
+        )
         |> redirect(to: ~p"/users/settings")
 
-      {:error, %Ecto.Changeset{} = cs} ->
-        render(conn, :edit, export_changeset: cs)
+      {:error, :no_business_selected} ->
+        conn
+        |> put_flash(
+          :error,
+          "Choose at least one workspace to export (only businesses you create as owner are listed)."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, :no_owned_businesses} ->
+        conn
+        |> put_flash(
+          :error,
+          "You do not own any businesses yet, so there is nothing to export. Create a business first."
+        )
+        |> redirect(to: ~p"/users/settings")
     end
   end
 
@@ -247,13 +282,17 @@ defmodule RompCrmWeb.UserSettingsController do
         user.subscription_status == "active" and
         is_binary(paypal_sub_id) and String.trim(paypal_sub_id) != ""
 
+    owned_export = Businesses.list_owned_businesses_for_user(user)
+
     conn
     |> assign(:email_changeset, Accounts.change_user_email(user))
     |> assign(:password_changeset, Accounts.change_user_password(user))
     |> assign(:profile_changeset, Accounts.change_user_profile(user))
     |> assign(:export_changeset, Accounts.change_user_export_settings(user))
     |> assign(:profile_businesses, Businesses.list_businesses_for_user(user))
-    |> assign(:owned_businesses_for_export, Businesses.list_owned_businesses_for_user(user))
+    |> assign(:owned_businesses_for_export, owned_export)
+    |> assign(:export_selected_business_ids, DataExport.export_form_selected_business_ids(user, owned_export))
+    |> assign(:export_selected_kind_strings, DataExport.export_form_selected_kind_strings(user))
     |> assign(:show_paypal_subscription_help, show_subscription_help)
     |> assign(:show_cancel_subscription, show_cancel_subscription)
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
@@ -272,7 +311,14 @@ defmodule RompCrmWeb.UserSettingsController do
         "#{workspace_count} workspaces"
       end
 
-    "Check your email for CSV attachments: #{names}. (#{ws}.)"
+    zip_note =
+      if length(kinds) > 2 do
+        " The email uses one ZIP attachment when more than two tables are selected."
+      else
+        ""
+      end
+
+    "Check your email for CSV export: #{names}. (#{ws}.)#{zip_note}"
   end
 
   defp export_csv_filename(:jobs), do: "jobs.csv"
