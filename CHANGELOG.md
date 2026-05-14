@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.9.39] - 2026-05-13
+
+### Added
+
+- **`RompCrmWeb.JobExpandedInlineFields`**: edit **client**, **address**, **phone**, **priority**, **status**, **referred by**, **next action**, **work description**, **job scheduled date**, and **notes** in the expanded job panel (no **Edit** link); **`JobsLive`** **`inline_job_update`** event
+
+### Changed
+
+- **`jobs_live.html.heex`**: wire inline fields on mobile and desktop expanded rows; remove **Edit** actions from the job table and mobile footer (**Delete** remains)
+- **`JobExpandLists`**: replace **Remove** text with compact **×** buttons; work items show **ISO date** as plain text plus a **small calendar** control (no wide date field); materials use **one flex row** (narrow **Qty** input, no **`Job:`** prefix for job-level lines), **`truncate`** description
+
 ## [0.9.38] - 2026-05-13
 
 ### Changed

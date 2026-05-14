@@ -101,26 +101,7 @@
               id={"job-expand-sm-#{job.id}"}
               class="border-t border-base-300 px-4 py-3 text-sm text-base-content space-y-2"
             >
-              <p>
-                <span class="font-medium text-base-content/90">Address:</span>
-                <span class="break-words text-base-content">{display(job.address)}</span>
-              </p>
-              <p>
-                <span class="font-medium text-base-content/90">Phone:</span>
-                <span class="text-base-content">{display(job.phone)}</span>
-              </p>
-              <p>
-                <span class="font-medium text-base-content/90">Work description:</span>
-                <span class="block mt-0.5 break-words text-base-content">
-                  {display(job.work_description)}
-                </span>
-              </p>
-              <%= if job.scheduled_on do %>
-                <p>
-                  <span class="font-medium text-base-content/90">Scheduled:</span>
-                  <span class="text-base-content">{Date.to_iso8601(job.scheduled_on)}</span>
-                </p>
-              <% end %>
+              <.job_expanded_inline_fields job={job} can_edit_jobs={@can_edit_jobs} variant={:mobile} />
               <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} />
               <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} />
               <%= if job.photos != [] && job.photos do %>
@@ -136,28 +117,6 @@
                   <% end %>
                 </div>
               <% end %>
-              <p>
-                <span class="font-medium text-base-content/90">Priority:</span>
-                <span class="text-base-content">
-                  <%= if job.priority == :high do %>
-                    High
-                  <% else %>
-                    Normal
-                  <% end %>
-                </span>
-              </p>
-              <p>
-                <span class="font-medium text-base-content/90">Status:</span>
-                <span class="text-base-content">{status_label(job.status)}</span>
-              </p>
-              <p>
-                <span class="font-medium text-base-content/90">Referred By:</span>
-                <span class="break-words text-base-content">{display(job.referred_by)}</span>
-              </p>
-              <p>
-                <span class="font-medium text-base-content/90">Next Action:</span>
-                <span class="break-words text-base-content">{display(job.next_action)}</span>
-              </p>
               <%!-- Hours on this job (client / site) — not the employer punch clock --%>
               <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
               <% total = TimeTracking.format_total_for_job(job.id, @current_business_id) %>
@@ -224,12 +183,6 @@
               </div>
               <%= if @can_edit_jobs do %>
                 <div class="pt-2 flex items-center gap-4">
-                  <.link
-                    patch={~p"/jobs/#{job.id}/edit"}
-                    class="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Edit
-                  </.link>
                   <button
                     phx-click="delete"
                     phx-value-id={job.id}
@@ -316,12 +269,6 @@
                     "flex items-center gap-2 transition-opacity",
                     if(job_expanded?, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
                   ]}>
-                    <.link
-                      patch={~p"/jobs/#{job.id}/edit"}
-                      class="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Edit
-                    </.link>
                     <button
                       phx-click="delete"
                       phx-value-id={job.id}
@@ -338,56 +285,7 @@
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
                 <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
-                    <p>
-                      <span class="font-medium text-base-content/90">Client:</span> {display(
-                        job.client_name
-                      )}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Address:</span> {display(
-                        job.address
-                      )}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Phone:</span> {display(
-                        job.phone
-                      )}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Priority:</span> {if job.priority ==
-                                                                                            :high,
-                                                                                          do:
-                                                                                            "High",
-                                                                                          else:
-                                                                                            "Normal"}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Status:</span> {status_label(
-                        job.status
-                      )}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Referred By:</span> {display(
-                        job.referred_by
-                      )}
-                    </p>
-                    <p>
-                      <span class="font-medium text-base-content/90">Next Action:</span> {display(
-                        job.next_action
-                      )}
-                    </p>
-                    <p class="lg:col-span-2">
-                      <span class="font-medium text-base-content/90">Work description:</span>
-                      <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">
-                        {display(job.work_description)}
-                      </span>
-                    </p>
-                    <%= if job.scheduled_on do %>
-                      <p class="lg:col-span-2">
-                        <span class="font-medium text-base-content/90">Scheduled:</span>
-                        <span class="text-base-content">{Date.to_iso8601(job.scheduled_on)}</span>
-                      </p>
-                    <% end %>
+                    <.job_expanded_inline_fields job={job} can_edit_jobs={@can_edit_jobs} variant={:desktop} />
                     <.job_work_items_section
                       job={job}
                       can_edit_jobs={@can_edit_jobs}
@@ -411,11 +309,6 @@
                         <% end %>
                       </div>
                     <% end %>
-                    <p class="lg:col-span-2">
-                      <span class="font-medium text-base-content/90">Notes:</span> {display(
-                        job.notes
-                      )}
-                    </p>
                     <%!-- Hours on this job --%>
                     <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
                     <div class="lg:col-span-2 pt-2 border-t border-base-300">
