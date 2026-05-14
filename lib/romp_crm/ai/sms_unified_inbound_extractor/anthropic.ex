@@ -233,7 +233,10 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     **Job-level date:** `"scheduled_on": "YYYY-MM-DD"` on create/update for the overall job start or primary visit date when stated.
 
-    **Materials:** `"materials": [ { "description": "...", "job_work_item_id": <int from snapshot work_items> or omit for whole job, "work_item_index": <0-based index in snapshot work_items list> } ]`. Materials tied to a work item also appear in the combined job list in the app.
+    **Materials:** each object must include **`quantity`** (a positive number; default **1**) and **`description`** (the **item name only** — never put the count inside `description`).
+    Optional: `"job_work_item_id"` (int from snapshot `work_items`) or `"work_item_index"` (0-based index in snapshot `work_items`) to tie the line to a task; omit both for whole-job supplies.
+    Examples: `{"quantity":2,"description":"1 1/4\\\" P traps"}`, `{"quantity":1,"description":"wax seal"}`, `{"quantity":2,"description":"1/2\\\" PRS 90s"}`.
+    Spoken counts in the SMS (**two**, **one**, …) must become **`quantity`**, not a prefix inside **`description`**.
 
     **Attach photo (MMS):** When the inbound message includes Twilio image URL(s) and the user is adding a picture to an existing job, include `"intent": "attach_photo"`, `"job_id": <int>`, `"media_url": "<exact URL from message>"` (or `"media_urls": [...]`), optional `"work_item_title": "<substring of a work item title>"` to attach to that line item.
 

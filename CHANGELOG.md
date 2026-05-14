@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.41] - 2026-05-13
+
+### Added
+
+- **`RompCrm.Jobs.MaterialSmsNormalize`**: derive **`quantity`** and **`description`** when SMS/AI sends count inside **`description`** or omits **`quantity`**
+- **`JobsLive`** **`work_item_title`** and **`material_description`** events for inline edits in **`JobExpandLists`**
+
+### Changed
+
+- **`JobExpandLists`**: editable **work item title** and **material description** inputs (when **`can_edit_jobs`**) with **`phx-debounce`**
+- **`Jobs.normalize_material_specs`** / **`sync_material_specs_list`**: persist **`quantity`** from extraction JSON; apply **`MaterialSmsNormalize`** before insert
+- **`sms_unified_inbound_extractor` / `sms_job_extractor` Anthropic prompts**: document **`quantity`** + **`description`** rules and examples for materials
+
 ## [0.9.40] - 2026-05-13
 
 ### Changed
