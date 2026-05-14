@@ -232,6 +232,18 @@ if config_env() == :prod do
         |> Enum.map(&String.downcase/1)
     end
 
+  email_logo_url =
+    case System.get_env("EMAIL_LOGO_URL") |> to_string() |> String.trim() do
+      "" -> Application.get_env(:romp_crm, :email_logo_url)
+      url -> url
+    end
+
+  email_brand_base_url =
+    case System.get_env("EMAIL_BRAND_BASE_URL") |> to_string() |> String.trim() do
+      "" -> Application.get_env(:romp_crm, :email_brand_base_url)
+      url -> url
+    end
+
   config :romp_crm,
     twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
@@ -263,7 +275,9 @@ if config_env() == :prod do
     paypal_plan_annual_id: paypal_plan_annual_id,
     paypal_skip_webhook_verify: paypal_skip_verify_effective,
     paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name,
-    paypal_trial_days: paypal_trial_days
+    paypal_trial_days: paypal_trial_days,
+    email_logo_url: email_logo_url,
+    email_brand_base_url: email_brand_base_url
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
     "" ->

@@ -24,7 +24,10 @@ config :romp_crm,
   ecto_repos: [RompCrm.Repo],
   generators: [timestamp_type: :utc_datetime],
   paypal_trial_days: 14,
-  admin_emails: ["151henry151@gmail.com"]
+  admin_emails: ["151henry151@gmail.com"],
+  # Transactional HTML email branding (absolute https URLs)
+  email_logo_url: "https://rompcrm.com/media/romp-crm-logo-main-dark.png",
+  email_brand_base_url: "https://rompcrm.com"
 
 # URL prefix for mounting the app (e.g. `/romp-crm` on hromp.com). Dev/test use `/`.
 config :romp_crm, :path_prefix, "/"
