@@ -1,7 +1,7 @@
 defmodule RompCrmWeb.AppWorkspaceNav do
   @moduledoc """
-  Shared workspace navigation (jobs area): job list, time log, timeclock, employees, businesses, settings.
-  Desktop: pill-style links (same visual language as **Support**). Mobile: `<details>` panel with the same links.
+  Shared workspace navigation (jobs area): job list, time log, timeclock, employees, businesses.
+  Desktop: pill-style links plus **Support**. Mobile: icon-only **hamburger** drawer with the same links and **Support**.
   """
   use Phoenix.Component
   use Gettext, backend: RompCrmWeb.Gettext
@@ -13,6 +13,7 @@ defmodule RompCrmWeb.AppWorkspaceNav do
 
   import Phoenix.Controller, only: [get_csrf_token: 0]
   import RompCrmWeb.CoreComponents
+  import RompCrmWeb.SupportContact, only: [support_contact: 1]
 
   attr :current_business_id, :any, default: nil
   attr :my_businesses, :list, default: []
@@ -20,31 +21,43 @@ defmodule RompCrmWeb.AppWorkspaceNav do
 
   def app_workspace_nav(assigns) do
     ~H"""
-    <div class="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
+    <div class="flex w-full min-w-0 flex-col items-end gap-2 lg:w-auto lg:flex-row lg:items-center lg:justify-start lg:gap-3">
       <%!-- Desktop --%>
       <div class="hidden flex-wrap items-center gap-x-2 gap-y-1.5 lg:flex">
         <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
-          <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} />
+          <.business_switcher
+            my_businesses={@my_businesses}
+            current_business_id={@current_business_id}
+          />
         <% end %>
         <.nav_links is_business_owner={@is_business_owner} />
+        <div class="shrink-0 [&_summary]:px-2.5 [&_summary]:py-1">
+          <.support_contact />
+        </div>
       </div>
 
       <%!-- Mobile menu --%>
       <details class="group relative lg:hidden">
         <summary
-          class="btn btn-ghost btn-sm list-none gap-2 border border-base-300 [&::-webkit-details-marker]:hidden"
+          class="btn btn-square btn-ghost btn-sm h-9 w-9 min-h-0 shrink-0 list-none border border-base-300 p-0 [&::-webkit-details-marker]:hidden"
           aria-label="Open navigation menu"
         >
           <.icon name="hero-bars-3" class="size-5" />
-          <span class="text-sm font-medium">Menu</span>
         </summary>
         <div class="absolute right-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1.5 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
           <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
             <div class="mb-1 border-b border-base-300 pb-2">
-              <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} compact={true} />
+              <.business_switcher
+                my_businesses={@my_businesses}
+                current_business_id={@current_business_id}
+                compact={true}
+              />
             </div>
           <% end %>
           <.nav_links is_business_owner={@is_business_owner} mobile={true} />
+          <div class="border-t border-base-300 pt-2">
+            <.support_contact />
+          </div>
         </div>
       </details>
     </div>
@@ -62,7 +75,9 @@ defmodule RompCrmWeb.AppWorkspaceNav do
         else: "flex flex-wrap items-center gap-2"
 
     select_id =
-      if assigns.compact, do: "app-nav-business-switch-mobile", else: "app-nav-business-switch-desktop"
+      if assigns.compact,
+        do: "app-nav-business-switch-mobile",
+        else: "app-nav-business-switch-desktop"
 
     assigns =
       assigns
@@ -119,9 +134,6 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     <% end %>
     <.link navigate={~p"/businesses"} class={@pill} {@mobile_attrs}>
       Businesses
-    </.link>
-    <.link href={~p"/users/settings"} class={@pill} {@mobile_attrs}>
-      Settings
     </.link>
     """
   end

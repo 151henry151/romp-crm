@@ -11,7 +11,6 @@ defmodule RompCrmWeb.JobsLive do
   alias RompCrm.Jobs.Job
   alias RompCrm.TimeTracking
   alias RompCrm.TimeTracking.TimeEntry
-  alias RompCrm.Twilio.Phone
   alias RompCrmWeb.DatetimeLocal
   alias RompCrmWeb.JobTimeLogDefaults
   alias RompCrmWeb.JobExpandEditKeys, as: JEK
@@ -24,18 +23,6 @@ defmodule RompCrmWeb.JobsLive do
       Jobs.subscribe(bid)
       TimeTracking.subscribe(bid)
     end
-
-    sms_from =
-      case Application.get_env(:romp_crm, :twilio_messaging_from_number) do
-        s when is_binary(s) ->
-          case String.trim(s) do
-            "" -> "+18022780965"
-            t -> t
-          end
-
-        _ ->
-          "+18022780965"
-      end
 
     user = socket.assigns.current_scope.user
     caps = EmployeePermissions.for(user, bid)
@@ -55,9 +42,7 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:job_time_started_at, "")
      |> assign(:job_time_ended_at, "")
      |> assign(:job_time_notes, "")
-     |> assign(:job_expand_editing, MapSet.new())
-     |> assign(:sms_intake_href, Phone.sms_uri(sms_from))
-     |> assign(:sms_intake_display, Phone.format_us_display(sms_from))}
+     |> assign(:job_expand_editing, MapSet.new())}
   end
 
   @impl true
