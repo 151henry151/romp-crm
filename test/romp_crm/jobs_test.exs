@@ -127,6 +127,44 @@ defmodule RompCrm.JobsTest do
       assert job2.work_description == "Water heater; kitchen faucet on same visit"
     end
 
+    test "update_job/2 zip-merges work_items without id when count matches (SMS date edits, no duplicate)" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Paul",
+                 "priority" => "normal",
+                 "status" => "in_progress",
+                 "work_description" => "Bath rough-in",
+                 "work_items" => [
+                   %{"title" => "Sink stops"},
+                   %{"title" => "Sink drain"}
+                 ]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+      assert length(job.work_items) == 2
+      [wi1, wi2] = Enum.sort_by(job.work_items, &{&1.sort_order, &1.id})
+
+      assert {:ok, %Job{} = job2} =
+               Jobs.update_job(job, %{
+                 "work_items" => [
+                   %{"title" => wi1.title, "scheduled_on" => "2026-05-15"},
+                   %{"title" => wi2.title, "scheduled_on" => "2026-05-19"}
+                 ]
+               })
+
+      job2 = Jobs.get_job!(job2.id, b.id)
+      assert length(job2.work_items) == 2
+      titles = job2.work_items |> Enum.sort_by(& &1.id) |> Enum.map(& &1.title)
+      assert titles == ["Sink stops", "Sink drain"]
+
+      by_title = Map.new(job2.work_items, &{&1.title, &1})
+      assert Date.compare(by_title["Sink stops"].scheduled_on, ~D[2026-05-15]) == :eq
+      assert Date.compare(by_title["Sink drain"].scheduled_on, ~D[2026-05-19]) == :eq
+    end
+
     test "delete_job/1 deletes the job" do
       job = job_fixture()
       assert {:ok, %Job{}} = Jobs.delete_job(job)
