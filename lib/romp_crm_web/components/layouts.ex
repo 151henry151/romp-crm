@@ -39,16 +39,13 @@ defmodule RompCrmWeb.Layouts do
 
   attr :show_workspace_nav, :boolean,
     default: false,
-    doc:
-      "when true, show full CRM workspace links (time log, timeclock, employees, …) in the header"
+    doc: "when true, show full CRM workspace links (time log, timeclock, employees, …) in the header"
 
   attr :current_business_id, :any, default: nil
   attr :my_businesses, :list, default: []
   attr :is_business_owner, :boolean, default: false
 
-  attr :socket, :any,
-    default: nil,
-    doc: "LiveView socket when rendering from LiveView (for embedded LiveComponents)"
+  attr :socket, :any, default: nil, doc: "LiveView socket when rendering from LiveView (for embedded LiveComponents)"
 
   attr :show_sms_assistant_intro_modal, :boolean,
     default: false,
@@ -67,9 +64,18 @@ defmodule RompCrmWeb.Layouts do
     <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
       <div class="mx-auto max-w-screen-xl">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
+            <div class="shrink-0 lg:hidden">
+              <.app_workspace_nav_mobile_drawer
+                current_business_id={@current_business_id}
+                my_businesses={@my_businesses}
+                is_business_owner={@is_business_owner}
+              />
+            </div>
+          <% end %>
           <a
             href={~p"/"}
-            class="brand-logo-hitbox inline-flex shrink-0 focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+            class="brand-logo-hitbox inline-flex min-w-0 shrink-0 focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
           >
             <span class="brand-logo-crop block aspect-[1154/489] h-8 sm:h-9 overflow-hidden rounded-2xl">
               <img
@@ -88,11 +94,13 @@ defmodule RompCrmWeb.Layouts do
           <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1 sm:justify-between">
             <div class="flex min-w-0 flex-1 items-center justify-end lg:justify-start">
               <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
-                <.app_workspace_nav
-                  current_business_id={@current_business_id}
-                  my_businesses={@my_businesses}
-                  is_business_owner={@is_business_owner}
-                />
+                <div class="hidden min-w-0 flex-1 lg:flex lg:justify-start">
+                  <.app_workspace_nav
+                    current_business_id={@current_business_id}
+                    my_businesses={@my_businesses}
+                    is_business_owner={@is_business_owner}
+                  />
+                </div>
               <% else %>
                 <%= if @current_scope && @current_scope.user do %>
                   <nav class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm lg:justify-start">

@@ -18,42 +18,43 @@ defmodule RompCrmWeb.AppWorkspaceNav do
   attr :my_businesses, :list, default: []
   attr :is_business_owner, :boolean, default: false
 
+  @doc """
+  Desktop-only workspace pills and business switcher. Mobile menu lives in
+  `app_workspace_nav_mobile_drawer/1` (rendered from the layout to the left of the logo).
+  """
   def app_workspace_nav(assigns) do
     ~H"""
-    <div class="flex w-full min-w-0 flex-col items-end gap-2 lg:w-auto lg:flex-row lg:items-center lg:justify-start lg:gap-3">
-      <%!-- Desktop --%>
-      <div class="hidden flex-wrap items-center gap-x-2 gap-y-1.5 lg:flex">
-        <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
-          <.business_switcher
-            my_businesses={@my_businesses}
-            current_business_id={@current_business_id}
-          />
-        <% end %>
-        <.nav_links is_business_owner={@is_business_owner} />
-      </div>
-
-      <%!-- Mobile menu --%>
-      <details class="group relative lg:hidden">
-        <summary
-          class="btn btn-square btn-ghost btn-sm h-9 w-9 min-h-0 shrink-0 list-none border border-base-300 p-0 [&::-webkit-details-marker]:hidden"
-          aria-label="Open navigation menu"
-        >
-          <.icon name="hero-bars-3" class="size-5" />
-        </summary>
-        <div class="absolute right-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1.5 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
-          <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
-            <div class="mb-1 border-b border-base-300 pb-2">
-              <.business_switcher
-                my_businesses={@my_businesses}
-                current_business_id={@current_business_id}
-                compact={true}
-              />
-            </div>
-          <% end %>
-          <.nav_links is_business_owner={@is_business_owner} mobile={true} />
-        </div>
-      </details>
+    <div class="hidden min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 lg:flex">
+      <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
+        <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} />
+      <% end %>
+      <.nav_links is_business_owner={@is_business_owner} />
     </div>
+    """
+  end
+
+  @doc """
+  Hamburger + drawer for small screens only. Kept separate from `app_workspace_nav/1` so the
+  layout can place this control to the **left** of the brand logo on mobile.
+  """
+  def app_workspace_nav_mobile_drawer(assigns) do
+    ~H"""
+    <details class="group relative">
+      <summary
+        class="btn btn-square btn-ghost btn-sm h-9 w-9 min-h-0 shrink-0 list-none border border-base-300 p-0 [&::-webkit-details-marker]:hidden"
+        aria-label="Open navigation menu"
+      >
+        <.icon name="hero-bars-3" class="size-5" />
+      </summary>
+      <div class="absolute left-0 z-[200] mt-1 flex min-w-[12rem] max-w-[min(100vw-2rem,20rem)] flex-col gap-1.5 rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+        <%= if @my_businesses != [] && length(@my_businesses) > 1 do %>
+          <div class="mb-1 border-b border-base-300 pb-2">
+            <.business_switcher my_businesses={@my_businesses} current_business_id={@current_business_id} compact={true} />
+          </div>
+        <% end %>
+        <.nav_links is_business_owner={@is_business_owner} mobile={true} />
+      </div>
+    </details>
     """
   end
 
@@ -68,9 +69,7 @@ defmodule RompCrmWeb.AppWorkspaceNav do
         else: "flex flex-wrap items-center gap-2"
 
     select_id =
-      if assigns.compact,
-        do: "app-nav-business-switch-mobile",
-        else: "app-nav-business-switch-desktop"
+      if assigns.compact, do: "app-nav-business-switch-mobile", else: "app-nav-business-switch-desktop"
 
     assigns =
       assigns

@@ -26,7 +26,9 @@ defmodule RompCrm.Reminders do
     |> Repo.insert()
   end
 
-  @doc false
+  @doc """
+  Returns merged reminder preferences (defaults plus decoded JSON from `users.sms_reminder_prefs_json`).
+  """
   def decode_prefs_json(nil), do: @default_prefs
   def decode_prefs_json(""), do: @default_prefs
 
@@ -139,9 +141,7 @@ defmodule RompCrm.Reminders do
     offsets =
       offsets
       |> Enum.flat_map(fn
-        n when is_integer(n) ->
-          [n]
-
+        n when is_integer(n) -> [n]
         n when is_binary(n) ->
           case Integer.parse(String.trim(n)) do
             {i, _} -> [i]
@@ -201,8 +201,7 @@ defmodule RompCrm.Reminders do
     Repo.exists?(
       from l in JobReminderSendLog,
         where:
-          l.user_id == ^user_id and l.job_id == ^job_id and l.kind == ^kind and
-            l.anchor_on == ^anchor
+          l.user_id == ^user_id and l.job_id == ^job_id and l.kind == ^kind and l.anchor_on == ^anchor
     )
   end
 

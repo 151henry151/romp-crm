@@ -165,7 +165,7 @@ defmodule RompCrmWeb.UserSettingsController do
   end
 
   def update(conn, %{"action" => "update_profile"} = params) do
-    %{"user" => user_params} = params
+    %{"user" => user_params} = merge_sms_reminder_prefs_from_form(params)
     user = conn.assigns.current_scope.user
 
     case Accounts.update_user_profile(user, user_params) do
@@ -279,6 +279,59 @@ defmodule RompCrmWeb.UserSettingsController do
   defp export_csv_filename(:employees), do: "employees.csv"
   defp export_csv_filename(:time_log), do: "time_log.csv"
   defp export_csv_filename(:audit_log), do: "audit_log.csv"
+
+  defp merge_sms_reminder_prefs_from_form(%{"user" => inner} = params) when is_map(inner) do
+    inner =
+      if Map.has_key?(inner, "sms_reminder_send_hour_utc") do
+        offsets = normalize_reminder_offsets_param(Map.get(inner, "sms_reminder_offsets"))
+        hour = normalize_reminder_hour_param(Map.get(inner, "sms_reminder_send_hour_utc"))
+        json = Jason.encode!(%{"job_offsets" => offsets, "send_hour_utc" => hour})
+
+        inner
+        |> Map.put("sms_reminder_prefs_json", json)
+        |> Map.drop(["sms_reminder_offsets", "sms_reminder_send_hour_utc"])
+      else
+        inner
+      end
+
+    %{params | "user" => inner}
+  end
+
+  defp merge_sms_reminder_prefs_from_form(params), do: params
+
+  defp normalize_reminder_offsets_param(raw) do
+    raw
+    |> List.wrap()
+    |> Enum.map(&parse_reminder_offset/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Enum.sort(:desc)
+    |> case do
+      [] -> [1, 0]
+      list -> list
+    end
+  end
+
+  defp parse_reminder_offset(v) when v in [0, 1, 2, 3, 7], do: v
+
+  defp parse_reminder_offset(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {n, _} when n in [0, 1, 2, 3, 7] -> n
+      _ -> nil
+    end
+  end
+
+  defp parse_reminder_offset(_), do: nil
+
+  defp normalize_reminder_hour_param(raw) when is_binary(raw) do
+    case Integer.parse(String.trim(raw)) do
+      {h, _} when h >= 0 and h <= 23 -> h
+      _ -> 13
+    end
+  end
+
+  defp normalize_reminder_hour_param(h) when is_integer(h) and h >= 0 and h <= 23, do: h
+  defp normalize_reminder_hour_param(_), do: 13
 
   defp assign_workspace_nav_for_layout(conn, _opts) do
     user = conn.assigns.current_scope.user
