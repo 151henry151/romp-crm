@@ -19,10 +19,10 @@ defmodule RompCrmWeb.JobExpandLists do
         <div class="divide-y divide-dotted divide-base-content/15">
           <%= for wi <- @job.work_items do %>
             <div class={[
-              "flex flex-nowrap items-center gap-2 py-1 first:pt-0 min-h-0 min-w-0",
+              "flex flex-wrap items-start gap-2 py-1 first:pt-0 min-h-0 min-w-0",
               wi.completed && "opacity-55 text-base-content/75"
             ]}>
-              <div class="shrink-0 flex items-center leading-none">
+              <div class="shrink-0 flex items-start pt-0.5 leading-none">
                 <%= if @can_edit_jobs do %>
                   <input
                     type="checkbox"
@@ -42,12 +42,12 @@ defmodule RompCrmWeb.JobExpandLists do
                   />
                 <% end %>
               </div>
-              <div class="flex min-w-0 flex-1 flex-nowrap items-center gap-x-1.5 overflow-hidden">
+              <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-1.5 gap-y-1">
                 <%= if @can_edit_jobs do %>
                   <%= if editing?(@edit_keys, EK.wi_title(wi.id)) do %>
                     <form
                       phx-submit="job_expand_commit_wi_title"
-                      class="flex min-w-0 flex-1 items-center gap-1"
+                      class="flex min-w-0 flex-1 flex-wrap items-start gap-1"
                     >
                       <input type="hidden" name="job_id" value={@job.id} />
                       <input type="hidden" name="work_item_id" value={wi.id} />
@@ -75,8 +75,8 @@ defmodule RompCrmWeb.JobExpandLists do
                       </button>
                     </form>
                   <% else %>
-                    <div class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-                      <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
+                    <div class="flex min-w-0 flex-1 flex-wrap items-start gap-1">
+                      <span class="min-w-0 flex-1 text-sm text-base-content break-words">
                         {wi.title}
                       </span>
                       <button
@@ -91,7 +91,7 @@ defmodule RompCrmWeb.JobExpandLists do
                     </div>
                   <% end %>
                 <% else %>
-                  <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
+                  <span class="min-w-0 flex-1 text-sm text-base-content break-words">
                     {wi.title}
                   </span>
                 <% end %>
@@ -99,7 +99,7 @@ defmodule RompCrmWeb.JobExpandLists do
                   <%= if editing?(@edit_keys, EK.wi_scheduled(wi.id)) do %>
                     <form
                       phx-submit="job_expand_commit_wi_scheduled"
-                      class="flex shrink-0 items-center gap-0.5"
+                      class="flex shrink-0 flex-wrap items-start gap-0.5"
                     >
                       <input type="hidden" name="job_id" value={@job.id} />
                       <input type="hidden" name="work_item_id" value={wi.id} />
@@ -127,7 +127,7 @@ defmodule RompCrmWeb.JobExpandLists do
                       </button>
                     </form>
                   <% else %>
-                    <div class="flex shrink-0 items-center gap-0.5">
+                    <div class="flex shrink-0 flex-wrap items-start gap-0.5">
                       <span class="text-[11px] tabular-nums text-base-content/65 whitespace-nowrap">
                         <%= if wi.scheduled_on do %>
                           {Date.to_iso8601(wi.scheduled_on)}
@@ -154,7 +154,7 @@ defmodule RompCrmWeb.JobExpandLists do
                   <% end %>
                 <% end %>
               </div>
-              <div class="shrink-0 flex items-center leading-none">
+              <div class="shrink-0 flex items-start pt-0.5 leading-none">
                 <%= if @can_edit_jobs do %>
                   <button
                     type="button"
@@ -193,10 +193,10 @@ defmodule RompCrmWeb.JobExpandLists do
         <div class="divide-y divide-dotted divide-base-content/15 text-sm">
           <%= for m <- @mc do %>
             <div class={[
-              "flex flex-nowrap items-center gap-1.5 py-1 first:pt-0 min-w-0",
+              "flex flex-wrap items-start gap-1.5 py-1 first:pt-0 min-w-0",
               m.completed && "opacity-55 text-base-content/75"
             ]}>
-              <div class="shrink-0 flex items-center">
+              <div class="shrink-0 flex items-start pt-0.5">
                 <%= if @can_edit_jobs do %>
                   <input
                     type="checkbox"
@@ -271,7 +271,7 @@ defmodule RompCrmWeb.JobExpandLists do
                   {format_qty_value(m.quantity)}
                 </span>
               <% end %>
-              <div class="flex min-w-0 flex-1 items-center gap-0.5 leading-tight">
+              <div class="flex min-w-0 flex-1 flex-wrap items-start gap-0.5 leading-tight">
                 <%= if m.scope_label != "Job" do %>
                   <span class="shrink-0 text-base-content/55 text-xs">{m.scope_label}:</span>
                 <% end %>
@@ -279,7 +279,7 @@ defmodule RompCrmWeb.JobExpandLists do
                   <%= if editing?(@edit_keys, EK.mat_description(m.id)) do %>
                     <form
                       phx-submit="job_expand_commit_material_desc"
-                      class="flex min-w-0 flex-1 items-center gap-1"
+                      class="flex min-w-0 flex-1 flex-wrap items-start gap-1"
                     >
                       <input type="hidden" name="job_id" value={@job.id} />
                       <input type="hidden" name="material_id" value={m.id} />
@@ -308,8 +308,8 @@ defmodule RompCrmWeb.JobExpandLists do
                       </button>
                     </form>
                   <% else %>
-                    <div class="flex min-w-0 flex-1 items-center gap-1">
-                      <p class="min-w-0 flex-1 truncate text-sm" title={material_line_title(m)}>
+                    <div class="flex min-w-0 flex-1 flex-wrap items-start gap-1">
+                      <p class="min-w-0 flex-1 text-sm break-words">
                         <span class="text-base-content">{m.description}</span>
                       </p>
                       <button
@@ -324,7 +324,7 @@ defmodule RompCrmWeb.JobExpandLists do
                     </div>
                   <% end %>
                 <% else %>
-                  <p class="min-w-0 flex-1 truncate text-sm" title={material_line_title(m)}>
+                  <p class="min-w-0 flex-1 text-sm break-words">
                     <span class="text-base-content">{m.description}</span>
                   </p>
                 <% end %>
@@ -336,7 +336,7 @@ defmodule RompCrmWeb.JobExpandLists do
                   phx-value-job_id={@job.id}
                   phx-value-material_id={m.id}
                   data-confirm="Remove this material line?"
-                  class="btn btn-square btn-ghost btn-xs h-6 w-6 min-h-0 shrink-0 border border-red-500/35 p-0 text-sm font-semibold leading-none text-red-500 hover:bg-red-500/15 hover:text-red-400"
+                  class="btn btn-square btn-ghost btn-xs h-6 w-6 min-h-0 shrink-0 self-start border border-red-500/35 p-0 text-sm font-semibold leading-none text-red-500 hover:bg-red-500/15 hover:text-red-400"
                   aria-label="Remove material"
                 >
                   ×

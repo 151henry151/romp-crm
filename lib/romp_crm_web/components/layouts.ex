@@ -39,7 +39,8 @@ defmodule RompCrmWeb.Layouts do
 
   attr :show_workspace_nav, :boolean,
     default: false,
-    doc: "when true, show full CRM workspace links (time log, timeclock, employees, …) in the header"
+    doc:
+      "when true, show full CRM workspace links (time log, timeclock, employees, …) in the header"
 
   attr :current_business_id, :any, default: nil
   attr :my_businesses, :list, default: []
@@ -55,63 +56,74 @@ defmodule RompCrmWeb.Layouts do
       |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
 
     ~H"""
-    <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-4">
-      <div class="mx-auto max-w-screen-xl space-y-3">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div class="min-w-0 flex-1">
-            <a
-              href={~p"/"}
-              class="brand-logo-hitbox inline-flex focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
-            >
-              <span class="brand-logo-crop block aspect-[1154/489] h-10 sm:h-12 overflow-hidden rounded-2xl">
-                <img
-                  src={~p"/images/romp-crm-logo-main.png"}
-                  alt="Romp CRM"
-                  class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
+    <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
+      <div class="mx-auto max-w-screen-xl">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
+          <a
+            href={~p"/"}
+            class="brand-logo-hitbox inline-flex shrink-0 focus:outline-none focus-visible:rounded-2xl focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
+          >
+            <span class="brand-logo-crop block aspect-[1154/489] h-8 sm:h-9 overflow-hidden rounded-2xl">
+              <img
+                src={~p"/images/romp-crm-logo-main.png"}
+                alt="Romp CRM"
+                class="brand-logo-light block h-full w-full object-cover object-center max-w-none"
+              />
+              <img
+                src={~p"/images/romp-crm-logo-main-dark.png"}
+                alt="Romp CRM"
+                class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
+              />
+            </span>
+          </a>
+
+          <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1 sm:justify-between">
+            <div class="flex min-w-0 flex-1 items-center justify-end lg:justify-start">
+              <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
+                <.app_workspace_nav
+                  current_business_id={@current_business_id}
+                  my_businesses={@my_businesses}
+                  is_business_owner={@is_business_owner}
                 />
-                <img
-                  src={~p"/images/romp-crm-logo-main-dark.png"}
-                  alt="Romp CRM"
-                  class="brand-logo-dark block h-full w-full object-cover object-center max-w-none"
-                />
-              </span>
-            </a>
-            <%= if @header_extras != [] do %>
-              <div class="mt-2 max-w-2xl space-y-1 text-sm">
-                {render_slot(@header_extras)}
-              </div>
-            <% end %>
+              <% else %>
+                <%= if @current_scope && @current_scope.user do %>
+                  <nav class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm lg:justify-start">
+                    <a href={~p"/businesses"} class="link link-hover whitespace-nowrap">
+                      Businesses
+                    </a>
+                  </nav>
+                <% end %>
+              <% end %>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-0.5">
+              <.theme_toggle />
+              <%= if @current_scope && @current_scope.user do %>
+                <.link
+                  href={~p"/users/settings"}
+                  class="btn btn-square btn-ghost btn-sm h-9 w-9 min-h-0 shrink-0 p-0 text-base-content/80 hover:bg-base-300/40"
+                  aria-label="Settings"
+                >
+                  <.icon name="hero-cog-6-tooth" class="size-5" />
+                </.link>
+                <.link
+                  href={~p"/users/log-out"}
+                  method="delete"
+                  class="btn btn-square btn-ghost btn-sm h-9 w-9 min-h-0 shrink-0 p-0 text-base-content/80 hover:bg-base-300/40"
+                  aria-label="Log out"
+                >
+                  <.icon name="hero-arrow-right-start-on-rectangle" class="size-5" />
+                </.link>
+              <% end %>
+            </div>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-            <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
-              <.app_workspace_nav
-                current_business_id={@current_business_id}
-                my_businesses={@my_businesses}
-                is_business_owner={@is_business_owner}
-              />
-            <% else %>
-              <%= if @current_scope && @current_scope.user do %>
-                <nav class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  <a href={~p"/businesses"} class="link link-hover whitespace-nowrap">
-                    Businesses
-                  </a>
-                  <a href={~p"/users/settings"} class="link link-hover whitespace-nowrap">
-                    Settings
-                  </a>
-                </nav>
-              <% end %>
-            <% end %>
+        <%= if @header_extras != [] do %>
+          <div class="mt-2 max-w-2xl space-y-1 border-t border-base-300/60 pt-2 text-sm lg:max-w-none">
+            {render_slot(@header_extras)}
           </div>
-          <div class="ml-auto flex shrink-0 items-center gap-2">
-            <div class="[&_details]:max-w-[calc(100vw-2rem)]">
-              <.support_contact />
-            </div>
-            <.theme_toggle />
-          </div>
-        </div>
+        <% end %>
       </div>
     </header>
 
@@ -139,6 +151,7 @@ defmodule RompCrmWeb.Layouts do
   ## Examples
 
       <.flash_group flash={@flash} />
+
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
   attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
@@ -203,30 +216,6 @@ defmodule RompCrmWeb.Layouts do
       </nav>
       <p class="mt-2 tabular-nums">© {Date.utc_today().year} Romp CRM</p>
     </footer>
-    """
-  end
-
-  @doc """
-  Expandable **Support** control with telephone number for live help.
-  """
-  def support_contact(assigns) do
-    ~H"""
-    <details class="relative">
-      <summary class="list-none cursor-pointer select-none rounded-lg border border-emerald-600/35 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-500/15 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-100 dark:hover:bg-emerald-500/25 [&::-webkit-details-marker]:hidden">
-        Support
-      </summary>
-      <div class="absolute right-0 z-[100] mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-base-300 bg-base-100 p-3 shadow-lg">
-        <a
-          href="tel:+18024587299"
-          class="block text-lg font-semibold text-primary hover:underline tabular-nums"
-        >
-          802-458-7299
-        </a>
-        <p class="mt-1.5 text-xs leading-snug text-base-content/75">
-          call to speak with a live person 24/7
-        </p>
-      </div>
-    </details>
     """
   end
 

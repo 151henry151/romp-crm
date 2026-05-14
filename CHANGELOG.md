@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.9.45] - 2026-05-14
+
+### Added
+
+- **`RompCrmWeb.SupportContact`**: extracted **Support** disclosure (used from workspace nav)
+
+### Changed
+
+- **`Layouts.app`**: single compact header row — **logo** (slightly shorter), workspace nav, **theme toggle**, then **Settings** / **Log out** as **icon-only** buttons; drop duplicate **Support** from header rail (**Support** stays on desktop nav and in the **mobile hamburger** menu)
+- **`Layouts.root`**: hide top email / text **Settings** / **Log out** for signed-in users (guest **Register** / **Log in** bar unchanged); shorten **`<.live_title>`** suffix
+- **`AppWorkspaceNav`**: **hamburger-only** summary (no “Menu” label); **Support** inside mobile drawer; **Settings** removed from pill list (header icons replace it)
+- **`JobsLive`**: remove **`header_extras`** SMS / tagline block and related assigns
+
+## [0.9.44] - 2026-05-14
+
+### Changed
+
+- **`JobExpandLists`**: allow **work item titles** and **material descriptions** to **wrap** across lines instead of **`truncate`**; use **`flex-wrap`** and **`items-start`** on rows so long names stay readable on narrow screens
+
 ## [0.9.43] - 2026-05-14
 
 ### Added
