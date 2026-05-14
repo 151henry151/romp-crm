@@ -3,6 +3,7 @@ defmodule RompCrmWeb.JobsLive do
 
   import RompCrmWeb.JobExpandLists
   import RompCrmWeb.JobExpandedInlineFields
+  import RompCrmWeb.JobDeleteBar, only: [job_delete_bar: 1]
 
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
@@ -42,6 +43,8 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:job_time_started_at, "")
      |> assign(:job_time_ended_at, "")
      |> assign(:job_time_notes, "")
+     |> assign(:log_time_entry_id, nil)
+     |> assign(:job_delete_steps, %{})
      |> assign(:job_expand_editing, MapSet.new())}
   end
 
@@ -134,32 +137,55 @@ defmodule RompCrmWeb.JobsLive do
      |> refresh_jobs()}
   end
 
-  def handle_event("delete", %{"id" => id}, socket) do
+  def handle_event("job_delete_advance", %{"id" => id}, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to delete jobs.")}
     else
+      jid = String.to_integer(id)
       bid = socket.assigns.current_business_id
-      user = socket.assigns.current_scope.user
-      job = Jobs.get_job!(String.to_integer(id), bid)
+      steps = socket.assigns.job_delete_steps
+      step = Map.get(steps, jid, 0)
 
-      case Jobs.delete_job(job) do
-        {:ok, _} ->
-          BusinessAuditLogs.record(%{
-            business_id: bid,
-            actor_user_id: user.id,
-            source: "web",
-            action: "jobs.delete",
-            entity_type: "jobs",
-            entity_id: job.id,
-            metadata: %{client_name: job.client_name}
-          })
+      cond do
+        step < 2 ->
+          {:noreply, assign(socket, :job_delete_steps, Map.put(steps, jid, step + 1))}
 
-          {:noreply, refresh_jobs(socket)}
+        true ->
+          user = socket.assigns.current_scope.user
+          job = Jobs.get_job!(jid, bid)
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Could not delete that job.")}
+          case Jobs.delete_job(job) do
+            {:ok, _} ->
+              BusinessAuditLogs.record(%{
+                business_id: bid,
+                actor_user_id: user.id,
+                source: "web",
+                action: "jobs.delete",
+                entity_type: "jobs",
+                entity_id: job.id,
+                metadata: %{client_name: job.client_name}
+              })
+
+              expanded = socket.assigns.expanded_job_id
+
+              {:noreply,
+               socket
+               |> assign(:expanded_job_id, if(expanded == jid, do: nil, else: expanded))
+               |> assign(:job_delete_steps, Map.delete(steps, jid))
+               |> put_flash(:info, "Job deleted.")
+               |> refresh_jobs()}
+
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Could not delete that job.")}
+          end
       end
     end
+  end
+
+  def handle_event("job_delete_cancel", %{"id" => id}, socket) do
+    jid = String.to_integer(id)
+    steps = Map.delete(socket.assigns.job_delete_steps, jid)
+    {:noreply, assign(socket, :job_delete_steps, steps)}
   end
 
   def handle_event("open_job_time_log", %{"job_id" => job_id}, socket) do
@@ -174,6 +200,7 @@ defmodule RompCrmWeb.JobsLive do
       {:noreply,
        socket
        |> assign(:log_job_time_job_id, job_id)
+       |> assign(:log_time_entry_id, nil)
        |> assign(:log_job_time_client_name, job.client_name || "Job")
        |> assign(:job_time_started_at, s)
        |> assign(:job_time_ended_at, e)
@@ -181,10 +208,89 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  def handle_event(
+        "open_edit_job_time_log",
+        %{"job_id" => job_id, "time_entry_id" => te_id},
+        socket
+      ) do
+    if not socket.assigns.can_log_job_time do
+      {:noreply, put_flash(socket, :error, "You do not have permission to log time on jobs.")}
+    else
+      job_id = String.to_integer(job_id)
+      te_id = String.to_integer(te_id)
+      bid = socket.assigns.current_business_id
+      job = Jobs.get_job!(job_id, bid)
+      entry = TimeTracking.get_time_entry!(te_id, bid)
+
+      if entry.job_id != job_id do
+        {:noreply, put_flash(socket, :error, "That time entry does not belong to this job.")}
+      else
+        started_s = JobTimeLogDefaults.to_datetime_local(entry.started_at)
+
+        ended_s =
+          case entry.ended_at do
+            %NaiveDateTime{} = e -> JobTimeLogDefaults.to_datetime_local(e)
+            _ -> ""
+          end
+
+        notes = entry.notes || ""
+
+        {:noreply,
+         socket
+         |> assign(:log_job_time_job_id, job_id)
+         |> assign(:log_time_entry_id, entry.id)
+         |> assign(:log_job_time_client_name, job.client_name || "Job")
+         |> assign(:job_time_started_at, started_s)
+         |> assign(:job_time_ended_at, ended_s)
+         |> assign(:job_time_notes, notes)}
+      end
+    end
+  end
+
+  def handle_event("delete_time_entry", %{"job_id" => job_id, "id" => te_id}, socket) do
+    if not socket.assigns.can_log_job_time do
+      {:noreply, put_flash(socket, :error, "You do not have permission to change job hours.")}
+    else
+      job_id = String.to_integer(job_id)
+      te_id = String.to_integer(te_id)
+      bid = socket.assigns.current_business_id
+      user = socket.assigns.current_scope.user
+
+      entry = TimeTracking.get_time_entry!(te_id, bid)
+
+      if entry.job_id != job_id do
+        {:noreply, put_flash(socket, :error, "That time entry does not belong to this job.")}
+      else
+        case TimeTracking.delete_time_entry(entry) do
+          {:ok, _} ->
+            BusinessAuditLogs.record(%{
+              business_id: bid,
+              actor_user_id: user.id,
+              source: "web",
+              action: "time_entries.delete",
+              entity_type: "time_entries",
+              entity_id: te_id,
+              metadata: %{job_id: job_id, source: "job_hours_list"}
+            })
+
+            {:noreply,
+             socket
+             |> put_flash(:info, "Job hours removed.")
+             |> refresh_time_entries()
+             |> refresh_jobs()}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not remove those hours.")}
+        end
+      end
+    end
+  end
+
   def handle_event("close_job_time_log", _params, socket) do
     {:noreply,
      socket
      |> assign(:log_job_time_job_id, nil)
+     |> assign(:log_time_entry_id, nil)
      |> assign(:log_job_time_client_name, "")
      |> assign(:job_time_started_at, "")
      |> assign(:job_time_ended_at, "")
@@ -210,6 +316,7 @@ defmodule RompCrmWeb.JobsLive do
       job_id = socket.assigns.log_job_time_job_id
       bid = socket.assigns.current_business_id
       user = socket.assigns.current_scope.user
+      te_id = socket.assigns.log_time_entry_id
 
       if is_nil(job_id) do
         {:noreply, socket}
@@ -222,68 +329,52 @@ defmodule RompCrmWeb.JobsLive do
           |> to_string()
           |> String.trim()
 
-        case {DatetimeLocal.parse(started_s), DatetimeLocal.parse(ended_s)} do
-          {{:error, :missing}, _} ->
-            {:noreply, put_flash(socket, :error, "Start and end are required.")}
+        entry_for_resolve =
+          if is_integer(te_id) do
+            TimeTracking.get_time_entry!(te_id, bid)
+          else
+            nil
+          end
 
-          {_, {:error, :missing}} ->
-            {:noreply, put_flash(socket, :error, "Start and end are required.")}
+        with {:ok, started_at} <- DatetimeLocal.parse(started_s),
+             {:ok, ended_at} <- resolve_job_time_ended(ended_s, entry_for_resolve) do
+          cond do
+            is_nil(ended_at) ->
+              {:noreply,
+               save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, nil, notes)}
 
-          {{:error, _}, _} ->
-            {:noreply, put_flash(socket, :error, "Invalid start time.")}
-
-          {_, {:error, _}} ->
-            {:noreply, put_flash(socket, :error, "Invalid end time.")}
-
-          {{:ok, started_at}, {:ok, ended_at}} ->
-            if NaiveDateTime.compare(ended_at, started_at) != :gt do
+            NaiveDateTime.compare(ended_at, started_at) != :gt ->
               {:noreply, put_flash(socket, :error, "End time must be after start time.")}
-            else
-              attrs = %{
-                business_id: bid,
-                job_id: job_id,
-                started_at: started_at,
-                ended_at: ended_at,
-                notes: if(notes == "", do: nil, else: notes)
-              }
 
-              case TimeTracking.create_time_entry(attrs) do
-                {:ok, entry} ->
-                  BusinessAuditLogs.record(%{
-                    business_id: bid,
-                    actor_user_id: user.id,
-                    source: "web",
-                    action: "time_entries.create",
-                    entity_type: "time_entries",
-                    entity_id: entry.id,
-                    metadata: %{job_id: job_id, source: "job_hours_form"}
-                  })
+            true ->
+              {:noreply,
+               save_job_time_log_apply(
+                 socket,
+                 job_id,
+                 bid,
+                 user,
+                 te_id,
+                 started_at,
+                 ended_at,
+                 notes
+               )}
+          end
+        else
+          {:error, :missing} ->
+            {:noreply, put_flash(socket, :error, "Start time is required.")}
 
-                  {:noreply,
-                   socket
-                   |> assign(:log_job_time_job_id, nil)
-                   |> assign(:log_job_time_client_name, "")
-                   |> assign(:job_time_started_at, "")
-                   |> assign(:job_time_ended_at, "")
-                   |> assign(:job_time_notes, "")
-                   |> put_flash(:info, "Job hours saved.")
-                   |> refresh_time_entries()
-                   |> refresh_jobs()}
+          {:error, :ended_required} ->
+            {:noreply, put_flash(socket, :error, "End time is required for completed hours.")}
 
-                {:error, %Ecto.Changeset{} = cs} ->
-                  msg =
-                    cs.errors
-                    |> Enum.map(fn {k, {m, _}} -> "#{k} #{m}" end)
-                    |> Enum.join("; ")
+          {:error, :missing_ended} ->
+            {:noreply, put_flash(socket, :error, "Start and end are required.")}
 
-                  {:noreply, put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
-              end
-            end
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Invalid start or end time.")}
         end
       end
     end
   end
-
 
   def handle_event("toggle_row", %{"id" => id}, socket) do
     id = String.to_integer(id)
@@ -304,11 +395,18 @@ defmodule RompCrmWeb.JobsLive do
         socket.assigns.expanded_time_entries
       end
 
+    steps_cleared =
+      case expanded do
+        nil -> %{}
+        eid -> Map.take(socket.assigns.job_delete_steps, [eid])
+      end
+
     {:noreply,
      socket
      |> assign(:expanded_job_id, expanded)
      |> assign(:expanded_time_entries, entries_map)
      |> assign(:job_expand_editing, MapSet.new())
+     |> assign(:job_delete_steps, steps_cleared)
      |> refresh_jobs()}
   end
 
@@ -410,8 +508,11 @@ defmodule RompCrmWeb.JobsLive do
                      scheduled_on: scheduled_on,
                      scheduled_time: scheduled_time
                    }) do
-                {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
+                {:ok, _} ->
+                  {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
@@ -461,7 +562,11 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
-  def handle_event("toggle_work_item_completed", %{"job_id" => jid, "work_item_id" => wi_id}, socket) do
+  def handle_event(
+        "toggle_work_item_completed",
+        %{"job_id" => jid, "work_item_id" => wi_id},
+        socket
+      ) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
@@ -482,8 +587,11 @@ defmodule RompCrmWeb.JobsLive do
 
             wi ->
               case Jobs.update_job_work_item(job, wi_id, %{completed: not wi.completed}) do
-                {:ok, _} -> {:noreply, refresh_jobs(socket)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
+                {:ok, _} ->
+                  {:noreply, refresh_jobs(socket)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
@@ -599,6 +707,95 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  defp resolve_job_time_ended(ended_s, entry) do
+    ended_s = ended_s |> to_string() |> String.trim()
+
+    cond do
+      ended_s != "" ->
+        DatetimeLocal.parse(ended_s)
+
+      entry == nil ->
+        {:error, :missing_ended}
+
+      entry.ended_at == nil ->
+        {:ok, nil}
+
+      true ->
+        {:error, :ended_required}
+    end
+  end
+
+  defp save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, ended_at, notes) do
+    notes_field = if(notes == "", do: nil, else: notes)
+
+    result =
+      if is_integer(te_id) do
+        entry = TimeTracking.get_time_entry!(te_id, bid)
+
+        if entry.job_id != job_id do
+          {:error, :wrong_job}
+        else
+          TimeTracking.update_time_entry(entry, %{
+            started_at: started_at,
+            ended_at: ended_at,
+            notes: notes_field
+          })
+        end
+      else
+        TimeTracking.create_time_entry(%{
+          business_id: bid,
+          job_id: job_id,
+          started_at: started_at,
+          ended_at: ended_at,
+          notes: notes_field
+        })
+      end
+
+    case result do
+      {:error, :wrong_job} ->
+        {:noreply, put_flash(socket, :error, "That entry does not belong to this job.")}
+
+      {:ok, entry} ->
+        action =
+          if is_integer(te_id),
+            do: "time_entries.update",
+            else: "time_entries.create"
+
+        BusinessAuditLogs.record(%{
+          business_id: bid,
+          actor_user_id: user.id,
+          source: "web",
+          action: action,
+          entity_type: "time_entries",
+          entity_id: entry.id,
+          metadata: %{job_id: job_id, source: "job_hours_form"}
+        })
+
+        msg = if is_integer(te_id), do: "Job hours updated.", else: "Job hours saved."
+
+        {:noreply,
+         socket
+         |> assign(:log_job_time_job_id, nil)
+         |> assign(:log_time_entry_id, nil)
+         |> assign(:log_job_time_client_name, "")
+         |> assign(:job_time_started_at, "")
+         |> assign(:job_time_ended_at, "")
+         |> assign(:job_time_notes, "")
+         |> put_flash(:info, msg)
+         |> refresh_time_entries()
+         |> refresh_jobs()}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        msg =
+          cs.errors
+          |> Enum.map(fn {k, {m, _}} -> "#{k} #{m}" end)
+          |> Enum.join("; ")
+
+        {:noreply,
+         put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
+    end
+  end
+
   defp drop_expand_edit(socket, key) do
     assign(socket, :job_expand_editing, MapSet.delete(socket.assigns.job_expand_editing, key))
   end
@@ -673,7 +870,9 @@ defmodule RompCrmWeb.JobsLive do
 
   defp inline_job_field_allowed?(_), do: false
 
-  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal), do: %{"priority" => raw}
+  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal),
+    do: %{"priority" => raw}
+
   defp build_inline_job_update_attrs("priority", _), do: %{}
 
   defp build_inline_job_update_attrs("status", raw)
@@ -713,6 +912,8 @@ defmodule RompCrmWeb.JobsLive do
   defp display(nil), do: "—"
   defp display(""), do: "—"
   defp display(value), do: value
+
+  def delete_step_for(steps, job_id), do: Map.get(steps, job_id, 0)
 
   defp time_entries_for(expanded_map, job_id) do
     Map.get(expanded_map, job_id, [])

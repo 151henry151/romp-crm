@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.59] - 2026-05-08
+
+### Added
+
+- **Jobs list job hours**: edit (pencil) and remove (red X) actions per row; **Edit job hours** reuses the time modal with **Update job hours**; optional **End** left blank keeps an in-progress row open
+
+### Changed
+
+- **Jobs list delete job**: replace single **Delete** text control with **`RompCrmWeb.JobDeleteBar`** — explicit **Delete job** / **Continue** / **Delete job permanently** flow (**three steps** with **Cancel delete**); remove delete control from the collapsed table header cell (desktop) so the flow lives in the expanded panel with room for warnings
 
 ## [0.9.58] - 2026-05-08
 
