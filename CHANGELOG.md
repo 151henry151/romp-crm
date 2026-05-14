@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.36] - 2026-05-13
+
+### Changed
+
+- **`JobExpandLists` `job_work_items_section`**: keep checkbox, title, date, and **Remove** on one row with **`items-center`** and **`truncate`** titles (full text in **`title`**); tighten vertical padding; restore **`input type="date"`** with **`input-bordered input-xs`** on the right instead of the icon-only control
+
 ## [0.9.35] - 2026-05-13
 
 ### Changed
