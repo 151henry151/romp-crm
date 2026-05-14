@@ -7,6 +7,22 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
   alias RompCrm.Businesses
   alias RompCrm.Businesses.{BusinessInvitation}
   alias RompCrm.Repo
+  alias RompCrmWeb.CardlessTrialToken
+
+  defp with_subscription_paywall_enabled(fun) do
+    previous = Application.get_env(:romp_crm, :subscription_paywall_enabled)
+    Application.put_env(:romp_crm, :subscription_paywall_enabled, true)
+
+    try do
+      fun.()
+    after
+      if previous == nil do
+        Application.delete_env(:romp_crm, :subscription_paywall_enabled)
+      else
+        Application.put_env(:romp_crm, :subscription_paywall_enabled, previous)
+      end
+    end
+  end
 
   describe "GET /users/register" do
     test "sends no-store headers so cached register HTML cannot stale CSRF tokens", %{conn: conn} do
@@ -71,6 +87,41 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
 
       assert redirected_to(conn) == ~p"/"
     end
+
+    test "valid signed t enables cardless trial UI when paywall enabled", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        t = CardlessTrialToken.sign()
+        conn = get(conn, ~p"/users/register?#{[t: t]}")
+        body = html_response(conn, 200)
+        refute body =~ "Billing plan"
+        assert body =~ "special link"
+        assert get_session(conn, :cardless_trial_signup) == true
+      end)
+    end
+
+    test "invalid t shows flash and does not set cardless session when paywall enabled", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        conn = get(conn, ~p"/users/register?#{[t: "not-a-valid-token"]}")
+        _body = html_response(conn, 200)
+        assert conn.assigns.flash["error"] =~ "promotional link"
+        refute get_session(conn, :cardless_trial_signup)
+      end)
+    end
+
+    test "register without t clears cardless session after a valid t visit", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        t = CardlessTrialToken.sign()
+
+        conn =
+          conn
+          |> get(~p"/users/register?#{[t: t]}")
+          |> get(~p"/users/register")
+
+        body = html_response(conn, 200)
+        assert body =~ "Billing plan"
+        refute get_session(conn, :cardless_trial_signup)
+      end)
+    end
   end
 
   describe "POST /users/register" do
@@ -127,6 +178,52 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       response = html_response(conn, 200)
       assert response =~ "Register"
       assert response =~ "must have the @ sign and no spaces"
+    end
+
+    @tag :capture_log
+    test "cardless trial signup sets gift_access_until and emails magic link when paywall enabled", %{
+      conn: conn
+    } do
+      with_subscription_paywall_enabled(fn ->
+        t = CardlessTrialToken.sign()
+        email = unique_user_email()
+
+        conn =
+          conn
+          |> get(~p"/users/register?#{[t: t]}")
+          |> post(~p"/users/register", %{
+            "user" => valid_user_attributes(email: email)
+          })
+
+        assert redirected_to(conn) == ~p"/users/log-in"
+        assert conn.assigns.flash["info"] =~ "30 days"
+
+        user = Accounts.get_user_by_email(email)
+        assert user.subscription_status == "pending_payment"
+        assert %DateTime{} = user.gift_access_until
+        assert DateTime.after?(user.gift_access_until, DateTime.utc_now(:second))
+        refute get_session(conn, :cardless_trial_signup)
+      end)
+    end
+
+    test "cardless trial signup for duplicate pending paywall email redirects to subscribe", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        email = unique_user_email()
+        assert {:ok, _} = Accounts.register_user(valid_user_attributes(email: email))
+
+        t = CardlessTrialToken.sign()
+
+        conn =
+          conn
+          |> get(~p"/users/register?#{[t: t]}")
+          |> post(~p"/users/register", %{
+            "user" => valid_user_attributes(email: email)
+          })
+
+        assert redirected_to(conn) == ~p"/subscribe"
+        assert conn.assigns.flash["info"] =~ "subscription page"
+        refute get_session(conn, :cardless_trial_signup)
+      end)
     end
   end
 

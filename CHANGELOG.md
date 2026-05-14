@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.60] - 2026-05-08
+
+### Added
+
+- **Cardless 30-day promo registration**: signed query param **`t`** on **`GET /users/register`** (session **`cardless_trial_signup`**) hides PayPal plan UI; **`POST`** creates the user, sets **`gift_access_until`** 30 days ahead via **`Accounts.apply_cardless_promo_trial/2`**, and emails the magic link; when the email already had an abandoned paywall row (**`register_user/2`** returns that user), redirect to **`/subscribe`** without stacking the promo; add **`mix romp_crm.cardless_trial_link`** to print the HTTPS URL
+
 ## [0.9.59] - 2026-05-08
 
 ### Added
