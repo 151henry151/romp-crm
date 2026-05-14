@@ -29,13 +29,32 @@ defmodule RompCrmWeb.JobExpandLists do
                     aria-label={"Mark work item complete: #{wi.title}"}
                   />
                 <% else %>
-                  <input type="checkbox" checked={wi.completed} disabled class="checkbox checkbox-sm opacity-50" />
+                  <input
+                    type="checkbox"
+                    checked={wi.completed}
+                    disabled
+                    class="checkbox checkbox-sm opacity-50"
+                  />
                 <% end %>
               </div>
               <div class="flex min-w-0 flex-1 flex-nowrap items-center gap-x-1.5 overflow-hidden">
-                <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
-                  {wi.title}
-                </span>
+                <%= if @can_edit_jobs do %>
+                  <input
+                    type="text"
+                    name={"work_item_#{wi.id}_title"}
+                    value={wi.title}
+                    phx-change="work_item_title"
+                    phx-value-job_id={@job.id}
+                    phx-value-work_item_id={wi.id}
+                    phx-debounce="400"
+                    class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
+                    title={wi.title}
+                  />
+                <% else %>
+                  <span class="min-w-0 flex-1 truncate text-sm text-base-content" title={wi.title}>
+                    {wi.title}
+                  </span>
+                <% end %>
                 <%= if wi.scheduled_on do %>
                   <span class="shrink-0 text-[11px] tabular-nums text-base-content/65 whitespace-nowrap">
                     {Date.to_iso8601(wi.scheduled_on)}
@@ -121,7 +140,12 @@ defmodule RompCrmWeb.JobExpandLists do
                     aria-label={"Mark material complete: #{m.description}"}
                   />
                 <% else %>
-                  <input type="checkbox" checked={m.completed} disabled class="checkbox checkbox-xs opacity-50" />
+                  <input
+                    type="checkbox"
+                    checked={m.completed}
+                    disabled
+                    class="checkbox checkbox-xs opacity-50"
+                  />
                 <% end %>
               </div>
               <span class="shrink-0 text-xs font-medium text-base-content/70">Qty:</span>
@@ -139,14 +163,32 @@ defmodule RompCrmWeb.JobExpandLists do
                   class="input input-bordered input-xs box-border h-6 w-9 max-w-[2.75rem] shrink-0 px-0.5 py-0 text-center text-xs leading-none tabular-nums sm:max-w-[4rem] sm:[field-sizing:content]"
                 />
               <% else %>
-                <span class="shrink-0 text-[11px] tabular-nums text-base-content">{format_qty_value(m.quantity)}</span>
+                <span class="shrink-0 text-[11px] tabular-nums text-base-content">
+                  {format_qty_value(m.quantity)}
+                </span>
               <% end %>
-              <p class="min-w-0 flex-1 truncate leading-tight text-sm" title={material_line_title(m)}>
+              <div class="flex min-w-0 flex-1 items-center gap-0.5 leading-tight">
                 <%= if m.scope_label != "Job" do %>
-                  <span class="text-base-content/55">{m.scope_label}:</span>
+                  <span class="shrink-0 text-base-content/55 text-xs">{m.scope_label}:</span>
                 <% end %>
-                <span class="text-base-content">{m.description}</span>
-              </p>
+                <%= if @can_edit_jobs do %>
+                  <input
+                    type="text"
+                    name={"material_#{m.id}_description"}
+                    value={m.description}
+                    phx-change="material_description"
+                    phx-value-job_id={@job.id}
+                    phx-value-material_id={m.id}
+                    phx-debounce="400"
+                    class="input input-bordered input-xs min-w-0 flex-1 text-sm text-base-content"
+                    title={material_line_title(m)}
+                  />
+                <% else %>
+                  <p class="min-w-0 flex-1 truncate text-sm" title={material_line_title(m)}>
+                    <span class="text-base-content">{m.description}</span>
+                  </p>
+                <% end %>
+              </div>
               <%= if @can_edit_jobs do %>
                 <button
                   type="button"

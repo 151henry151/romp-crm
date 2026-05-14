@@ -138,7 +138,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
       - "address", "phone", "work_description", "referred_by", "notes", "next_action": strings or null.
       - optional "scheduled_on": `YYYY-MM-DD` for the main job visit/start when the SMS states it.
       - optional "work_items": array of `{ "title": "...", "scheduled_on": "YYYY-MM-DD" or null }` — use when the SMS clearly lists multiple distinct tasks for the same customer; prefer this over one long `work_description`.
-      - optional "materials": array of `{ "description": "...", "work_item_index": <0-based> }` or `{ "description", "job_work_item_id" }` for parts/supplies.
+      - optional "materials": array of `{ "quantity": <positive number>, "description": "<item name only>", "work_item_index": <0-based>? }` or include `"job_work_item_id"` instead of index. **`quantity`** is required (use **1** when the SMS does not state a count). Never put the count inside **`description`** (e.g. SMS "2 1 1/4 P traps" → `quantity` **2**, `description` **"1 1/4 P traps"**; "one wax seal" → `quantity` **1**, `description` **"wax seal"**).
       - "priority": "normal" | "high"
       - "status": "lead" | "pending" | "in_progress" | "done"
 
@@ -146,7 +146,7 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     Use keys on an action object:
     - "intent": "update"
     - "job_id": integer — MUST be exactly one `"id"` from the snapshot JSON that matches the SMS (your semantic judgment).
-    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`), plus optional **`scheduled_on`** (date string `YYYY-MM-DD`), **`work_items`** (array of `{ "title", "scheduled_on"?, "sort_order"?, "id"? }`), and **`materials`** (array of `{ "description", "job_work_item_id"?, "work_item_index"? }`).
+    - "updates": only fields that change — omit or null unchanged keys — same field names as in create job object (`client_name`, `address`, `phone`, `work_description`, `priority`, `status`, `referred_by`, `notes`, `next_action`), plus optional **`scheduled_on`** (date string `YYYY-MM-DD`), **`work_items`** (array of `{ "title", "scheduled_on"?, "sort_order"?, "id"? }`), and **`materials`** (array of `{ "quantity", "description", "job_work_item_id"?, "work_item_index"? }` — same **`quantity` / `description`** rules as on create).
 
     **Interpreting add-on work (your judgment):** Compare the SMS to the snapshot. When the user is **adding** another distinct task to an existing customer/job (same visit / same scope of work, phrases like "also", "add to her job", "when we're there for the X, also Y"), put that added task as a **new `work_items` row** (`title` = the new task). Update **`work_description`** too when a refreshed summary helps; **both** are appropriate when the message reads that way. For additions only, new rows may omit `"id"` (server keeps existing line items and appends). To remove or rewrite existing line items, include every remaining **`id`** from the snapshot in `work_items` with the intended titles.
 

@@ -285,7 +285,12 @@ defmodule RompCrmWeb.JobsLive do
                     |> Enum.map(fn {k, {m, _}} -> "#{k} #{m}" end)
                     |> Enum.join("; ")
 
-                  {:noreply, put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
+                  {:noreply,
+                   put_flash(
+                     socket,
+                     :error,
+                     if(msg != "", do: msg, else: "Could not save hours.")
+                   )}
               end
             end
         end
@@ -315,8 +320,11 @@ defmodule RompCrmWeb.JobsLive do
 
             job ->
               case Jobs.update_job(job, attrs) do
-                {:ok, _} -> {:noreply, refresh_jobs(socket)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not save that change.")}
+                {:ok, _} ->
+                  {:noreply, refresh_jobs(socket)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not save that change.")}
               end
           end
         end
@@ -352,7 +360,11 @@ defmodule RompCrmWeb.JobsLive do
      |> refresh_jobs()}
   end
 
-  def handle_event("toggle_work_item_completed", %{"job_id" => jid, "work_item_id" => wi_id}, socket) do
+  def handle_event(
+        "toggle_work_item_completed",
+        %{"job_id" => jid, "work_item_id" => wi_id},
+        socket
+      ) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
@@ -373,8 +385,11 @@ defmodule RompCrmWeb.JobsLive do
 
             wi ->
               case Jobs.update_job_work_item(job, wi_id, %{completed: not wi.completed}) do
-                {:ok, _} -> {:noreply, refresh_jobs(socket)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
+                {:ok, _} ->
+                  {:noreply, refresh_jobs(socket)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
@@ -412,6 +427,36 @@ defmodule RompCrmWeb.JobsLive do
             {:ok, _} -> {:noreply, refresh_jobs(socket)}
             {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update date.")}
           end
+      end
+    end
+  end
+
+  def handle_event("work_item_title", params, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      job_id = String.to_integer(params["job_id"])
+      wi_id = String.to_integer(params["work_item_id"])
+      bid = socket.assigns.current_business_id
+      key = "work_item_#{wi_id}_title"
+      title = params |> Map.get(key, "") |> to_string() |> String.trim()
+
+      if title == "" do
+        {:noreply, put_flash(socket, :error, "Work item title cannot be empty.")}
+      else
+        case Jobs.get_job(job_id, bid) do
+          nil ->
+            {:noreply, put_flash(socket, :error, "Job not found.")}
+
+          job ->
+            case Jobs.update_job_work_item(job, wi_id, %{title: title}) do
+              {:ok, _} ->
+                {:noreply, refresh_jobs(socket)}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Could not update work item title.")}
+            end
+        end
       end
     end
   end
@@ -499,6 +544,36 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  def handle_event("material_description", params, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      job_id = String.to_integer(params["job_id"])
+      mid = String.to_integer(params["material_id"])
+      bid = socket.assigns.current_business_id
+      key = "material_#{mid}_description"
+      desc = params |> Map.get(key, "") |> to_string() |> String.trim()
+
+      if desc == "" do
+        {:noreply, put_flash(socket, :error, "Material description cannot be empty.")}
+      else
+        case Jobs.get_job(job_id, bid) do
+          nil ->
+            {:noreply, put_flash(socket, :error, "Job not found.")}
+
+          job ->
+            case Jobs.update_job_material(job, mid, %{description: desc}) do
+              {:ok, _} ->
+                {:noreply, refresh_jobs(socket)}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Could not update material description.")}
+            end
+        end
+      end
+    end
+  end
+
   def handle_event("material_unit_price", params, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
@@ -564,7 +639,9 @@ defmodule RompCrmWeb.JobsLive do
 
   defp inline_job_field_allowed?(_), do: false
 
-  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal), do: %{"priority" => raw}
+  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal),
+    do: %{"priority" => raw}
+
   defp build_inline_job_update_attrs("priority", _), do: %{}
 
   defp build_inline_job_update_attrs("status", raw)
