@@ -578,8 +578,11 @@ defmodule RompCrm.AccountsTest do
       phone = unique_nanp_phone()
       assert {:ok, _} = Accounts.update_user_profile(u1, %{"phone" => phone})
 
-      assert {:error, %Ecto.Changeset{}} =
+      assert {:error, %Ecto.Changeset{} = cs} =
                Accounts.complete_sms_assistant_intro_with_phone(u2, %{"phone" => phone})
+
+      phone_errors = List.wrap(errors_on(cs)[:phone])
+      assert Enum.any?(phone_errors, &String.contains?(&1, "another account"))
     end
   end
 

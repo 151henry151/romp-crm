@@ -41,6 +41,7 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
         </h2>
         <p class="mt-3 text-sm leading-relaxed text-gray-700">
           Add your mobile to text the assistant about jobs and lists, or skip and add it later in Account Settings.
+          Each number can only be on one Romp CRM account; if you use it elsewhere, remove it there first.
         </p>
         <.form
           for={@form}
@@ -85,12 +86,15 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
       {:noreply, assign(socket, :form, to_form(cs, as: :user_profile))}
     else
       case Accounts.complete_sms_assistant_intro_with_phone(user, params) do
-        {:ok, user, sms_result} ->
-          send(self(), {:sms_assistant_intro, :updated, user})
+        {:ok, updated_user, sms_result} ->
+          send(self(), {:sms_assistant_intro, :updated, updated_user})
           {:noreply, socket |> put_flash_for_sms_result(sms_result)}
 
         {:error, %Ecto.Changeset{} = cs} ->
-          {:noreply, assign(socket, :form, to_form(cs, as: :user_profile))}
+          {:noreply,
+           socket
+           |> Phoenix.LiveView.put_flash(:error, first_profile_changeset_flash(cs))
+           |> assign(:form, to_form(cs, as: :user_profile))}
       end
     end
   end
@@ -146,6 +150,22 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
 
       _ ->
         Phoenix.LiveView.put_flash(socket, :info, "You're all set.")
+    end
+  end
+
+  defp first_profile_changeset_flash(%Ecto.Changeset{errors: errors}) do
+    case errors do
+      [{field, {msg, _}} | _] ->
+        label =
+          case field do
+            :phone -> "Mobile number"
+            _ -> field |> to_string() |> String.replace("_", " ")
+          end
+
+        "#{label}: #{msg}"
+
+      _ ->
+        "Could not save your mobile. Check the form and try again."
     end
   end
 end
