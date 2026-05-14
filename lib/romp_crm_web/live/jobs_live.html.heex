@@ -1,6 +1,8 @@
 <Layouts.app
   flash={@flash}
   current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
   show_workspace_nav={true}
   current_business_id={@current_business_id}
   my_businesses={@my_businesses}
@@ -94,16 +96,8 @@
                 variant={:mobile}
                 edit_keys={@job_expand_editing}
               />
-              <.job_work_items_section
-                job={job}
-                can_edit_jobs={@can_edit_jobs}
-                edit_keys={@job_expand_editing}
-              />
-              <.job_materials_section
-                job={job}
-                can_edit_jobs={@can_edit_jobs}
-                edit_keys={@job_expand_editing}
-              />
+              <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
+              <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
               <%= if job.photos != [] && job.photos do %>
                 <div class="pt-2 flex flex-wrap gap-2">
                   <%= for ph <- job.photos do %>
@@ -250,10 +244,7 @@
                 <td class="px-4 py-3">
                   <div class={[
                     "flex items-center gap-2 transition-opacity",
-                    if(job_expanded?,
-                      do: "opacity-100",
-                      else: "opacity-0 group-hover:opacity-100"
-                    )
+                    if(job_expanded?, do: "opacity-100", else: "opacity-0 group-hover:opacity-100")
                   ]}>
                     <button
                       phx-click="delete"
@@ -269,10 +260,7 @@
             </tr>
             <%= if job_expanded? do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
-                <td
-                  colspan={if(@can_edit_jobs, do: 9, else: 8)}
-                  class="px-4 py-3 text-sm text-base-content"
-                >
+                <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
                   <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
                     <.job_expanded_inline_fields
                       job={job}
@@ -295,11 +283,7 @@
                     <%= if job.photos != [] && job.photos do %>
                       <div class="lg:col-span-2 pt-2 flex flex-wrap gap-2">
                         <%= for ph <- job.photos do %>
-                          <a
-                            href={"/" <> ph.relative_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
+                          <a href={"/" <> ph.relative_path} target="_blank" rel="noopener noreferrer">
                             <img
                               src={"/" <> ph.relative_path}
                               alt="Job photo"
@@ -369,10 +353,7 @@
           <% end %>
           <%= if visible_jobs(@jobs, @filter) == [] do %>
             <tr>
-              <td
-                colspan={if(@can_edit_jobs, do: 9, else: 8)}
-                class="px-4 py-12 text-center text-base-content/60"
-              >
+              <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-12 text-center text-base-content/60">
                 No jobs found.
               </td>
             </tr>
@@ -382,97 +363,80 @@
     </div>
   </div>
 
-  <%!-- Modal: log hours on a job (closed interval; not punch clock) --%>
-  <%= if @log_job_time_job_id do %>
-    <.modal id="job-time-log-modal" show on_cancel={JS.push("close_job_time_log")}>
-      <div class="pr-8">
-        <h2 id="job-time-log-modal-title" class="text-lg font-semibold text-gray-900">
-          Add job hours
-        </h2>
-        <p class="mt-1 text-sm text-gray-600">
-          For <span class="font-medium text-gray-800">{@log_job_time_client_name}</span>. Enter when you started and
-          finished on <span class="font-medium">this job</span>
-          (pickers use 15-minute steps; you can still type any
-          minute). This does <span class="font-medium">not</span>
-          start a live timer.
-        </p>
-        <p class="mt-2 text-xs text-gray-500">
-          Workday punch in/out is separate: <a
-            href={~p"/my-timeclock"}
-            class="text-blue-600 hover:underline font-medium"
-          >Workday timeclock</a>.
-        </p>
+<%!-- Modal: log hours on a job (closed interval; not punch clock) --%>
+<%= if @log_job_time_job_id do %>
+  <.modal id="job-time-log-modal" show on_cancel={JS.push("close_job_time_log")}>
+    <div class="pr-8">
+      <h2 id="job-time-log-modal-title" class="text-lg font-semibold text-gray-900">
+        Add job hours
+      </h2>
+      <p class="mt-1 text-sm text-gray-600">
+        For <span class="font-medium text-gray-800">{@log_job_time_client_name}</span>. Enter when you started and
+        finished on <span class="font-medium">this job</span> (pickers use 15-minute steps; you can still type any
+        minute). This does <span class="font-medium">not</span> start a live timer.
+      </p>
+      <p class="mt-2 text-xs text-gray-500">
+        Workday punch in/out is separate:
+        <a href={~p"/my-timeclock"} class="text-blue-600 hover:underline font-medium">Workday timeclock</a>.
+      </p>
 
-        <form phx-change="job_time_field" phx-submit="save_job_time_log" class="mt-5 space-y-4">
-          <div>
-            <label for="job-time-started" class="block text-sm font-medium text-gray-700 mb-1">
-              Start
-            </label>
-            <input
-              id="job-time-started"
-              type="datetime-local"
-              name="started_at"
-              value={@job_time_started_at}
-              step="900"
-              class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label for="job-time-ended" class="block text-sm font-medium text-gray-700 mb-1">
-              End
-            </label>
-            <input
-              id="job-time-ended"
-              type="datetime-local"
-              name="ended_at"
-              value={@job_time_ended_at}
-              step="900"
-              class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label for="job-time-notes" class="block text-sm font-medium text-gray-700 mb-1">
-              Notes (optional)
-            </label>
-            <textarea
-              id="job-time-notes"
-              name="notes"
-              rows="2"
-              class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            ><%= @job_time_notes %></textarea>
-          </div>
-          <div class="flex flex-wrap gap-2 pt-2">
-            <button
-              type="submit"
-              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-            >
-              Save job hours
-            </button>
-            <button
-              type="button"
-              phx-click="close_job_time_log"
-              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </.modal>
-  <% end %>
-  <%= if @live_action in [:new, :edit] do %>
-    <.modal id="job-modal" show on_cancel={JS.patch(~p"/")}>
-      <.live_component
-        module={RompCrmWeb.JobFormComponent}
-        id={@job.id || :new}
-        title={if @live_action == :new, do: "New Job", else: "Edit Job"}
-        action={@live_action}
-        job={@job}
-        current_business_id={@current_business_id}
-        actor_user_id={@current_scope.user.id}
-        can_edit_jobs={@can_edit_jobs}
-        patch={~p"/"}
-      />
-    </.modal>
-  <% end %>
+      <form phx-change="job_time_field" phx-submit="save_job_time_log" class="mt-5 space-y-4">
+        <div>
+          <label for="job-time-started" class="block text-sm font-medium text-gray-700 mb-1">Start</label>
+          <input
+            id="job-time-started"
+            type="datetime-local"
+            name="started_at"
+            value={@job_time_started_at}
+            step="900"
+            class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label for="job-time-ended" class="block text-sm font-medium text-gray-700 mb-1">End</label>
+          <input
+            id="job-time-ended"
+            type="datetime-local"
+            name="ended_at"
+            value={@job_time_ended_at}
+            step="900"
+            class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label for="job-time-notes" class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+          <textarea
+            id="job-time-notes"
+            name="notes"
+            rows="2"
+            class="w-full max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          ><%= @job_time_notes %></textarea>
+        </div>
+        <div class="flex flex-wrap gap-2 pt-2">
+          <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+            Save job hours
+          </button>
+          <button type="button" phx-click="close_job_time_log" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </.modal>
+<% end %>
+<%= if @live_action in [:new, :edit] do %>
+  <.modal id="job-modal" show on_cancel={JS.patch(~p"/")}>
+    <.live_component
+      module={RompCrmWeb.JobFormComponent}
+      id={@job.id || :new}
+      title={if @live_action == :new, do: "New Job", else: "Edit Job"}
+      action={@live_action}
+      job={@job}
+      current_business_id={@current_business_id}
+      actor_user_id={@current_scope.user.id}
+      can_edit_jobs={@can_edit_jobs}
+      patch={~p"/"}
+    />
+  </.modal>
+<% end %>
 </Layouts.app>

@@ -258,6 +258,12 @@ defmodule RompCrmWeb.UserAuth do
     end
   end
 
+  @doc false
+  def on_mount(:assign_sms_assistant_intro, _params, _session, socket) do
+    user = Accounts.get_user!(socket.assigns.current_scope.user.id)
+    {:cont, apply_sms_assistant_intro_assigns(socket, user)}
+  end
+
   # Requires `:require_authenticated` to run first. Assigns `current_business_id` and `my_businesses`.
   @doc false
   def on_mount(:ensure_business_scope, _params, session, socket) do
@@ -297,6 +303,25 @@ defmodule RompCrmWeb.UserAuth do
        socket
        |> Phoenix.LiveView.put_flash(:error, "Only a business owner can manage employees.")
        |> Phoenix.LiveView.redirect(to: ~p"/")}
+    end
+  end
+
+  @doc false
+  def apply_sms_assistant_intro_assigns(socket, %User{} = user) do
+    scope = Scope.for_user(user)
+    show? = is_nil(user.sms_assistant_intro_completed_at)
+
+    socket =
+      socket
+      |> Phoenix.Component.assign(:current_scope, scope)
+      |> Phoenix.Component.assign(:show_sms_assistant_intro_modal, show?)
+
+    case socket.assigns do
+      %{user: %User{id: id}} when id == user.id ->
+        Phoenix.Component.assign(socket, :user, user)
+
+      _ ->
+        socket
     end
   end
 

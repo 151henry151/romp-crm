@@ -24,6 +24,10 @@ defmodule RompCrmWeb.TimeLogLive do
   end
 
   @impl true
+  def handle_info({:sms_assistant_intro, :updated, user}, socket) do
+    {:noreply, RompCrmWeb.UserAuth.apply_sms_assistant_intro_assigns(socket, user)}
+  end
+
   def handle_info({:time_entry_created, _entry}, socket) do
     {:noreply, refresh(socket)}
   end

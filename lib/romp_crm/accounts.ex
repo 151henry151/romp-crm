@@ -344,6 +344,49 @@ defmodule RompCrm.Accounts do
     Repo.update(changeset)
   end
 
+  @doc """
+  Marks the first-login SMS assistant intro as finished without saving a phone number.
+  """
+  def skip_sms_assistant_intro(%User{} = user), do: mark_sms_assistant_intro_completed(user)
+
+  @doc """
+  Saves **`attrs`** as the profile **`phone`** (and derived **`phone_normalized`**), sends the
+  welcome SMS when outbound SMS is enabled, then marks the intro flow complete.
+
+  Twilio errors do not roll back the saved phone number.
+  """
+  def complete_sms_assistant_intro_with_phone(%User{} = user, attrs) when is_map(attrs) do
+    case update_user_profile(user, profile_phone_only_attrs(attrs)) do
+      {:error, _} = err ->
+        err
+
+      {:ok, %User{} = user} ->
+        sms_result = RompCrm.SmsAssistantIntro.send_welcome_sms(user)
+
+        case mark_sms_assistant_intro_completed(user) do
+          {:ok, u} -> {:ok, u, sms_result}
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  @doc false
+  def mark_sms_assistant_intro_completed(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(sms_assistant_intro_completed_at: DateTime.utc_now(:second))
+    |> Repo.update()
+  end
+
+  defp profile_phone_only_attrs(attrs) when is_map(attrs) do
+    flat =
+      Enum.into(attrs, %{}, fn
+        {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+        {k, v} -> {to_string(k), v}
+      end)
+
+    %{"phone" => flat |> Map.get("phone", "") |> to_string()}
+  end
+
   defp normalize_profile_attrs(attrs) when is_map(attrs) do
     attrs =
       Enum.into(attrs, %{}, fn

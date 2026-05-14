@@ -108,7 +108,8 @@ defmodule RompCrmWeb.Router do
     live_session :authenticated_business_pages,
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},
-        {RompCrmWeb.UserAuth, :require_active_subscription}
+        {RompCrmWeb.UserAuth, :require_active_subscription},
+        {RompCrmWeb.UserAuth, :assign_sms_assistant_intro}
       ] do
       live "/businesses", BusinessesLive, :index
     end
@@ -117,6 +118,7 @@ defmodule RompCrmWeb.Router do
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},
         {RompCrmWeb.UserAuth, :require_active_subscription},
+        {RompCrmWeb.UserAuth, :assign_sms_assistant_intro},
         {RompCrmWeb.UserAuth, :ensure_business_scope}
       ] do
       live "/", JobsLive, :index
@@ -131,6 +133,7 @@ defmodule RompCrmWeb.Router do
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},
         {RompCrmWeb.UserAuth, :require_active_subscription},
+        {RompCrmWeb.UserAuth, :assign_sms_assistant_intro},
         {RompCrmWeb.UserAuth, :ensure_business_scope},
         {RompCrmWeb.UserAuth, :require_business_owner}
       ] do

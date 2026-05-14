@@ -30,4 +30,15 @@ defmodule RompCrm.Twilio.PhoneTest do
       assert Phone.sms_uri("+18022780965") == "sms:+18022780965"
     end
   end
+
+  describe "to_e164/1" do
+    test "adds plus for stored 11-digit NANP" do
+      assert Phone.to_e164("18024587299") == "+18024587299"
+    end
+
+    test "returns nil for unusable input" do
+      assert Phone.to_e164(nil) == nil
+      assert Phone.to_e164("") == nil
+    end
+  end
 end

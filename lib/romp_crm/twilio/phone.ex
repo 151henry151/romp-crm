@@ -77,4 +77,26 @@ defmodule RompCrm.Twilio.Phone do
   end
 
   def sms_uri(_), do: "sms:"
+
+  @doc """
+  Converts internal **`phone_normalized`** (NANP digits, typically `1` + 10 digits) to **E.164**
+  for Twilio (`+1…`). Returns **`nil`** when normalization does not yield a valid NANP mobile/line.
+  """
+  def to_e164(nil), do: nil
+
+  def to_e164(norm) when is_binary(norm) and norm != "" do
+    if String.starts_with?(norm, "1") and byte_size(norm) == 11 do
+      "+" <> norm
+    else
+      case normalize_us(norm) do
+        "" ->
+          nil
+
+        n ->
+          if String.starts_with?(n, "1") and byte_size(n) == 11, do: "+" <> n, else: nil
+      end
+    end
+  end
+
+  def to_e164(_), do: nil
 end
