@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.9.48] - 2026-05-08
+
+### Changed
+
+- **`UserSettings` profile form**: replace SMS reminder **JSON** field with checkboxes (relative days before the job) and a **UTC hour** select; merge synthetic params into `sms_reminder_prefs_json` in **`UserSettingsController`**
+- **`Layouts.app`**: keep **mobile workspace hamburger** to the **left** of the logo via **`app_workspace_nav_mobile_drawer/1`**; render **`app_workspace_nav/1`** on **large screens only**
+- **`Reminders`**: document **`decode_prefs_json/1`** for use from settings templates
+
 ## [0.9.47] - 2026-05-08
 
 ### Added
