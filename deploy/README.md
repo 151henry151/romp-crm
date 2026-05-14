@@ -1,5 +1,7 @@
 # Deploying on hromp.com (`/romp-crm`)
 
+**Moving to a new VPS?** Use **[`docs/vps-migration-rompcrm.md`](../docs/vps-migration-rompcrm.md)** (database, nginx, TLS, DNS, secrets checklist).
+
 Run these steps **on the server**. This repo’s OTP application name is **`:romp_crm`** (release binary **`romp_crm`**); public URLs use **`/romp-crm`**.
 
 The hosted product is also served at **`https://rompcrm.com/romp-crm/`** with the same reverse-proxy pattern. For **self-hosting on your own domain**, use the end-user guide **[docs/self-hosting-rompcrm.com.html](../docs/self-hosting-rompcrm.com.html)** (synced to **https://rompcrm.com/self-hosting.html**) and keep **`SUBSCRIPTION_PAYWALL_ENABLED`** unset or **`false`** unless you intentionally replicate PayPal billing (then set **`true`** and supply every **`PAYPAL_*`** variable required by **`config/runtime.exs`**).

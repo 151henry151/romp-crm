@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.65] - 2026-05-14
+
+### Added
+
+- **`docs/vps-migration-rompcrm.md`**: operator checklist for moving **`rompcrm.com`**, nginx, TLS, SQLite, **`romp-crm`** release, and secrets to a new VPS with minimal downtime
+- **`deploy/README.md`**: link the VPS migration doc from the deploy guide
+
+### Changed
+
+- **`RompCrm.EmailHtml`**: simplify transactional email layout to a **light** palette (aligned with app light mode); keep the **`email_logo_url`** image with a visible **“Romp CRM”** wordmark and **light** header cell so blocked images do not leave a dark placeholder; tighten typography; use **underlined** footer and fallback links for clarity
+- **`UserNotifier`**: align gift callout inline styles with the light email palette
+
 ## [0.9.63] - 2026-05-08
 
 ### Changed

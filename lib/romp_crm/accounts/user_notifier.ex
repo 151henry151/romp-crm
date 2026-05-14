@@ -99,9 +99,7 @@ defmodule RompCrm.Accounts.UserNotifier do
         EmailHtml.h1(EmailHtml.escape("Log in to Romp CRM")),
         EmailHtml.p(EmailHtml.escape("Hi #{user.email},")),
         EmailHtml.p(
-          EmailHtml.escape(
-            "Tap the button below to open Romp CRM and sign in. The link expires after a short time."
-          )
+          EmailHtml.escape("Tap the button below to open Romp CRM and sign in. The link expires after a short time.")
         ),
         EmailHtml.cta_button(url, "Open Romp CRM"),
         EmailHtml.url_fallback(url),
@@ -315,9 +313,7 @@ defmodule RompCrm.Accounts.UserNotifier do
             "If you already have a Romp CRM account with this email, the link takes you to sign in and applies the gift after you log in. If you're new, the same link creates your account and signs you in."
           )
         ),
-        EmailHtml.muted_p(
-          EmailHtml.escape("If you did not expect this email, you can ignore it.")
-        )
+        EmailHtml.muted_p(EmailHtml.escape("If you did not expect this email, you can ignore it."))
       ]
       |> Enum.reject(&(&1 == ""))
       |> Enum.join()
@@ -335,7 +331,7 @@ defmodule RompCrm.Accounts.UserNotifier do
 
           html =
             EmailHtml.callout(
-              "<p style=\"margin:0;font-family:'Inter','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#e6edf8;\"><strong style=\"color:#7dd3fc;\">" <>
+              "<p style=\"margin:0;font-family:'Inter','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#374151;\"><strong style=\"color:#111827;\">" <>
                 EmailHtml.escape("Message from the team") <>
                 "</strong><br />" <>
                 EmailHtml.multiline_html(t) <>
@@ -364,15 +360,9 @@ defmodule RompCrm.Accounts.UserNotifier do
       [
         EmailHtml.h1(EmailHtml.escape("Nothing to export yet")),
         EmailHtml.p(
-          EmailHtml.escape(
-            "This account doesn't own any workspaces, so there are no CSV files to attach."
-          )
+          EmailHtml.escape("This account doesn't own any workspaces, so there are no CSV files to attach.")
         ),
-        EmailHtml.p(
-          EmailHtml.escape(
-            "Create a business in Romp CRM, then run the export again from Settings."
-          )
-        )
+        EmailHtml.p(EmailHtml.escape("Create a business in Romp CRM, then run the export again from Settings."))
       ]
       |> Enum.join()
 

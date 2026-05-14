@@ -3,12 +3,16 @@ defmodule RompCrm.EmailHtmlTest do
 
   alias RompCrm.EmailHtml
 
-  test "layout wraps inner content and includes logo URL" do
+  test "layout uses light theme, wordmark, and logo image src" do
     html = EmailHtml.layout("<p>Hello</p>")
     assert html =~ "Hello"
+    assert html =~ "<img"
     assert html =~ "rompcrm.com/media/romp-crm-logo-main-dark.png"
-    assert html =~ "#0b1220"
-    assert html =~ "#121c31"
+    assert html =~ ~s(alt="Romp CRM")
+    assert html =~ "Romp CRM"
+    assert html =~ "#f3f4f6"
+    assert html =~ "#ffffff"
+    assert html =~ "#111827"
   end
 
   test "escape encodes HTML special characters" do
