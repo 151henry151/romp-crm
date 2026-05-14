@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.61] - 2026-05-08
+
+### Changed
+
+- **README.md**: refresh overview (public hosts, self-hosting pointers, Twilio/Paywall env summary, features pointer to **CHANGELOG**)
+- **deploy/README.md**: document **rompcrm.com** mount, self-host **`SUBSCRIPTION_PAYWALL_ENABLED`** default, link **docs/self-hosting-rompcrm.com.html**, Twilio webhook examples for **hromp.com** or **rompcrm.com**
+- **deploy/romp-crm.env.example**: expand commented blocks for mail, voice, PayPal paywall, admin, and email branding
+- **docs/self-hosting-rompcrm.com.html**: add maintained self-hosting HTML guide (canonical live URL **https://rompcrm.com/self-hosting.html**)
+
 ## [0.9.60] - 2026-05-08
 
 ### Added

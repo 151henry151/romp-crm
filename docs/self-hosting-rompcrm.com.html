@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Romp CRM Self-Hosting Guide</title>
+  <meta name="description" content="Detailed step-by-step guide to self-host Romp CRM with Anthropic and Twilio on your own VPS.">
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #121c31;
+      --panel-2: #1a2742;
+      --text: #e6edf8;
+      --muted: #a8b6cf;
+      --primary: #7dd3fc;
+      --primary-2: #38bdf8;
+      --border: #253453;
+      --success: #86efac;
+      --warn: #fcd34d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 20% -20%, #1d2d4f 0, var(--bg) 45%);
+      line-height: 1.5;
+    }
+    .wrap { width: min(1100px, calc(100% - 2rem)); margin: 0 auto; }
+    header { padding: 2rem 0 1rem; }
+    .brand { font-size: 1.05rem; font-weight: 700; letter-spacing: .02em; }
+    h1 { margin: .25rem 0 .5rem; font-size: clamp(1.9rem, 4vw, 2.8rem); line-height: 1.1; }
+    h2 { margin: .1rem 0 1rem; font-size: clamp(1.2rem, 2.8vw, 1.7rem); }
+    h3 { margin: 1.2rem 0 .45rem; font-size: 1.08rem; }
+    p { margin: .45rem 0; }
+    .lede { color: var(--muted); max-width: 80ch; }
+    .section { padding: 1.2rem 0; }
+    .card {
+      background: linear-gradient(180deg, var(--panel), #0f182b);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1rem;
+      margin-top: .85rem;
+    }
+    .callout {
+      border-left: 4px solid var(--warn);
+      background: rgba(252,211,77,.1);
+      border-radius: .5rem;
+      padding: .75rem .85rem;
+      margin: .8rem 0;
+      color: #fde68a;
+    }
+    .ok {
+      border-left-color: var(--success);
+      background: rgba(134,239,172,.1);
+      color: #bbf7d0;
+    }
+    a { color: var(--primary); }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: rgba(2,6,23,.65);
+      border: 1px solid var(--border);
+      border-radius: .35rem;
+      padding: .08rem .3rem;
+      color: #c7d2fe;
+    }
+    pre {
+      margin: .6rem 0;
+      background: #060b18;
+      border: 1px solid var(--border);
+      border-radius: .7rem;
+      padding: .85rem;
+      overflow-x: auto;
+      color: #cbd5e1;
+    }
+    pre code { border: 0; background: transparent; padding: 0; color: inherit; }
+    ul, ol { margin: .45rem 0 .7rem 1.15rem; }
+    li { margin: .28rem 0; color: var(--muted); }
+    .topnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .55rem;
+      margin-top: .8rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: .7rem;
+      padding: .65rem .9rem;
+      text-decoration: none;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: #1a2a49;
+    }
+    .btn.primary { background: linear-gradient(180deg, var(--primary), var(--primary-2)); color: #041222; border-color: #67d4ff; }
+    .grid {
+      display: grid;
+      gap: .85rem;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    footer { padding: 1.8rem 0 2.6rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="brand">Romp CRM</div>
+      <h1>Self-Hosting Guide</h1>
+      <p class="lede">Run Romp CRM on your own VPS with your own domain, email sender, Anthropic API key, and Twilio number for inbound/outbound SMS workflows.</p>
+      <div class="topnav">
+        <a class="btn" href="/">Back to pricing</a>
+        <a class="btn" href="/romp-crm/users/register">Try hosted plan</a>
+        <a class="btn primary" href="https://github.com/151henry151/romp-crm" target="_blank" rel="noopener noreferrer">Romp CRM on GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="section">
+      <div class="card">
+        <h2>1) What you need before you start</h2>
+        <ul>
+          <li>A Linux VPS (Ubuntu/Debian recommended) with root or sudo access</li>
+          <li>A domain name pointed at your VPS</li>
+          <li>SMTP mailbox credentials for your sender address (example: <code>noreply@yourdomain.com</code>)</li>
+          <li>An <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">Anthropic Console</a> account and API key</li>
+          <li>A <a href="https://www.twilio.com/" target="_blank" rel="noopener noreferrer">Twilio</a> account, SMS-capable number, and A2P 10DLC registration for outbound US texting</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>2) Clone and deploy Romp CRM on your VPS</h2>
+        <h3>2.1 Install platform dependencies</h3>
+        <p>Install Elixir (compatible with the version in <code>.tool-versions</code> or <code>mix.exs</code> in the repo), Erlang/OTP, Node.js, Git, SQLite client libraries, and nginx on your VPS (package names vary by distro).</p>
+
+        <h3>2.2 Clone the app</h3>
+        <pre><code>git clone https://github.com/151henry151/romp-crm.git
+cd romp-crm</code></pre>
+
+        <h3>2.3 Create production env file</h3>
+        <pre><code>cp deploy/romp-crm.env.example .env.production
+chmod 600 .env.production</code></pre>
+
+        <h3>2.4 Build release</h3>
+        <pre><code>MIX_ENV=prod mix deps.get
+MIX_ENV=prod mix assets.deploy
+MIX_ENV=prod mix release</code></pre>
+
+        <h3>2.5 SQLite data directory</h3>
+        <p>Create the directory for your SQLite file before the first start (match your <code>DATABASE_PATH</code>):</p>
+        <pre><code>mkdir -p /home/youruser/romp-crm/data</code></pre>
+
+        <h3>2.6 Install systemd unit</h3>
+        <p>The example unit uses <code>User=henry</code>, <code>WorkingDirectory=/home/henry/romp-crm</code>, and <code>EnvironmentFile=/home/henry/romp-crm/.env.production</code>. Edit those paths and the Unix user to match your server, then install:</p>
+        <pre><code>sudo install -m 644 deploy/romp-crm.service /etc/systemd/system/romp-crm.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now romp-crm
+sudo systemctl status romp-crm</code></pre>
+        <p>Systemd reads variables from <code>EnvironmentFile</code> (you do not need <code>export</code> lines in that file). After editing <code>.env.production</code>, restart: <code>sudo systemctl restart romp-crm</code>.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>3) Configure your Romp CRM environment</h2>
+        <p>Production loads <code>.env.production</code> at runtime; see <code>config/runtime.exs</code> in the repo for the full list of variables. At minimum, set:</p>
+        <pre><code>MIX_ENV=prod
+PHX_SERVER=true
+PHX_HOST=yourdomain.com
+PORT=40175
+SECRET_KEY_BASE=...generated...
+DATABASE_PATH=/home/youruser/romp-crm/data/romp_crm.db
+
+MAIL_FROM_NAME="Romp CRM"
+MAIL_FROM_ADDRESS=noreply@yourdomain.com
+SMTP_HOST=your.smtp.host
+SMTP_PORT=587
+SMTP_TLS=always
+SMTP_USERNAME=noreply@yourdomain.com
+SMTP_PASSWORD="your-mail-password"
+
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_MESSAGING_FROM=+1XXXXXXXXXX
+TWILIO_WEBHOOK_PUBLIC_URL=https://yourdomain.com/romp-crm/webhooks/twilio/sms
+TWILIO_SMS_REPLIES_ENABLED=true
+
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+
+ENFORCE_REGISTRATION_ALLOWLIST=false</code></pre>
+
+        <h3>3.1 Subscription paywall (usually off for self-host)</h3>
+        <p>Leave <code>SUBSCRIPTION_PAYWALL_ENABLED</code> <strong>unset</strong> or set it to <code>false</code> so new accounts are active without PayPal (typical self-host). If you set <code>SUBSCRIPTION_PAYWALL_ENABLED=true</code>, you must supply all PayPal billing variables (client id/secret, plan ids, webhook id, etc.) as documented in the repo’s <code>deploy/README.md</code> and the <code>mix paypal.provision</code> flow.</p>
+
+        <h3>3.2 Public URL path (<code>/romp-crm</code>)</h3>
+        <p>The default production build expects the app under <strong><code>/romp-crm</code></strong> on your public host (see <code>config/prod.exs</code> <code>:path_prefix</code>). Nginx must strip that prefix when proxying to Phoenix. To serve at the site root (<code>/</code>) instead, change <code>:path_prefix</code> and the endpoint <code>url: [path: …]</code> to match, then run a new <code>mix release</code>.</p>
+
+        <h3>3.3 Optional</h3>
+        <ul>
+          <li><strong>Admin dashboard</strong> — comma-separated <code>ADMIN_EMAILS</code> (override the built-in default list in production).</li>
+          <li><strong>Twilio voice</strong> — <code>TWILIO_VOICE_WEBHOOK_PUBLIC_URL</code> and <code>TWILIO_VOICE_FORWARD_TO</code> if you use the voice webhook.</li>
+          <li><strong>Transactional email branding</strong> — <code>EMAIL_LOGO_URL</code> and <code>EMAIL_BRAND_BASE_URL</code>.</li>
+          <li><strong>CSRF / LiveView origins</strong> — <code>PHX_CHECK_ORIGINS</code> if you expose multiple public hostnames.</li>
+        </ul>
+
+        <div class="callout">
+          Keep your real <code>.env.production</code> out of git. Treat every API key/password as secret.
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>4) Set up Anthropic and get your API key</h2>
+        <ol>
+          <li>Create/login at <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.</li>
+          <li>Set up billing for production use.</li>
+          <li>Create an API key from API Keys section.</li>
+          <li>Put it into <code>ANTHROPIC_API_KEY</code> in <code>.env.production</code>.</li>
+          <li>Restart Romp CRM after updating env.</li>
+        </ol>
+        <pre><code>sudo systemctl restart romp-crm</code></pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>5) Set up Twilio (including A2P 10DLC for outbound)</h2>
+
+        <h3>5.1 Create Twilio project and buy an SMS-capable US number</h3>
+        <ol>
+          <li>Create/login at <a href="https://console.twilio.com/" target="_blank" rel="noopener noreferrer">console.twilio.com</a>.</li>
+          <li>Buy a US number with SMS capability.</li>
+          <li>Copy <code>Account SID</code> and <code>Auth Token</code>.</li>
+        </ol>
+
+        <h3>5.2 Register for A2P 10DLC (required for reliable US outbound texting)</h3>
+        <ol>
+          <li>In Twilio Console, go to Messaging -> Regulatory Compliance -> A2P 10DLC.</li>
+          <li>Create your Brand (business identity info).</li>
+          <li>Create Campaign Use Case matching your SMS purpose (customer updates, transactional notifications).</li>
+          <li>Attach your phone number to that campaign.</li>
+        </ol>
+
+        <div class="callout">
+          Without proper A2P registration, outbound messages may be filtered, delayed, or blocked in US carrier networks.
+        </div>
+
+        <h3>5.3 Configure inbound webhook for your number</h3>
+        <p>Set your number's “A message comes in” webhook to:</p>
+        <pre><code>https://yourdomain.com/romp-crm/webhooks/twilio/sms</code></pre>
+        <p>Method: <code>POST</code>.</p>
+
+        <h3>5.4 Optional: configure via provided Mix task</h3>
+        <p>Run from the app clone with the same <code>MIX_ENV</code> you use to build the release (usually <code>prod</code>):</p>
+        <pre><code>set -a && source .env.production && set +a
+MIX_ENV=prod mix twilio.configure_sms --phone +1XXXXXXXXXX --sms-url "$TWILIO_WEBHOOK_PUBLIC_URL"</code></pre>
+
+        <h3>5.5 If using Twilio Messaging Service</h3>
+        <p>Enable “defer inbound to sender webhook” behavior:</p>
+        <pre><code>set -a && source .env.production && set +a
+TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx MIX_ENV=prod mix twilio.messaging_service_inbound</code></pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>6) Nginx and HTTPS (Let’s Encrypt)</h2>
+        <ol>
+          <li>Proxy <code>/romp-crm/</code> to your release port (default <code>40175</code>) and strip prefix with trailing slash in <code>proxy_pass</code>.</li>
+          <li>Expose <code>/.well-known/acme-challenge/</code> for webroot cert issuance.</li>
+          <li>Issue cert for apex + <code>www</code> with certbot.</li>
+          <li>Enable HTTP -> HTTPS redirect and reload nginx.</li>
+        </ol>
+        <p>See deployment files in repo for reference:</p>
+        <ul>
+          <li><a href="https://github.com/151henry151/romp-crm/blob/master/deploy/README.md" target="_blank" rel="noopener noreferrer">deploy/README.md</a></li>
+          <li><a href="https://github.com/151henry151/romp-crm/blob/master/deploy/nginx-location-romp-crm.conf" target="_blank" rel="noopener noreferrer">deploy/nginx-location-romp-crm.conf</a></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>7) Verification checklist</h2>
+        <div class="grid">
+          <div>
+            <h3>App</h3>
+            <ul>
+              <li><code>https://yourdomain.com/romp-crm/</code> loads</li>
+              <li>User registration and magic-link login work</li>
+              <li>Optional: <code>/reminders</code>, <code>/support</code>, and (for admin emails) <code>/admin</code></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Email</h3>
+            <ul>
+              <li>Login email delivers from <code>noreply@yourdomain.com</code></li>
+              <li>SPF/DKIM/DMARC configured</li>
+            </ul>
+          </div>
+          <div>
+            <h3>SMS</h3>
+            <ul>
+              <li>Inbound text reaches webhook and creates/updates jobs</li>
+              <li>Outbound confirmation SMS sends successfully</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout ok">
+          Once all three are green (app, email, SMS), your self-hosted Romp CRM is production-ready.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">Romp CRM self-hosting docs · <a href="https://github.com/151henry151/romp-crm" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+  </footer>
+</body>
+</html>
