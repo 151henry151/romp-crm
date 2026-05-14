@@ -1,6 +1,7 @@
 defmodule RompCrm.DataExportTest do
   use RompCrm.DataCase, async: true
 
+  alias RompCrm.Accounts.User
   alias RompCrm.AccountsFixtures
   alias RompCrm.Businesses
   alias RompCrm.DataExport
@@ -96,6 +97,33 @@ defmodule RompCrm.DataExportTest do
                DataExport.normalize_export_business_ids(owner, %{
                  "export_business_ids" => ["999999999"]
                })
+    end
+  end
+
+  describe "export_form_selected_kind_strings/1 and export_form_selected_business_ids/2" do
+    test "defaults when json columns are nil" do
+      user = %User{data_export_kinds_json: nil, data_export_business_ids_json: nil}
+      owned = [%{id: 10}, %{id: 20}]
+
+      assert DataExport.export_form_selected_kind_strings(user) == [
+               "jobs",
+               "employees",
+               "time_log",
+               "audit_log"
+             ]
+
+      assert DataExport.export_form_selected_business_ids(user, owned) == [10, 20]
+    end
+
+    test "reads saved json lists" do
+      user = %User{
+        data_export_kinds_json: ~s(["employees","jobs"]),
+        data_export_business_ids_json: "[2,1]"
+      }
+
+      owned = [%{id: 1}, %{id: 2}, %{id: 3}]
+      assert DataExport.export_form_selected_kind_strings(user) == ["jobs", "employees"]
+      assert DataExport.export_form_selected_business_ids(user, owned) == [1, 2]
     end
   end
 

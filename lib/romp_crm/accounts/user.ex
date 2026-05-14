@@ -28,6 +28,8 @@ defmodule RompCrm.Accounts.User do
     field :data_export_schedule, :string, default: "none"
     field :data_export_next_run_at, :utc_datetime
     field :data_export_last_sent_at, :utc_datetime
+    field :data_export_kinds_json, :string
+    field :data_export_business_ids_json, :string
 
     field :sms_reminders_enabled, :boolean, default: false
     field :sms_reminder_prefs_json, :string
@@ -224,7 +226,11 @@ defmodule RompCrm.Accounts.User do
   @doc "Changeset for scheduled CSV email export (owner businesses only in generated files)."
   def export_settings_changeset(user, attrs \\ %{}) do
     user
-    |> cast(attrs, [:data_export_schedule])
+    |> cast(attrs, [
+      :data_export_schedule,
+      :data_export_kinds_json,
+      :data_export_business_ids_json
+    ])
     |> validate_required([:data_export_schedule])
     |> validate_inclusion(:data_export_schedule, @export_schedules)
     |> put_export_next_run_at()
