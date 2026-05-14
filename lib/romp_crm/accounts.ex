@@ -291,13 +291,28 @@ defmodule RompCrm.Accounts do
     %{cs | action: :insert}
   end
 
-  defp resumable_paywall_signup?(%User{
-         subscription_status: "pending_payment",
-         confirmed_at: nil
-       }),
-       do: true
+  @doc false
+  def resumable_paywall_signup?(%User{
+        subscription_status: "pending_payment",
+        confirmed_at: nil
+      }),
+      do: true
 
-  defp resumable_paywall_signup?(_), do: false
+  def resumable_paywall_signup?(_), do: false
+
+  @doc """
+  Sets **`gift_access_until`** to **`days`** days from now (UTC) for promo signups that skip PayPal.
+
+  **`Billing.subscription_active?/1`** treats unexpired **`gift_access_until`** like active access.
+  """
+  def apply_cardless_promo_trial(%User{} = user, days \\ 30)
+      when is_integer(days) and days > 0 do
+    until = DateTime.add(DateTime.utc_now(:second), days, :day)
+
+    user
+    |> Ecto.Changeset.change(gift_access_until: until)
+    |> Repo.update()
+  end
 
   defp maybe_mark_pending_paywall(user) do
     if RompCrm.ApplicationConfig.subscription_paywall_enabled?() do

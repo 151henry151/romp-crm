@@ -10,11 +10,15 @@
             <%= if @gift_registration do %>
               Gift subscription — no payment. Use the email address from your gift message.
             <% else %>
-              Already registered?
-              <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
-                Log in
-              </.link>
-              to your account now.
+              <%= if @cardless_trial do %>
+                Promotional sign-up — 30 days full access with no card; add PayPal before it ends to continue.
+              <% else %>
+                Already registered?
+                <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
+                  Log in
+                </.link>
+                to your account now.
+              <% end %>
             <% end %>
           <% end %>
         </:subtitle>
@@ -30,6 +34,12 @@
     <%= if @gift_registration do %>
       <div class="alert alert-success mb-4 text-sm" role="status">
         Gifted subscription — no PayPal. After you create your account, check email for the sign-in link.
+      </div>
+    <% end %>
+
+    <%= if @cardless_trial && !@gift_registration && !@invitation_registration do %>
+      <div class="alert alert-info mb-4 text-sm" role="status">
+        You’re on a special link: create your account here with no credit card. You’ll get 30 days of access, then add PayPal on the subscription page to stay subscribed.
       </div>
     <% end %>
 
