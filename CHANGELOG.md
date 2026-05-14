@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.38] - 2026-05-13
+
+### Changed
+
+- **`JobExpandLists` `job_materials_section`**: show **Qty:** beside the quantity control; drop the inline **unit price** field from the expanded materials list; size the qty **`input`** from the saved value (**`size`** + **`field-sizing: content`**, **`max-w-[12ch]`**) so single-digit quantities stay narrow
+
 ## [0.9.37] - 2026-05-13
 
 ### Changed

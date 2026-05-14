@@ -96,7 +96,7 @@ defmodule RompCrmWeb.JobExpandLists do
         <div class="divide-y divide-dotted divide-base-content/15 text-sm">
           <%= for m <- @mc do %>
             <div class={[
-              "grid grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-x-2 gap-y-0 py-1 first:pt-0 items-start min-h-0",
+              "grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-2 gap-y-0 py-1 first:pt-0 items-start min-h-0",
               m.completed && "opacity-55 text-base-content/75"
             ]}>
               <div class="shrink-0 flex items-center pt-0.5">
@@ -114,7 +114,8 @@ defmodule RompCrmWeb.JobExpandLists do
                   <input type="checkbox" checked={m.completed} disabled class="checkbox checkbox-xs opacity-50 scale-90" />
                 <% end %>
               </div>
-              <div class="w-14 sm:w-16 shrink-0 pt-0.5">
+              <div class="flex shrink-0 items-center gap-1 pt-0.5">
+                <span class="text-xs font-medium text-base-content/70 whitespace-nowrap">Qty:</span>
                 <%= if @can_edit_jobs do %>
                   <input
                     type="number"
@@ -122,13 +123,14 @@ defmodule RompCrmWeb.JobExpandLists do
                     min="0.0001"
                     name={"material_#{m.id}_quantity"}
                     value={format_qty_value(m.quantity)}
-                    class="input input-bordered input-xs h-7 min-h-0 w-full px-1 py-0 text-xs leading-none"
+                    size={material_qty_input_size(m.quantity)}
+                    class="input input-bordered input-xs box-border h-7 min-w-0 max-w-[12ch] px-1 py-0 text-xs leading-none tabular-nums [field-sizing:content]"
                     phx-change="material_quantity"
                     phx-value-job_id={@job.id}
                     phx-value-material_id={m.id}
                   />
                 <% else %>
-                  <span class="text-[11px] tabular-nums">{format_qty_value(m.quantity)}</span>
+                  <span class="text-[11px] tabular-nums text-base-content">{format_qty_value(m.quantity)}</span>
                 <% end %>
               </div>
               <div class="min-w-0 py-0.5">
@@ -136,34 +138,6 @@ defmodule RompCrmWeb.JobExpandLists do
                   <span class="text-base-content/55">{m.scope_label}:</span>
                   <span class="text-base-content">{m.description}</span>
                 </p>
-              </div>
-              <div class="w-[5.25rem] sm:w-24 shrink-0 pt-0.5">
-                <%= if @can_edit_jobs do %>
-                  <div class="relative w-full">
-                    <span class="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-base-content/45">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      name={"material_#{m.id}_unit_price"}
-                      value={format_price_input(m.unit_price)}
-                      class="input input-bordered input-xs h-7 min-h-0 w-full py-0 pl-4 pr-0.5 text-xs leading-none"
-                      phx-change="material_unit_price"
-                      phx-value-job_id={@job.id}
-                      phx-value-material_id={m.id}
-                    />
-                  </div>
-                <% else %>
-                  <span class="text-[11px] text-base-content/80 tabular-nums">
-                    <%= if m.unit_price do %>
-                      ${format_price_input(m.unit_price)}
-                    <% else %>
-                      —
-                    <% end %>
-                  </span>
-                <% end %>
               </div>
               <div class="shrink-0 flex justify-end pt-0.5">
                 <%= if @can_edit_jobs do %>
@@ -195,8 +169,10 @@ defmodule RompCrmWeb.JobExpandLists do
   defp format_qty_value(n) when is_integer(n), do: Integer.to_string(n)
   defp format_qty_value(_), do: "1"
 
-  defp format_price_input(nil), do: ""
-  defp format_price_input(n) when is_float(n), do: :erlang.float_to_binary(n * 1.0, decimals: 2)
-  defp format_price_input(n) when is_integer(n), do: :erlang.float_to_binary(n * 1.0, decimals: 2)
-  defp format_price_input(_), do: ""
+  # HTML `size` (character columns) + `field-sizing: content` so the box stays narrow for 1–9
+  # and grows when the saved value has more digits or decimals (re-renders after `phx-change`).
+  defp material_qty_input_size(qty) do
+    n = qty |> format_qty_value() |> String.length()
+    min(max(n + 2, 2), 14)
+  end
 end
