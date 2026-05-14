@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.42] - 2026-05-13
+
+### Changed
+
+- **`jobs_live.html.heex`**: keep job status (and priority) pills a fixed width on small screens — **`shrink-0`**, **`w-28`**, **`box-border`**, **`self-start`** on the badge; give the mobile text column **`flex-1 min-w-0`** so only the left block shrinks instead of the pill
+
 ## [0.9.41] - 2026-05-13
 
 ### Added
