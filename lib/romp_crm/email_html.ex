@@ -5,7 +5,11 @@ defmodule RompCrm.EmailHtml do
 
   @font "'Inter','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"
 
-  @doc "Absolute URL for the logo image in HTML emails."
+  @doc """
+  Absolute URL for the logo image in HTML emails (`EMAIL_LOGO_URL` / **`:email_logo_url`** override).
+
+  The layout also includes a visible **“Romp CRM”** wordmark so branding stays clear when clients block images.
+  """
   def logo_url do
     Application.get_env(:romp_crm, :email_logo_url) ||
       "https://rompcrm.com/media/romp-crm-logo-main-dark.png"
@@ -22,7 +26,7 @@ defmodule RompCrm.EmailHtml do
 
   @doc """
   Wraps inner HTML (must already be safe: use `escape/1` for user-controlled strings)
-  in a table-based layout aligned with Romp CRM marketing colors.
+  in a simple table-based layout: light background, high contrast, logo image plus a text wordmark when images are blocked.
   """
   def layout(inner_html) when is_binary(inner_html) do
     logo = logo_url() |> html_escape()
@@ -36,25 +40,26 @@ defmodule RompCrm.EmailHtml do
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Romp CRM</title>
     </head>
-    <body style="margin:0;padding:0;background-color:#0b1220;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0b1220;">
+    <body style="margin:0;padding:0;background-color:#f3f4f6;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f3f4f6;">
       <tr>
-        <td align="center" style="padding:28px 16px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#121c31;border-radius:14px;border:1px solid #253453;">
+        <td align="center" style="padding:24px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;">
             <tr>
-              <td style="padding:28px 24px 8px;">
-                <img src="#{logo}" alt="Romp CRM" width="220" height="auto" style="display:block;max-width:220px;width:100%;height:auto;margin:0 auto 8px;border:0;outline:none;text-decoration:none;" />
+              <td style="padding:24px 24px 12px;font-family:#{@font};background-color:#ffffff;text-align:center;">
+                <p style="margin:0 0 10px;font-size:17px;font-weight:700;color:#111827;letter-spacing:-0.02em;">Romp CRM</p>
+                <img src="#{logo}" alt="Romp CRM" width="200" style="display:block;max-width:200px;width:100%;height:auto;margin:0 auto;border:0;outline:none;text-decoration:none;" />
               </td>
             </tr>
             <tr>
-              <td style="padding:8px 24px 28px;font-family:#{@font};">
+              <td style="padding:4px 24px 20px;font-family:#{@font};">
                 #{inner_html}
               </td>
             </tr>
             <tr>
-              <td style="padding:16px 24px 22px;border-top:1px solid #253453;">
-                <p style="margin:0;font-size:12px;line-height:1.5;font-family:#{@font};color:#a8b6cf;text-align:center;">
-                  <a href="#{brand}" style="color:#7dd3fc;text-decoration:none;font-weight:600;">rompcrm.com</a>
+              <td style="padding:16px 24px 20px;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;font-size:12px;line-height:1.5;font-family:#{@font};color:#6b7280;text-align:center;">
+                  <a href="#{brand}" style="color:#0369a1;text-decoration:underline;">rompcrm.com</a>
                 </p>
               </td>
             </tr>
@@ -68,15 +73,15 @@ defmodule RompCrm.EmailHtml do
   end
 
   def h1(title_html) do
-    ~s(<h1 style="margin:0 0 16px;font-family:#{@font};font-size:22px;font-weight:700;color:#e6edf8;line-height:1.25;">#{title_html}</h1>)
+    ~s(<h1 style="margin:0 0 14px;font-family:#{@font};font-size:20px;font-weight:700;color:#111827;line-height:1.3;">#{title_html}</h1>)
   end
 
   def p(content_html) do
-    ~s(<p style="margin:0 0 14px;font-family:#{@font};font-size:15px;line-height:1.55;color:#e6edf8;">#{content_html}</p>)
+    ~s(<p style="margin:0 0 12px;font-family:#{@font};font-size:15px;line-height:1.55;color:#374151;">#{content_html}</p>)
   end
 
   def muted_p(content_html) do
-    ~s(<p style="margin:0 0 14px;font-family:#{@font};font-size:13px;line-height:1.5;color:#a8b6cf;">#{content_html}</p>)
+    ~s(<p style="margin:0 0 12px;font-family:#{@font};font-size:13px;line-height:1.5;color:#4b5563;">#{content_html}</p>)
   end
 
   def cta_button(href, label) when is_binary(href) and is_binary(label) do
@@ -84,10 +89,10 @@ defmodule RompCrm.EmailHtml do
     el = html_escape(label)
 
     """
-    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 18px;">
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
       <tr>
-        <td style="border-radius:10px;background-color:#38bdf8;">
-          <a href="#{eh}" style="display:inline-block;padding:12px 22px;font-family:#{@font};font-size:15px;font-weight:600;color:#0b1220;text-decoration:none;">#{el}</a>
+        <td style="border-radius:8px;background-color:#0284c7;">
+          <a href="#{eh}" style="display:inline-block;padding:12px 20px;font-family:#{@font};font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">#{el}</a>
         </td>
       </tr>
     </table>
@@ -97,18 +102,18 @@ defmodule RompCrm.EmailHtml do
   def url_fallback(url) when is_binary(url) do
     eu = html_escape(url)
 
-    ~s(<p style="margin:0 0 16px;font-size:12px;line-height:1.45;font-family:#{@font};color:#a8b6cf;word-break:break-word;">If the button does not work, copy and paste this link into your browser:<br /><span style="color:#7dd3fc;">#{eu}</span></p>)
+    ~s(<p style="margin:0 0 14px;font-size:13px;line-height:1.5;font-family:#{@font};color:#4b5563;word-break:break-word;">If the button does not work, copy and paste this link into your browser:<br /><a href="#{eu}" style="color:#0369a1;text-decoration:underline;">#{eu}</a></p>)
   end
 
   def bullet_list(items) when is_list(items) do
     lis =
       items
       |> Enum.map(fn item ->
-        ~s(<li style="margin:0 0 6px;">#{item}</li>)
+        ~s(<li style="margin:0 0 6px;color:#374151;">#{item}</li>)
       end)
       |> Enum.join()
 
-    ~s(<ul style="margin:0 0 16px;padding-left:20px;font-family:#{@font};font-size:14px;line-height:1.5;color:#e6edf8;">#{lis}</ul>)
+    ~s(<ul style="margin:0 0 14px;padding-left:20px;font-family:#{@font};font-size:14px;line-height:1.5;color:#374151;">#{lis}</ul>)
   end
 
   @doc "Escape then turn newlines into `<br />` for simple plain-text blocks."
@@ -121,6 +126,6 @@ defmodule RompCrm.EmailHtml do
   end
 
   def callout(html_inner) do
-    ~s(<div style="margin:0 0 18px;padding:14px 16px;border-radius:10px;border:1px solid #253453;background-color:#1a2742;">#{html_inner}</div>)
+    ~s(<div style="margin:0 0 16px;padding:12px 14px;border-radius:8px;border:1px solid #e5e7eb;background-color:#f9fafb;">#{html_inner}</div>)
   end
 end
