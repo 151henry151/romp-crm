@@ -14,70 +14,52 @@ defmodule RompCrmWeb.JobExpandLists do
         <div class="divide-y divide-dotted divide-base-content/15">
           <%= for wi <- @job.work_items do %>
             <div class={[
-              "grid grid-cols-[auto_minmax(0,1fr)_auto_auto] gap-x-2 gap-y-0 py-1 first:pt-0 items-start min-h-0",
+              "grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 py-0.5 first:pt-0 min-h-0",
               wi.completed && "opacity-55 text-base-content/75"
             ]}>
-              <div class="shrink-0 flex items-center pt-0.5">
+              <div class="shrink-0 flex items-center leading-none">
                 <%= if @can_edit_jobs do %>
                   <input
                     type="checkbox"
                     checked={wi.completed}
-                    class="checkbox checkbox-xs border-base-300 scale-90 origin-left"
+                    class="checkbox checkbox-sm border-base-300"
                     phx-click="toggle_work_item_completed"
                     phx-value-job_id={@job.id}
                     phx-value-work_item_id={wi.id}
                     aria-label={"Mark work item complete: #{wi.title}"}
                   />
                 <% else %>
-                  <input type="checkbox" checked={wi.completed} disabled class="checkbox checkbox-xs opacity-50 scale-90" />
+                  <input type="checkbox" checked={wi.completed} disabled class="checkbox checkbox-sm opacity-50" />
                 <% end %>
               </div>
-              <div class="min-w-0 py-0.5">
-                <p class="whitespace-pre-wrap break-words text-sm text-base-content leading-tight">
+              <div class="min-w-0 overflow-hidden leading-none">
+                <p class="truncate text-sm text-base-content" title={wi.title}>
                   {wi.title}
                 </p>
               </div>
-              <div class="shrink-0 flex items-center justify-end gap-1.5 pl-1 pt-0.5">
+              <div class="shrink-0 flex items-center justify-end">
                 <%= if @can_edit_jobs do %>
-                  <%= if wi.scheduled_on do %>
-                    <span class="text-[11px] tabular-nums text-base-content/60 whitespace-nowrap max-sm:max-w-[4.5rem] max-sm:truncate" title={Date.to_iso8601(wi.scheduled_on)}>
-                      {Date.to_iso8601(wi.scheduled_on)}
-                    </span>
-                  <% end %>
-                  <label
-                    class="relative inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded border border-base-content/15 bg-base-300/15 text-base-content/45 hover:border-base-content/25 hover:bg-base-300/30 hover:text-base-content/70"
-                    title="Schedule date"
-                  >
-                    <input
-                      type="date"
-                      id={"work-item-date-#{wi.id}"}
-                      name={"work_item_#{wi.id}_scheduled_on"}
-                      value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
-                      class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                      phx-change="work_item_scheduled_on"
-                      phx-value-job_id={@job.id}
-                      phx-value-work_item_id={wi.id}
-                      aria-label={"Set date for: #{wi.title}"}
-                    />
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 16 16"
-                      fill="currentColor"
-                      class="pointer-events-none h-3.5 w-3.5"
-                      aria-hidden="true"
-                    >
-                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" />
-                    </svg>
-                  </label>
+                  <input
+                    type="date"
+                    name={"work_item_#{wi.id}_scheduled_on"}
+                    value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
+                    class="input input-bordered input-xs h-7 w-[9.25rem] max-w-[36vw] shrink-0 px-2 py-0 text-xs leading-tight"
+                    phx-change="work_item_scheduled_on"
+                    phx-value-job_id={@job.id}
+                    phx-value-work_item_id={wi.id}
+                    aria-label={"Scheduled date for: #{wi.title}"}
+                  />
                 <% else %>
-                  <%= if wi.scheduled_on do %>
-                    <span class="text-[11px] tabular-nums text-base-content/55 whitespace-nowrap">
+                  <span class="text-xs text-base-content/70 tabular-nums whitespace-nowrap h-7 inline-flex items-center">
+                    <%= if wi.scheduled_on do %>
                       {Date.to_iso8601(wi.scheduled_on)}
-                    </span>
-                  <% end %>
+                    <% else %>
+                      —
+                    <% end %>
+                  </span>
                 <% end %>
               </div>
-              <div class="shrink-0 flex justify-end pt-0.5">
+              <div class="shrink-0 flex items-center justify-end leading-none">
                 <%= if @can_edit_jobs do %>
                   <button
                     type="button"
@@ -85,7 +67,7 @@ defmodule RompCrmWeb.JobExpandLists do
                     phx-value-job_id={@job.id}
                     phx-value-work_item_id={wi.id}
                     data-confirm="Remove this work item?"
-                    class="text-[11px] leading-none text-red-500/90 hover:text-red-400 font-medium"
+                    class="text-xs font-medium text-red-500/90 hover:text-red-400 whitespace-nowrap"
                   >
                     Remove
                   </button>
