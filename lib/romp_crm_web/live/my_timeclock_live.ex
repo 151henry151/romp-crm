@@ -14,7 +14,7 @@ defmodule RompCrmWeb.MyTimeclockLive do
     if connected?(socket), do: Employees.subscribe(bid)
 
     caps = EmployeePermissions.for(user, bid)
-    emp = Employees.get_employee_by_user_id(user.id, bid)
+    emp = Employees.get_or_link_employee_for_user(user, bid)
     open = if emp, do: Employees.get_open_entry(emp.id, bid), else: nil
 
     {:ok,
@@ -50,7 +50,7 @@ defmodule RompCrmWeb.MyTimeclockLive do
   defp refresh(socket) do
     bid = socket.assigns.current_business_id
     user = socket.assigns.current_scope.user
-    emp = Employees.get_employee_by_user_id(user.id, bid)
+    emp = Employees.get_or_link_employee_for_user(user, bid)
     open = if emp, do: Employees.get_open_entry(emp.id, bid), else: nil
 
     caps = EmployeePermissions.for(user, bid)

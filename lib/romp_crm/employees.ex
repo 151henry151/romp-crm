@@ -1,5 +1,8 @@
 defmodule RompCrm.Employees do
   import Ecto.Query
+
+  alias RompCrm.Accounts.User
+  alias RompCrm.BusinessAuditLogs
   alias RompCrm.Repo
   alias RompCrm.Employees.Employee
   alias RompCrm.Employees.EmployeeTimeEntry
@@ -37,6 +40,69 @@ defmodule RompCrm.Employees do
         limit: 1
     )
   end
+
+  @doc """
+  Returns the **`employees`** row for **`user`** in **`business_id`**, same as **`get_employee_by_user_id/2`**
+  when **`user_id`** is already set.
+
+  If none is linked but a roster row exists with the same **email** (case-insensitive, trimmed) and
+  **`user_id` is nil**, updates that row to **`user.id`** (same behavior as invite accept linking) and
+  returns the updated row. Used for owners who add themselves on the roster by email only.
+  """
+  def get_or_link_employee_for_user(%User{id: uid, email: email}, business_id)
+      when is_integer(uid) and is_integer(business_id) do
+    case get_employee_by_user_id(uid, business_id) do
+      %Employee{} = e ->
+        e
+
+      nil ->
+        link_roster_row_matching_email(uid, email, business_id)
+    end
+  end
+
+  defp link_roster_row_matching_email(uid, email, business_id) do
+    norm = normalize_roster_email(email)
+
+    if norm == "" do
+      nil
+    else
+      case Repo.one(
+             from e in Employee,
+               where: e.business_id == ^business_id,
+               where: fragment("lower(trim(?)) = ?", e.email, ^norm),
+               where: is_nil(e.user_id),
+               order_by: [asc: e.id],
+               limit: 1
+           ) do
+        nil ->
+          nil
+
+        %Employee{} = emp ->
+          case update_employee(emp, %{user_id: uid}) do
+            {:ok, updated} ->
+              BusinessAuditLogs.record(%{
+                business_id: business_id,
+                actor_user_id: uid,
+                source: "web",
+                action: "employees.link_user",
+                entity_type: "employees",
+                entity_id: updated.id,
+                metadata: %{reason: "email_match_roster"}
+              })
+
+              updated
+
+            {:error, _} ->
+              nil
+          end
+      end
+    end
+  end
+
+  defp normalize_roster_email(email) when is_binary(email),
+    do: email |> String.trim() |> String.downcase()
+
+  defp normalize_roster_email(_), do: ""
 
   @doc """
   Ensures a roster row exists for an invited email (name derived from the local part).

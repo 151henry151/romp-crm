@@ -9,6 +9,7 @@ defmodule RompCrm.EmployeePermissions do
   alias RompCrm.Accounts.User
   alias RompCrm.Businesses
   alias RompCrm.Employees
+  alias RompCrm.Employees.Employee
 
   defstruct [
     :owner,
@@ -30,23 +31,20 @@ defmodule RompCrm.EmployeePermissions do
 
   @doc false
   def for(%User{} = user, business_id) when is_integer(business_id) do
-    if Businesses.owner?(user, business_id) do
-      linked =
-        case Employees.get_employee_by_user_id(user.id, business_id) do
-          nil -> nil
-          e -> e.id
-        end
+    emp = Employees.get_or_link_employee_for_user(user, business_id)
+    owner? = Businesses.owner?(user, business_id)
 
+    if owner? do
       %__MODULE__{
         owner: true,
-        linked_employee_id: linked,
+        linked_employee_id: if(emp, do: emp.id, else: nil),
         can_edit_jobs: true,
         can_log_job_time: true,
         can_log_own_employee_time: true,
         can_log_employee_time_for_others: true
       }
     else
-      case Employees.get_employee_by_user_id(user.id, business_id) do
+      case emp do
         nil ->
           %__MODULE__{
             owner: false,
@@ -57,14 +55,14 @@ defmodule RompCrm.EmployeePermissions do
             can_log_employee_time_for_others: false
           }
 
-        emp ->
+        %Employee{} = e ->
           %__MODULE__{
             owner: false,
-            linked_employee_id: emp.id,
-            can_edit_jobs: emp.can_edit_jobs,
-            can_log_job_time: emp.can_log_job_time,
-            can_log_own_employee_time: emp.can_log_own_employee_time,
-            can_log_employee_time_for_others: emp.can_log_employee_time_for_others
+            linked_employee_id: e.id,
+            can_edit_jobs: e.can_edit_jobs,
+            can_log_job_time: e.can_log_job_time,
+            can_log_own_employee_time: e.can_log_own_employee_time,
+            can_log_employee_time_for_others: e.can_log_employee_time_for_others
           }
       end
     end

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.56] - 2026-05-14
+
+### Fixed
+
+- **Workday timeclock**: auto-link **`employees`** row to the logged-in user when the roster **`email`** matches and **`user_id`** was unset (e.g. owner adds themselves by email only); **`EmployeePermissions`** and **`MyTimeclockLive`** use **`get_or_link_employee_for_user/2`**
+
 ## [0.9.55] - 2026-05-08
 
 ### Fixed
