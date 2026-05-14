@@ -352,13 +352,14 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
   end
 
   describe "PUT /users/settings (update profile)" do
-    test "stores sms reminder prefs from checkboxes and hour select", %{conn: conn, user: user} do
+    test "stores sms reminder prefs from checkboxes, time zone, and hour select", %{conn: conn, user: user} do
       conn =
         put(conn, ~p"/users/settings", %{
           "action" => "update_profile",
           "user" => %{
             "sms_reminders_enabled" => "true",
-            "sms_reminder_send_hour_utc" => "9",
+            "sms_reminder_timezone" => "America/Chicago",
+            "sms_reminder_send_hour_local" => "9",
             "sms_reminder_offsets" => ["7", "1", "0"]
           }
         })
@@ -367,22 +368,27 @@ defmodule RompCrmWeb.UserSettingsControllerTest do
 
       refreshed = Repo.get!(Accounts.User, user.id)
       prefs = Jason.decode!(refreshed.sms_reminder_prefs_json)
-      assert prefs["send_hour_utc"] == 9
+      assert prefs["timezone"] == "America/Chicago"
+      assert prefs["send_hour_local"] == 9
       assert prefs["job_offsets"] == [7, 1, 0]
       assert refreshed.sms_reminders_enabled == true
     end
 
-    test "defaults job_offsets when none selected but hour is sent", %{conn: conn, user: user} do
+    test "defaults job_offsets when none selected but hour and time zone are sent", %{conn: conn, user: user} do
       conn =
         put(conn, ~p"/users/settings", %{
           "action" => "update_profile",
-          "user" => %{"sms_reminder_send_hour_utc" => "14"}
+          "user" => %{
+            "sms_reminder_timezone" => "America/Los_Angeles",
+            "sms_reminder_send_hour_local" => "14"
+          }
         })
 
       assert redirected_to(conn) == ~p"/users/settings"
       refreshed = Repo.get!(Accounts.User, user.id)
       prefs = Jason.decode!(refreshed.sms_reminder_prefs_json)
-      assert prefs["send_hour_utc"] == 14
+      assert prefs["timezone"] == "America/Los_Angeles"
+      assert prefs["send_hour_local"] == 14
       assert prefs["job_offsets"] == [1, 0]
     end
   end

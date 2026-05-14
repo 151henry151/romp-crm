@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.9.50] - 2026-05-08
+
+### Changed
+
+- **`JobExpandLists`**: one **Edit** control per work item row (title + scheduled date in a single form) and per material row (quantity + description); replace per-field edit keys with **`JobExpandEditKeys.wi_edit/1`** and **`mat_edit/1`**
+- **`JobsLive`**: replace **`job_expand_commit_wi_title`**, **`job_expand_commit_wi_scheduled`**, **`job_expand_commit_material_qty`**, and **`job_expand_commit_material_desc`** with **`job_expand_commit_wi_row`** and **`job_expand_commit_material_row`**
+
+## [0.9.49] - 2026-05-08
+
+### Added
+
+- **`tzdata`** dependency and **`config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase`** for IANA zones
+- **SMS reminder profile**: time zone `<select>` and **`send_hour_local`** (clock hour in that zone); **`Reminders.profile_timezone_select_options/0`** and **`valid_profile_timezone?/1`**
+- **`Reminders.local_send_hour_matches_now?/2`** for the scheduler (and tests)
+
+### Changed
+
+- **`Reminders`**: default prefs use **`America/New_York`** and **9:00** local; job pings run when the user’s **local** hour matches (DST-aware); legacy JSON with only **`send_hour_utc`** maps to **`Etc/UTC`** and the same hour
+- **`UserSettings`**: merge **`sms_reminder_timezone`** and **`sms_reminder_send_hour_local`** into prefs JSON; drop UTC-only copy
+
 ## [0.9.48] - 2026-05-08
 
 ### Changed

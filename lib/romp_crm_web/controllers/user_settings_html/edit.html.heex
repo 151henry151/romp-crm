@@ -82,23 +82,39 @@
         Ecto.Changeset.get_field(@profile_changeset, :sms_reminder_prefs_json)
       ) %>
     <% offset_set = prefs["job_offsets"] |> List.wrap() |> MapSet.new() %>
+    <% tz = Map.get(prefs, "timezone", "America/New_York") %>
     <% hour =
-      case prefs["send_hour_utc"] do
+      case prefs["send_hour_local"] do
         h when is_integer(h) and h >= 0 and h <= 23 -> h
-        _ -> 13
+        _ -> 9
       end %>
     <div class="mt-6 rounded-lg border border-base-300 bg-base-200/30 p-4 text-left">
       <p class="font-semibold text-base-content mb-1">SMS reminders</p>
       <p class="text-sm text-base-content/70 mb-3">
         Opt in to texts about upcoming jobs (from each job’s scheduled date) and one-off reminders you create by messaging the assistant.
-        Job pings go out once per day in the UTC hour you pick, on the days you select below.
+        Job pings go out once per day at the hour you pick, in the time zone you choose (handles daylight saving automatically).
       </p>
       <.input field={f[:sms_reminders_enabled]} type="checkbox" label="Send me SMS reminders" />
+
+      <div class="mt-4">
+        <label for="sms_reminder_timezone" class="mb-1 block text-sm font-medium text-base-content">
+          Reminder time zone
+        </label>
+        <select
+          id="sms_reminder_timezone"
+          name="user[sms_reminder_timezone]"
+          class="select select-bordered select-sm w-full max-w-md bg-base-100"
+        >
+          <%= for {label, value} <- RompCrm.Reminders.profile_timezone_select_options() do %>
+            <option value={value} selected={value == tz}>{label}</option>
+          <% end %>
+        </select>
+      </div>
 
       <fieldset class="mt-4 space-y-2 rounded-lg border border-base-300/70 bg-base-100/40 p-3">
         <legend class="mb-1 text-sm font-medium text-base-content">Remind me about upcoming jobs</legend>
         <p class="text-xs text-base-content/60 mb-2">
-          Choose which calendar days get a text (relative to the job’s scheduled date). Times use <span class="font-semibold">UTC</span>.
+          Choose which calendar days get a text (relative to the job’s scheduled date).
         </p>
         <%= for {days, label} <- [
               {7, "1 week before"},
@@ -121,20 +137,23 @@
       </fieldset>
 
       <div class="mt-4">
-        <label for="sms_reminder_send_hour_utc" class="mb-1 block text-sm font-medium text-base-content">
-          Send job reminder texts around this hour (UTC)
+        <label for="sms_reminder_send_hour_local" class="mb-1 block text-sm font-medium text-base-content">
+          Send job reminder texts around this local hour
         </label>
         <select
-          id="sms_reminder_send_hour_utc"
-          name="user[sms_reminder_send_hour_utc]"
+          id="sms_reminder_send_hour_local"
+          name="user[sms_reminder_send_hour_local]"
           class="select select-bordered select-sm w-full max-w-xs bg-base-100"
         >
           <%= for h <- 0..23 do %>
             <option value={h} selected={h == hour}>
-              {String.pad_leading(Integer.to_string(h), 2, "0")}:00 UTC
+              {String.pad_leading(Integer.to_string(h), 2, "0")}:00
             </option>
           <% end %>
         </select>
+        <p class="mt-1 text-xs text-base-content/60">
+          Uses the time zone above (for example Eastern includes EST and EDT).
+        </p>
       </div>
     </div>
 
