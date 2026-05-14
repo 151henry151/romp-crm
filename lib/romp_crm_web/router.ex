@@ -51,6 +51,8 @@ defmodule RompCrmWeb.Router do
     pipe_through :webhooks
 
     post "/sms", TwilioWebhookController, :sms
+    post "/voice", TwilioWebhookController, :voice
+    get "/voice", TwilioWebhookController, :voice
   end
 
   scope "/webhooks/paypal", RompCrmWeb do
@@ -112,6 +114,15 @@ defmodule RompCrmWeb.Router do
         {RompCrmWeb.UserAuth, :assign_sms_assistant_intro}
       ] do
       live "/businesses", BusinessesLive, :index
+    end
+
+    live_session :authenticated_support,
+      on_mount: [
+        {RompCrmWeb.UserAuth, :require_authenticated},
+        {RompCrmWeb.UserAuth, :require_active_subscription},
+        {RompCrmWeb.UserAuth, :assign_sms_assistant_intro}
+      ] do
+      live "/support", SupportLive, :index
     end
 
     live_session :authenticated_jobs,

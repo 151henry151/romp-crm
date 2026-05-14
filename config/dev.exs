@@ -98,6 +98,12 @@ config :romp_crm,
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
   anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
   twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
+  twilio_voice_webhook_public_url: System.get_env("TWILIO_VOICE_WEBHOOK_PUBLIC_URL"),
+  twilio_voice_forward_e164:
+    (case System.get_env("TWILIO_VOICE_FORWARD_TO") |> to_string() |> String.trim() do
+       "" -> "+18024587299"
+       s -> s
+     end),
   skip_twilio_signature_validation: System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
   registration_email_allowlist: [
     "151henry151@gmail.com",

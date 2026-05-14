@@ -13,7 +13,6 @@ defmodule RompCrmWeb.AppWorkspaceNav do
 
   import Phoenix.Controller, only: [get_csrf_token: 0]
   import RompCrmWeb.CoreComponents
-  import RompCrmWeb.SupportContact, only: [support_contact: 1]
 
   attr :current_business_id, :any, default: nil
   attr :my_businesses, :list, default: []
@@ -31,9 +30,6 @@ defmodule RompCrmWeb.AppWorkspaceNav do
           />
         <% end %>
         <.nav_links is_business_owner={@is_business_owner} />
-        <div class="shrink-0 [&_summary]:px-2.5 [&_summary]:py-1">
-          <.support_contact />
-        </div>
       </div>
 
       <%!-- Mobile menu --%>
@@ -55,9 +51,6 @@ defmodule RompCrmWeb.AppWorkspaceNav do
             </div>
           <% end %>
           <.nav_links is_business_owner={@is_business_owner} mobile={true} />
-          <div class="border-t border-base-300 pt-2">
-            <.support_contact />
-          </div>
         </div>
       </details>
     </div>
@@ -134,6 +127,9 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     <% end %>
     <.link navigate={~p"/businesses"} class={@pill} {@mobile_attrs}>
       Businesses
+    </.link>
+    <.link navigate={~p"/support"} class={@pill} {@mobile_attrs}>
+      Support
     </.link>
     """
   end

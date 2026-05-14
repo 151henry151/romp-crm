@@ -1,0 +1,45 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
+  <div class="mx-auto max-w-lg space-y-6 text-base-content">
+    <.header>
+      Support
+      <:subtitle>
+        Reach the Romp CRM team by phone or email.
+      </:subtitle>
+    </.header>
+
+    <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm space-y-4">
+      <div>
+        <h2 class="text-sm font-semibold text-base-content">Phone</h2>
+        <a
+          href="tel:+18022780965"
+          class="mt-1 block text-lg font-semibold text-primary hover:underline tabular-nums"
+        >
+          (802) 278-0965
+        </a>
+        <p class="mt-2 text-sm leading-relaxed text-base-content/75">
+          This is the same number Romp CRM uses for SMS with your assistant. You can call or text it.
+          Calls ring through to our live support line.
+        </p>
+      </div>
+
+      <div class="border-t border-base-300 pt-4">
+        <h2 class="text-sm font-semibold text-base-content">Email</h2>
+        <a
+          href="mailto:support@rompcrm.com"
+          class="mt-1 block text-lg font-semibold text-primary hover:underline break-all"
+        >
+          support@rompcrm.com
+        </a>
+      </div>
+    </div>
+  </div>
+</Layouts.app>

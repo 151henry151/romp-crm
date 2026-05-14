@@ -77,7 +77,9 @@ config :swoosh, :finch_name, RompCrm.Finch
 config :romp_crm,
   sms_job_extractor_adapter: RompCrm.Ai.SmsJobExtractor.Anthropic,
   anthropic_model: "claude-sonnet-4-20250514",
-  skip_twilio_signature_validation: false
+  skip_twilio_signature_validation: false,
+  twilio_voice_webhook_public_url: nil,
+  twilio_voice_forward_e164: "+18024587299"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

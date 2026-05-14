@@ -49,5 +49,7 @@ config :romp_crm,
   twilio_account_sid: nil,
   twilio_messaging_from_number: "+15551234567",
   twilio_sms_replies_enabled: false,
+  twilio_voice_webhook_public_url: "https://example.test/romp-crm/webhooks/twilio/voice",
+  twilio_voice_forward_e164: "+18024587299",
   data_export_scheduler_enabled: false,
   reminder_scheduler_enabled: false
