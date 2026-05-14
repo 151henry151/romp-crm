@@ -45,6 +45,70 @@ defmodule RompCrmWeb.TwilioWebhookController do
     end
   end
 
+  @doc """
+  Twilio **voice** webhook: returns TwiML that dials the configured support PSTN number.
+
+  Configure the Twilio number’s **“A call comes in”** URL to `https://YOUR_HOST/.../webhooks/twilio/voice`
+  (POST or GET). This does **not** change SMS handling (`/webhooks/twilio/sms`).
+  """
+  def voice(conn, _params) do
+    merged = Map.merge(conn.query_params || %{}, conn.body_params || %{})
+    conn_sig = %{conn | body_params: merged}
+
+    skip? = Application.get_env(:romp_crm, :skip_twilio_signature_validation, false)
+    token = Application.get_env(:romp_crm, :twilio_auth_token)
+    public_url = voice_webhook_public_url()
+
+    cond do
+      not skip? and (is_nil(token) or token == "") ->
+        Logger.warning(
+          "Twilio Voice webhook rejected: set TWILIO_AUTH_TOKEN or enable skip for dev"
+        )
+
+        send_resp(conn, 503, "Not configured")
+
+      not skip? and not Signature.valid?(conn_sig, token, public_url: public_url) ->
+        send_resp(conn, 403, "Forbidden")
+
+      true ->
+        forward_to =
+          Application.get_env(:romp_crm, :twilio_voice_forward_e164, "+18024587299")
+
+        conn
+        |> put_resp_content_type("text/xml")
+        |> send_resp(200, voice_twiml_dial(forward_to))
+    end
+  end
+
+  defp voice_webhook_public_url do
+    case Application.get_env(:romp_crm, :twilio_voice_webhook_public_url) do
+      url when is_binary(url) and url != "" ->
+        url
+
+      _ ->
+        infer_voice_url_from_sms_webhook()
+    end
+  end
+
+  defp infer_voice_url_from_sms_webhook do
+    case Application.get_env(:romp_crm, :twilio_webhook_public_url) do
+      url when is_binary(url) and url != "" ->
+        cond do
+          String.ends_with?(url, "/sms") -> String.replace_suffix(url, "/sms", "/voice")
+          String.ends_with?(url, "/sms/") -> String.replace_suffix(url, "/sms/", "/voice")
+          true -> String.trim_trailing(url, "/") <> "/voice"
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp voice_twiml_dial(e164) when is_binary(e164) do
+    # PSTN forward; `answerOnBridge` avoids dead air while the callee’s phone rings.
+    ~s(<?xml version="1.0" encoding="UTF-8"?><Response><Dial answerOnBridge="true">#{e164}</Dial></Response>)
+  end
+
   defp maybe_deliver_inbound_sms(conn) do
     from = conn.body_params["From"] |> to_string()
     norm = Phone.normalize_us(from)
@@ -226,7 +290,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
             reply =
               "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+            sms_reply_and_log(
+              conn,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_text,
+              reply,
               Map.merge(log_base, %{outcome: "permission_denied", results: []})
             )
 
@@ -237,7 +308,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
               msg ||
                 "No changes applied. Open Romp CRM or include clearer job/time details."
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+            sms_reply_and_log(
+              conn,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_text,
+              reply,
               Map.merge(log_base, %{outcome: "no_db_operations", results: []})
             )
 
@@ -263,7 +341,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
                    allowed_employee_ids
                  ) do
               {:clarify, msg} ->
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg,
+                sms_reply_and_log(
+                  conn,
+                  from,
+                  user,
+                  business_id,
+                  phone_norm,
+                  body_text,
+                  msg,
                   Map.merge(log_base, %{outcome: "clarify", results: []})
                 )
 
@@ -272,7 +357,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
 
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+                sms_reply_and_log(
+                  conn,
+                  from,
+                  user,
+                  business_id,
+                  phone_norm,
+                  body_text,
+                  reply,
                   Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
                 )
             end
@@ -333,7 +425,8 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp emp_op_target_employee_id({:emp_clock_out_by_id, id, _}), do: id
   defp emp_op_target_employee_id({:emp_lunch_by_id, id, _, _}), do: id
 
-  defp record_sms_db_audits(business_id, actor_user_id, message_sid, results) when is_list(results) do
+  defp record_sms_db_audits(business_id, actor_user_id, message_sid, results)
+       when is_list(results) do
     base = %{twilio_message_sid: message_sid}
 
     Enum.each(results, fn r ->
@@ -353,7 +446,8 @@ defmodule RompCrmWeb.TwilioWebhookController do
     })
   end
 
-  defp record_one_sms_audit(bid, uid, base, {:updated, %Job{} = job, fields}) when is_list(fields) do
+  defp record_one_sms_audit(bid, uid, base, {:updated, %Job{} = job, fields})
+       when is_list(fields) do
     BusinessAuditLogs.record(%{
       business_id: bid,
       actor_user_id: uid,
@@ -377,7 +471,12 @@ defmodule RompCrmWeb.TwilioWebhookController do
     })
   end
 
-  defp record_one_sms_audit(bid, uid, base, {:time_clocked_out, entry_id, name, started_at, ended_at}) do
+  defp record_one_sms_audit(
+         bid,
+         uid,
+         base,
+         {:time_clocked_out, entry_id, name, started_at, ended_at}
+       ) do
     BusinessAuditLogs.record(%{
       business_id: bid,
       actor_user_id: uid,
@@ -448,7 +547,8 @@ defmodule RompCrmWeb.TwilioWebhookController do
       action: "job_photos.create",
       entity_type: "jobs",
       entity_id: job.id,
-      metadata: Map.merge(base, %{client_name: job.client_name, saved: saved, attempted: attempted})
+      metadata:
+        Map.merge(base, %{client_name: job.client_name, saved: saved, attempted: attempted})
     })
   end
 
@@ -639,7 +739,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
               )
 
               job = Jobs.get_job(job_id, business_id)
-              {:time_clocked_out, updated.id, job && job.client_name, updated.started_at, ended_at}
+
+              {:time_clocked_out, updated.id, job && job.client_name, updated.started_at,
+               ended_at}
 
             {:error, cs} ->
               Logger.warning(
@@ -748,7 +850,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
               )
 
               emp = Employees.get_employee(emp_id, business_id)
-              {:emp_clocked_out, updated.id, emp && emp.name, updated.clocked_in_at, clocked_out_at}
+
+              {:emp_clocked_out, updated.id, emp && emp.name, updated.clocked_in_at,
+               clocked_out_at}
 
             {:error, cs} ->
               Logger.warning("Twilio SMS emp_clock_out failed: #{inspect(cs.errors)}")
@@ -819,7 +923,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp apply_reminder_op(
          {:reminder_schedule, %DateTime{} = fire_at, body, job_id, meta},
          idx,
-         %{message_sid: sid, from: from, business_id: business_id, allowed_job_ids: allowed, user_id: user_id}
+         %{
+           message_sid: sid,
+           from: from,
+           business_id: business_id,
+           allowed_job_ids: allowed,
+           user_id: user_id
+         }
        ) do
     Logger.info(
       "Twilio SMS reminder schedule: sid=#{sid} from=#{from} op_index=#{idx} user_id=#{user_id} job_id=#{inspect(job_id)}"
@@ -913,7 +1023,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 hint -> Jobs.find_work_item_id_by_title_substring(job, hint)
               end
 
-            results = Enum.map(urls, fn url -> Jobs.add_job_photo_from_url(job, business_id, url, wi_id) end)
+            results =
+              Enum.map(urls, fn url ->
+                Jobs.add_job_photo_from_url(job, business_id, url, wi_id)
+              end)
+
             ok_ct = Enum.count(results, &match?({:ok, _}, &1))
 
             if ok_ct > 0 do

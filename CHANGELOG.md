@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.47] - 2026-05-08
+
+### Added
+
+- **`SupportLive`** at **`/support`**: phone **(802) 278-0965** (same as SMS line) and **support@rompcrm.com**
+- **Twilio voice webhook** **`POST|GET /webhooks/twilio/voice`**: returns TwiML **`Dial`** to **`TWILIO_VOICE_FORWARD_TO`** (default **`+18024587299`** / 802-458-7299); does not change SMS handling
+- **`mix twilio.configure_voice`**: sets **`VoiceUrl`** / **`VoiceMethod`** on the Twilio incoming number via REST (leaves **`SmsUrl`** unchanged)
+- **Config**: **`twilio_voice_webhook_public_url`**, **`twilio_voice_forward_e164`** (env **`TWILIO_VOICE_WEBHOOK_PUBLIC_URL`**, **`TWILIO_VOICE_FORWARD_TO`**)
+
+### Changed
+
+- **`AppWorkspaceNav`**: **Support** navigates to **`/support`** (same pill style as other workspace links); remove expandable **`SupportContact`** disclosure component
+
 ## [0.9.46] - 2026-05-08
 
 ### Added

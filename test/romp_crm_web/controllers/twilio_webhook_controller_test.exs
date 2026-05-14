@@ -322,4 +322,20 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "Twilio SMS update applied: sid=SMpickerworkspace"
     assert Jobs.get_job!(job.id, biz_b.id).address == "Via picker routing"
   end
+
+  test "POST /webhooks/twilio/voice returns TwiML Dial to configured forward number", %{
+    conn: conn
+  } do
+    conn =
+      post(conn, ~p"/webhooks/twilio/voice", %{
+        "CallSid" => "CAtestvoice01",
+        "From" => "+15555550123",
+        "To" => "+18022780965"
+      })
+
+    body = response(conn, 200)
+    assert body =~ "<Dial"
+    assert body =~ "+18024587299"
+    assert get_resp_header(conn, "content-type") |> hd() =~ "xml"
+  end
 end
