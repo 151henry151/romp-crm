@@ -15,7 +15,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
 
   Snapshots and **`prior_turns`** passed into **`extract/5`** are ignored (tests vary snapshots externally).
   """
-  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [], _prior \\ [])
+  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [], _prior \\ [], _opts \\ [])
       when is_binary(raw_message) do
     trimmed = String.trim(raw_message)
 

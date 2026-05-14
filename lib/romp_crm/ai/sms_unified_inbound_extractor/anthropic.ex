@@ -9,7 +9,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         jobs_snapshot \\ [],
         open_te_snapshot \\ [],
         employees_snapshot \\ [],
-        prior_turns \\ []
+        prior_turns \\ [],
+        _opts \\ []
       )
       when is_binary(raw_message) and is_list(prior_turns) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
@@ -249,7 +250,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     ## reminder_actions — personal reminders for the texting user
 
     Each element:
-    - `{ "intent": "schedule", "fire_at": "<ISO 8601 UTC or Z>", "body": "<short reminder text>", "job_id": <optional int from jobs snapshot>, "metadata": { ... } }`
+    - `{ "intent": "schedule", "fire_at": "<ISO 8601 instant>", "body": "<short reminder text>", "job_id": <optional int from jobs snapshot>, "metadata": { ... } }`
+    - **`fire_at`:** Prefer UTC with **`Z`** or an explicit offset (e.g. `2026-05-08T19:30:00Z`). If you output a **naive** timestamp without zone (e.g. `2026-05-08T15:30:00`), the server treats it as **wall clock time in the user's SMS reminder profile time zone** (same IANA zone as Romp CRM → Settings → SMS reminders — Eastern, Central, etc.), then converts to UTC for storage — same convention as **`time_actions`** clock times.
     - Use when the contractor asks to be reminded later (e.g. "remind me Tuesday 11am to call Suzy"). Put the human-readable task in **`body`**. If a snapshot job clearly matches (same customer name), set **`job_id`**. Otherwise omit **`job_id`** and set metadata like `{ "no_customer_match": true, "suggested_name": "Suzy" }` when appropriate.
 
     Return `[]` when there is no reminder intent.

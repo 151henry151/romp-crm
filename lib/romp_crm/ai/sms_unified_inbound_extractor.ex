@@ -25,17 +25,20 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
   **`prior_turns`** — list of **`{:contractor | :assistant, String.t()}`** oldest-first (same phone / business);
   pass **`[]`** when there is no prior thread.
 
+  **`opts`** — keyword list; supports **`reminder_wall_tz`** (IANA) so naive **`fire_at`** values in **`reminder_actions`**
+  are interpreted as that zone’s wall clock (same as SMS reminder settings). Defaults to Eastern when omitted.
   """
   def extract(
         raw_message,
         jobs_snapshot,
         open_time_entries_snapshot,
         employees_snapshot,
-        prior_turns \\ []
+        prior_turns \\ [],
+        opts \\ []
       )
       when is_binary(raw_message) and is_list(jobs_snapshot) and
              is_list(open_time_entries_snapshot) and
-             is_list(employees_snapshot) and is_list(prior_turns) do
+             is_list(employees_snapshot) and is_list(prior_turns) and is_list(opts) do
     mod =
       Application.get_env(
         :romp_crm,
@@ -48,15 +51,16 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
            jobs_snapshot,
            open_time_entries_snapshot,
            employees_snapshot,
-           prior_turns
+           prior_turns,
+           opts
          ) do
-      {:ok, %{} = attrs} -> parse_combined_payload(attrs)
+      {:ok, %{} = attrs} -> parse_combined_payload(attrs, opts)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}
     end
   end
 
-  defp parse_combined_payload(map) when is_map(map) do
+  defp parse_combined_payload(map, opts) when is_map(map) and is_list(opts) do
     map = stringify_keys(map)
 
     assistant =
@@ -79,7 +83,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
     with {:ok, job_ops} <- SmsJobExtractor.parse_actions_list(job_actions),
          {:ok, time_ops} <- SmsTimeExtractor.parse_actions_list(time_actions),
          {:ok, emp_ops} <- SmsEmployeeTimeExtractor.parse_actions_list(employee_actions),
-         {:ok, rem_ops} <- SmsReminderExtractor.parse_actions_list(reminder_actions) do
+         {:ok, rem_ops} <- SmsReminderExtractor.parse_actions_list(reminder_actions, opts) do
       {:ok,
        %{
          assistant_sms: assistant,
