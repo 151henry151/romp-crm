@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.55] - 2026-05-08
+
+### Fixed
+
+- **SMS `reminder_actions`**: interpret **naive** `fire_at` strings as wall clock in the user’s **SMS reminder profile time zone** (Settings), not as **`Etc/UTC`**; prevents immediate delivery when the model meant local afternoon (e.g. 3:30pm)
+
 ## [0.9.54] - 2026-05-08
 
 ### Added
