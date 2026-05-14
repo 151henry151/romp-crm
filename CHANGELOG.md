@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.9.54] - 2026-05-08
+
+### Added
+
+- **`/reminders`** LiveView: list pending SMS reminders, create (date + optional time in profile time zone), edit, delete
+- **`jobs.scheduled_time`** and **`job_work_items.scheduled_time`**: optional wall time next to schedule date in Jobs UI (compact date + time inputs)
+- **SMS schedule nudges** for **work items** with their own **`scheduled_on`** when it differs from the job’s date (same calendar date still uses the job-only ping to avoid duplicates); job SMS lines include optional time
+
+### Changed
+
+- **Gift email links** use **`/gift/claim/:token`**: new recipients get a confirmed account and login in one step; existing users are sent to login with email prefilled and return to claim
+- **Workspace nav**: **Reminders** link next to Job list
+
 ## [0.9.53] - 2026-05-14
 
 ### Added

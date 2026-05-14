@@ -3,6 +3,7 @@ defmodule RompCrm.GiftsTest do
 
   import RompCrm.AccountsFixtures
 
+  alias RompCrm.Accounts
   alias RompCrm.Billing
   alias RompCrm.Gifts
   alias RompCrm.Gifts.GiftSubscription
@@ -17,11 +18,7 @@ defmodule RompCrm.GiftsTest do
     assert {:ok, gift} =
              Gifts.create_and_email(
                admin,
-               %{
-                 recipient_email: "gift.recipient@example.com",
-                 duration_days: 14,
-                 admin_message: "Enjoy"
-               },
+               %{recipient_email: "gift.recipient@example.com", duration_days: 14, admin_message: "Enjoy"},
                fn tok -> "https://example.test/redeem/#{tok}" end
              )
 
@@ -57,5 +54,41 @@ defmodule RompCrm.GiftsTest do
 
     gift = Repo.get!(GiftSubscription, gift.id)
     assert %DateTime{} = gift.redeemed_at
+  end
+
+  test "claim_creates_user inserts confirmed user and redeems gift", %{admin: admin} do
+    recipient = "claim_flow_new@example.com"
+
+    {:ok, gift} =
+      Gifts.create_and_email(
+        admin,
+        %{recipient_email: recipient, duration_days: 10, admin_message: nil},
+        fn _ -> "https://example.test/x" end
+      )
+
+    refute Accounts.get_user_by_email(recipient)
+
+    gift = Repo.get!(GiftSubscription, gift.id)
+    assert {:ok, user} = Gifts.claim_creates_user(gift)
+    assert String.downcase(user.email) == recipient
+    assert user.confirmed_at
+    assert Billing.subscription_active?(user)
+
+    gift = Repo.get!(GiftSubscription, gift.id)
+    assert %DateTime{} = gift.redeemed_at
+  end
+
+  test "claim_creates_user returns user_exists when email already registered", %{admin: admin} do
+    recipient = "claim_flow_exists@example.com"
+    _existing = user_fixture(%{email: recipient})
+
+    {:ok, gift} =
+      Gifts.create_and_email(
+        admin,
+        %{recipient_email: recipient, duration_days: 5, admin_message: nil},
+        fn _ -> "https://example.test/x" end
+      )
+
+    assert {:error, :user_exists} = Gifts.claim_creates_user(Repo.get!(GiftSubscription, gift.id))
   end
 end

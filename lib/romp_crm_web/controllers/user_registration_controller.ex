@@ -16,6 +16,14 @@ defmodule RompCrmWeb.UserRegistrationController do
   def new(conn, params) do
     gift_token_raw = params |> Map.get("gift") |> to_string() |> String.trim()
 
+    if gift_token_raw != "" and Gifts.claimable_gift_token?(gift_token_raw) do
+      redirect(conn, to: ~p"/gift/claim/#{gift_token_raw}")
+    else
+      new_register_form(conn, params, gift_token_raw)
+    end
+  end
+
+  defp new_register_form(conn, params, gift_token_raw) do
     {gift_registration?, gift_token, gift_email} = gift_registration_context(gift_token_raw)
 
     conn =

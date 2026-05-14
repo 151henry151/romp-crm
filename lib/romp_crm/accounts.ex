@@ -29,6 +29,48 @@ defmodule RompCrm.Accounts do
   end
 
   @doc """
+  Inserts a **confirmed** user for a gift-recipient email (no registration allowlist check).
+
+  Used only from the gift claim flow. Sets a random **`hashed_password`** so the row is valid;
+  the recipient should use magic-link sign-in or set a password later.
+
+  Returns **`{:error, :exists}`** if the email is already taken.
+  """
+  def insert_gift_recipient_user(email) when is_binary(email) do
+    email = email |> String.trim() |> String.downcase()
+
+    if get_user_by_email(email) do
+      {:error, :exists}
+    else
+      now = DateTime.utc_now(:second)
+      secret = :crypto.strong_rand_bytes(32) |> Base.encode64(padding: false)
+      hash = Bcrypt.hash_pwd_salt(secret)
+
+      attrs = %{
+        email: email,
+        hashed_password: hash,
+        confirmed_at: now
+      }
+
+      attrs =
+        if RompCrm.ApplicationConfig.subscription_paywall_enabled?() do
+          Map.merge(attrs, %{
+            subscription_status: "pending_payment",
+            paypal_subscription_id: nil,
+            paypal_plan_id: nil
+          })
+        else
+          Map.put(attrs, :subscription_status, "active")
+        end
+
+      %User{}
+      |> Ecto.Changeset.change(attrs)
+      |> Ecto.Changeset.unique_constraint(:email)
+      |> Repo.insert()
+    end
+  end
+
+  @doc """
   Gets a user by email and password.
 
   ## Examples

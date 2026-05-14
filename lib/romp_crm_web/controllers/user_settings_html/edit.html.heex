@@ -87,7 +87,8 @@
     <div class="mt-6 rounded-lg border border-base-300 bg-base-200/30 p-4 text-left">
       <p class="font-semibold text-base-content mb-1">SMS reminders</p>
       <p class="text-sm text-base-content/70 mb-3">
-        Job reminders: once daily at the hour below, in your time zone. Assistant reminders follow the same toggle.
+        Job reminders: once daily at the hour below, in your time zone. Includes jobs with a schedule date and
+        <span class="font-medium text-base-content/90">work items that have their own date</span> when it differs from the job (no duplicate if the dates match). Assistant reminders follow the same toggle.
       </p>
       <.input field={f[:sms_reminders_enabled]} type="checkbox" label="Send me SMS reminders" />
 

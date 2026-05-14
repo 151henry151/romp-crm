@@ -205,10 +205,12 @@ defmodule RompCrm.Accounts.UserNotifier do
 
     ==============================
 
-    You've been gifted a #{period} Romp CRM subscription (no card required to redeem).
+    You've been gifted a #{period} Romp CRM subscription (no card required).
     #{note}
-    Redeem here:
+    Open this link to activate your gift:
     #{redeem_url}
+
+    If you already have a Romp CRM account with this email, the link takes you to sign in and applies the gift after you log in. If you are new, the same link creates your account and signs you in.
 
     If you did not expect this email, you can ignore it.
 

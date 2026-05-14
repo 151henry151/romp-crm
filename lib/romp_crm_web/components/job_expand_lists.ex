@@ -4,6 +4,7 @@ defmodule RompCrmWeb.JobExpandLists do
 
   import RompCrmWeb.CoreComponents, only: [icon: 1]
 
+  alias RompCrm.Jobs
   alias RompCrmWeb.JobExpandEditKeys, as: EK
 
   attr :job, :any, required: true
@@ -55,15 +56,28 @@ defmodule RompCrmWeb.JobExpandLists do
                         class="input input-bordered input-xs w-full min-w-0 text-sm text-base-content"
                       />
                     </div>
-                    <div class="flex shrink-0 flex-col gap-1">
-                      <label for={"wi-date-#{wi.id}"} class="text-xs text-base-content/60">Scheduled</label>
-                      <input
-                        id={"wi-date-#{wi.id}"}
-                        type="date"
-                        name="scheduled_on"
-                        value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
-                        class="input input-bordered input-xs h-7 w-[10.5rem] shrink-0 px-1 text-[11px] tabular-nums"
-                      />
+                    <div class="flex shrink-0 flex-wrap items-end gap-1">
+                      <div class="flex shrink-0 flex-col gap-0.5">
+                        <label for={"wi-date-#{wi.id}"} class="text-xs text-base-content/60">Date</label>
+                        <input
+                          id={"wi-date-#{wi.id}"}
+                          type="date"
+                          name="scheduled_on"
+                          value={wi.scheduled_on && Date.to_iso8601(wi.scheduled_on)}
+                          class="input input-bordered input-xs h-7 w-[9.5rem] shrink-0 px-1 text-[11px] tabular-nums"
+                        />
+                      </div>
+                      <div class="flex shrink-0 flex-col gap-0.5">
+                        <label for={"wi-time-#{wi.id}"} class="text-xs text-base-content/60">Time</label>
+                        <input
+                          id={"wi-time-#{wi.id}"}
+                          type="time"
+                          name="scheduled_time"
+                          value={wi_time_value(wi.scheduled_time)}
+                          class="input input-bordered input-xs h-7 w-[5.5rem] shrink-0 px-1 text-[11px] tabular-nums"
+                          title="Optional"
+                        />
+                      </div>
                     </div>
                     <div class="flex shrink-0 items-center gap-0.5">
                       <button
@@ -90,7 +104,7 @@ defmodule RompCrmWeb.JobExpandLists do
                       <p class="text-sm text-base-content break-words">{wi.title}</p>
                       <p class="mt-0.5 text-[11px] tabular-nums text-base-content/65">
                         <%= if wi.scheduled_on do %>
-                          Scheduled {Date.to_iso8601(wi.scheduled_on)}
+                          {Jobs.format_schedule_date_time(wi.scheduled_on, wi.scheduled_time)}
                         <% else %>
                           No date
                         <% end %>
@@ -278,4 +292,12 @@ defmodule RompCrmWeb.JobExpandLists do
 
   defp format_qty_value(n) when is_integer(n), do: Integer.to_string(n)
   defp format_qty_value(_), do: "1"
+
+  defp wi_time_value(%Time{} = t) do
+    h = t.hour |> Integer.to_string() |> String.pad_leading(2, "0")
+    m = t.minute |> Integer.to_string() |> String.pad_leading(2, "0")
+    h <> ":" <> m
+  end
+
+  defp wi_time_value(_), do: ""
 end

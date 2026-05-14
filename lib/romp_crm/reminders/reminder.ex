@@ -27,4 +27,11 @@ defmodule RompCrm.Reminders.Reminder do
     |> foreign_key_constraint(:business_id)
     |> foreign_key_constraint(:job_id)
   end
+
+  def user_update_changeset(%__MODULE__{} = reminder, attrs) when is_map(attrs) do
+    reminder
+    |> cast(attrs, [:body, :fire_at, :status])
+    |> validate_required([:body, :fire_at])
+    |> validate_inclusion(:status, @statuses)
+  end
 end

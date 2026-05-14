@@ -1,0 +1,150 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  content_width={:wide}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
+  <div class="mx-auto max-w-3xl space-y-6 text-base-content">
+    <div>
+      <h1 class="text-xl font-semibold">Reminders</h1>
+      <p class="mt-1 text-sm text-base-content/70">
+        Upcoming SMS reminders for your account. Times use your
+        <span class="font-medium text-base-content/90">{@tz}</span> profile from
+        <.link href={~p"/users/settings"} class="text-blue-600 hover:text-blue-800 font-medium">Settings</.link>
+        (default hour when you leave time blank: {to_string(@default_hour)}:00).
+      </p>
+      <p class="mt-2 text-xs text-base-content/60">
+        Automated job and work-item day reminders use the same SMS settings; work items with their own schedule
+        (date different from the job) are included.
+      </p>
+    </div>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4">
+      <h2 class="text-sm font-semibold text-base-content mb-3">New reminder</h2>
+      <form phx-submit="new_reminder" class="space-y-3">
+        <div>
+          <label for="new-rem-body" class="mb-1 block text-xs font-medium text-base-content/80">What to remind</label>
+          <textarea
+            id="new-rem-body"
+            name="body"
+            rows="2"
+            class="textarea textarea-bordered textarea-sm w-full text-sm"
+            placeholder="Call Dave, pick up parts, …"
+          ><%= @new_form.body %></textarea>
+        </div>
+        <div class="flex flex-wrap items-end gap-2">
+          <%= if length(@my_businesses) > 1 do %>
+            <div class="min-w-0 flex-1 basis-[12rem]">
+              <label for="new-rem-biz" class="mb-1 block text-xs font-medium text-base-content/80">Business</label>
+              <select
+                id="new-rem-biz"
+                name="business_id"
+                class="select select-bordered select-sm w-full max-w-xs text-sm"
+              >
+                <%= for b <- @my_businesses do %>
+                  <option value={b.id} selected={b.id == @new_form.business_id}>{b.name}</option>
+                <% end %>
+              </select>
+            </div>
+          <% else %>
+            <input type="hidden" name="business_id" value={@new_form.business_id} />
+          <% end %>
+          <div class="shrink-0">
+            <label for="new-rem-date" class="mb-1 block text-xs font-medium text-base-content/80">Date</label>
+            <input
+              id="new-rem-date"
+              type="date"
+              name="date"
+              class="input input-bordered input-sm w-[10.5rem] px-1 text-[11px] tabular-nums"
+            />
+          </div>
+          <div class="shrink-0">
+            <label for="new-rem-time" class="mb-1 block text-xs font-medium text-base-content/80">Time</label>
+            <input
+              id="new-rem-time"
+              type="time"
+              name="time"
+              class="input input-bordered input-sm w-[6.25rem] px-1 text-[11px] tabular-nums"
+              title="Optional — defaults to profile hour"
+            />
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm shrink-0">Add</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-base-content mb-2">Upcoming</h2>
+      <%= if @reminders == [] do %>
+        <p class="text-sm text-base-content/60 rounded-lg border border-dashed border-base-300 px-4 py-8 text-center">
+          No pending reminders.
+        </p>
+      <% else %>
+        <ul class="divide-y divide-base-300 rounded-lg border border-base-300 bg-base-100">
+          <%= for r <- @reminders do %>
+            <li id={"reminder-row-#{r.id}"} class="px-3 py-3 text-sm">
+              <%= if @editing_id == r.id do %>
+                <form phx-submit="edit_save" class="space-y-2">
+                  <input type="hidden" name="reminder_id" value={r.id} />
+                  <textarea name="body" rows="2" class="textarea textarea-bordered textarea-sm w-full text-sm"><%= r.body %></textarea>
+                  <div class="flex flex-wrap items-end gap-2">
+                    <input
+                      type="date"
+                      name="date"
+                      value={fire_at_date_part(r.fire_at, @tz)}
+                      class="input input-bordered input-sm w-[10.5rem] px-1 text-[11px] tabular-nums"
+                    />
+                    <input
+                      type="time"
+                      name="time"
+                      value={fire_at_time_part(r.fire_at, @tz)}
+                      class="input input-bordered input-sm w-[6.25rem] px-1 text-[11px] tabular-nums"
+                    />
+                    <button type="submit" class="btn btn-primary btn-xs">Save</button>
+                    <button type="button" phx-click="edit_cancel" class="btn btn-ghost btn-xs">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              <% else %>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                  <div class="min-w-0 flex-1 space-y-1">
+                    <p class="text-base-content whitespace-pre-wrap break-words">{r.body}</p>
+                    <p class="text-xs text-base-content/65 tabular-nums">
+                      {fire_at_date_part(r.fire_at, @tz)} · {fire_at_time_part(r.fire_at, @tz)} {@tz}
+                      · {business_name(@my_businesses, r.business_id)}
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      phx-click="edit_start"
+                      phx-value-reminder_id={r.id}
+                      class="btn btn-ghost btn-xs h-8 min-h-0 px-2"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="delete"
+                      phx-value-reminder_id={r.id}
+                      data-confirm="Delete this reminder?"
+                      class="btn btn-ghost btn-xs h-8 min-h-0 px-2 text-error"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+  </div>
+</Layouts.app>

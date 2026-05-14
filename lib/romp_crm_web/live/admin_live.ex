@@ -23,9 +23,7 @@ defmodule RompCrmWeb.AdminLive do
      |> assign(:gifts, Gifts.list_recent_gifts())
      |> assign(
        :gift_form,
-       to_form(%{"recipient_email" => "", "duration_days" => "30", "admin_message" => ""},
-         as: :gift
-       )
+       to_form(%{"recipient_email" => "", "duration_days" => "30", "admin_message" => ""}, as: :gift)
      )
      |> RompCrmWeb.UserAuth.apply_sms_assistant_intro_assigns(user)}
   end
@@ -52,7 +50,7 @@ defmodule RompCrmWeb.AdminLive do
     redeem_url_fun = fn token ->
       RompCrmWeb.Endpoint.url()
       |> String.trim_trailing("/")
-      |> Kernel.<>(RompCrmWeb.Endpoint.path("/gift/redeem/#{token}"))
+      |> Kernel.<>(RompCrmWeb.Endpoint.path("/gift/claim/#{token}"))
     end
 
     case Gifts.create_and_email(admin, attrs, redeem_url_fun) do
@@ -64,9 +62,7 @@ defmodule RompCrmWeb.AdminLive do
          |> assign(:gifts, Gifts.list_recent_gifts())
          |> assign(
            :gift_form,
-           to_form(%{"recipient_email" => "", "duration_days" => "30", "admin_message" => ""},
-             as: :gift
-           )
+           to_form(%{"recipient_email" => "", "duration_days" => "30", "admin_message" => ""}, as: :gift)
          )}
 
       {:error, %Ecto.Changeset{} = cs} ->

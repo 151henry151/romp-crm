@@ -5,10 +5,19 @@ defmodule RompCrm.Gifts do
 
   import Ecto.Query
 
+  alias RompCrm.Accounts
   alias RompCrm.Accounts.User
   alias RompCrm.Accounts.UserNotifier
   alias RompCrm.Gifts.GiftSubscription
   alias RompCrm.Repo
+
+  @doc "True if **`token`** refers to a gift that exists and is not yet redeemed."
+  def claimable_gift_token?(token) when is_binary(token) do
+    case get_gift_by_token(token) do
+      %GiftSubscription{redeemed_at: nil} -> true
+      _ -> false
+    end
+  end
 
   @doc "Fetch an unredeemed gift by raw token string."
   def get_gift_by_token(token) when is_binary(token) do
@@ -137,14 +146,50 @@ defmodule RompCrm.Gifts do
 
   defp redeem_transaction(%User{} = user, %GiftSubscription{} = gift) do
     Repo.transact(fn ->
-      user = Repo.get!(User, user.id)
-
-      with {:ok, user} <- apply_gift_to_user(user, gift.duration_days),
-           {:ok, _gift} <- mark_redeemed(gift, user) do
-        {:ok, user}
-      else
+      case redeem_gift_steps(user, gift) do
+        {:ok, user} -> {:ok, user}
         {:error, _} = err -> err
         _ -> {:error, :transaction_aborted}
+      end
+    end)
+  end
+
+  defp redeem_gift_steps(%User{} = user, %GiftSubscription{} = gift) do
+    user = Repo.get!(User, user.id)
+
+    with {:ok, user} <- apply_gift_to_user(user, gift.duration_days),
+         {:ok, _} <- mark_redeemed(gift, user) do
+      {:ok, user}
+    end
+  end
+
+  @doc """
+  For an **unredeemed** gift whose recipient has **no** user row yet: insert a confirmed user,
+  apply the gift, and mark it redeemed — all in one transaction.
+
+  Returns **`{:error, :user_exists}`** if a user with the gift email already exists.
+  """
+  def claim_creates_user(%GiftSubscription{} = gift) do
+    Repo.transact(fn ->
+      case Repo.get_by(User, email: gift.recipient_email) do
+        %User{} ->
+          {:error, :user_exists}
+
+        nil ->
+          case Accounts.insert_gift_recipient_user(gift.recipient_email) do
+            {:ok, user} ->
+              case redeem_gift_steps(user, gift) do
+                {:ok, user} -> {:ok, user}
+                {:error, _} = err -> err
+                _ -> {:error, :redeem_failed}
+              end
+
+            {:error, :exists} ->
+              {:error, :user_exists}
+
+            {:error, %Ecto.Changeset{}} = err ->
+              err
+          end
       end
     end)
   end
