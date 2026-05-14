@@ -1,0 +1,7 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-md space-y-4 text-center text-base-content">
+    <.header>Gift link not found</.header>
+    <p class="text-sm text-base-content/80">This link is invalid or has expired.</p>
+    <.link navigate={~p"/users/log-in"} class="btn btn-primary btn-sm">Log in</.link>
+  </div>
+</Layouts.app>

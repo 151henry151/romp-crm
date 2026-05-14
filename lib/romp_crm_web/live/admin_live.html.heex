@@ -1,0 +1,144 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  show_workspace_nav={false}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+  content_width={:wide}
+>
+  <div class="mx-auto max-w-5xl space-y-8 text-base-content">
+    <.header>
+      Admin
+      <:subtitle>Users, usage, and gift subscriptions</:subtitle>
+    </.header>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm">
+      <h2 class="text-sm font-semibold text-base-content">Overview</h2>
+      <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt class="text-base-content/60">Total users</dt>
+          <dd class="text-lg font-semibold tabular-nums">{@stats.total_users}</dd>
+        </div>
+        <div>
+          <dt class="text-base-content/60">By subscription status</dt>
+          <dd class="mt-1 space-y-0.5">
+            <%= for {status, n} <- Enum.sort(@stats.by_status) do %>
+              <div class="flex justify-between gap-2 tabular-nums">
+                <span class="text-base-content/80">{status}</span>
+                <span class="font-medium">{n}</span>
+              </div>
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm">
+      <h2 class="text-sm font-semibold text-base-content">Gift subscription</h2>
+      <p class="mt-1 text-xs text-base-content/70">
+        Sends one email with a redeem link. Recipient registers or logs in with the same address — no PayPal required.
+      </p>
+      <.form
+        for={@gift_form}
+        id="admin-gift-form"
+        phx-change="validate_gift"
+        phx-submit="send_gift"
+        class="mt-4 max-w-md space-y-3"
+      >
+        <.input field={@gift_form[:recipient_email]} type="email" label="Recipient email" required />
+        <.input
+          field={@gift_form[:duration_days]}
+          type="select"
+          label="Duration"
+          options={[
+            {"7 days", "7"},
+            {"14 days", "14"},
+            {"30 days", "30"},
+            {"90 days", "90"},
+            {"180 days", "180"},
+            {"365 days", "365"}
+          ]}
+        />
+        <.input field={@gift_form[:admin_message]} type="textarea" label="Personal note (optional)" rows="3" />
+        <.button type="submit" class="btn btn-primary btn-sm">Send gift email</.button>
+      </.form>
+    </section>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm overflow-x-auto">
+      <h2 class="text-sm font-semibold text-base-content">Users</h2>
+      <table class="mt-3 table table-zebra table-sm w-full text-xs">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Gift until</th>
+            <th class="text-right">Workspaces</th>
+            <th class="text-right">Jobs</th>
+            <th>Confirmed</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for row <- @stats.rows do %>
+            <tr>
+              <td class="max-w-[14rem] truncate font-medium">{row.email}</td>
+              <td>{row.subscription_status}</td>
+              <td class="whitespace-nowrap tabular-nums">
+                <%= if row.gift_access_until do %>
+                  {row.gift_access_until |> DateTime.to_date() |> Date.to_string()}
+                <% else %>
+                  —
+                <% end %>
+              </td>
+              <td class="text-right tabular-nums">{row.workspaces}</td>
+              <td class="text-right tabular-nums">{row.jobs}</td>
+              <td>
+                <%= if row.confirmed_at do %>
+                  yes
+                <% else %>
+                  no
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap tabular-nums">
+                {row.inserted_at |> DateTime.to_date() |> Date.to_string()}
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm overflow-x-auto">
+      <h2 class="text-sm font-semibold text-base-content">Recent gifts</h2>
+      <table class="mt-3 table table-zebra table-sm w-full text-xs">
+        <thead>
+          <tr>
+            <th>Recipient</th>
+            <th>Days</th>
+            <th>Created</th>
+            <th>Redeemed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for g <- @gifts do %>
+            <tr>
+              <td class="max-w-[14rem] truncate">{g.recipient_email}</td>
+              <td class="tabular-nums">{g.duration_days}</td>
+              <td class="whitespace-nowrap">{g.inserted_at |> DateTime.to_iso8601() |> String.slice(0, 16)}</td>
+              <td class="whitespace-nowrap">
+                <%= if g.redeemed_at do %>
+                  {g.redeemed_at |> DateTime.to_date() |> Date.to_string()}
+                <% else %>
+                  pending
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</Layouts.app>

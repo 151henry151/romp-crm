@@ -184,6 +184,38 @@ defmodule RompCrm.Accounts.UserNotifier do
     Enum.reduce(attachments, email, fn att, em -> attachment(em, att) end)
   end
 
+  @doc """
+  Notifies **`to_email`** they received a gifted subscription; **`redeem_url`** opens the redemption page.
+  """
+  def deliver_gift_subscription_email(to_email, redeem_url, duration_days, admin_message)
+      when is_binary(to_email) and is_binary(redeem_url) and is_integer(duration_days) do
+    period = "#{duration_days} day" <> if(duration_days == 1, do: "", else: "s")
+
+    note =
+      case admin_message do
+        s when is_binary(s) ->
+          t = String.trim(s)
+          if t != "", do: "\n\nMessage from the team:\n#{t}\n", else: ""
+
+        _ ->
+          ""
+      end
+
+    deliver(to_email, "You've been gifted Romp CRM (#{period})", """
+
+    ==============================
+
+    You've been gifted a #{period} Romp CRM subscription (no card required to redeem).
+    #{note}
+    Redeem here:
+    #{redeem_url}
+
+    If you did not expect this email, you can ignore it.
+
+    ==============================
+    """)
+  end
+
   @doc "Notifies the user they have no owner businesses, so there is nothing to export."
   def deliver_data_export_no_owned_businesses(%User{email: email}) when is_binary(email) do
     from_name = Application.get_env(:romp_crm, :mail_from_name, "Romp CRM")

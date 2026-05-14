@@ -219,6 +219,19 @@ if config_env() == :prod do
   paypal_skip_verify_effective =
     not subscription_paywall_enabled or paypal_skip_webhook_verify
 
+  admin_emails =
+    case System.get_env("ADMIN_EMAILS") |> to_string() |> String.trim() do
+      "" ->
+        ["151henry151@gmail.com"]
+
+      csv ->
+        csv
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.map(&String.downcase/1)
+    end
+
   config :romp_crm,
     twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
@@ -239,6 +252,7 @@ if config_env() == :prod do
     mail_from_address: mail_from_address,
     registration_email_allowlist: registration_allowlist,
     enforce_registration_allowlist: enforce_registration_allowlist,
+    admin_emails: admin_emails,
     twilio_sms_allowed_from_normalized: twilio_allow_norm,
     subscription_paywall_enabled: subscription_paywall_enabled,
     paypal_mode: paypal_mode,
