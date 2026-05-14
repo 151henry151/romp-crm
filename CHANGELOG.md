@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.40] - 2026-05-13
+
+### Changed
+
+- **`jobs_live.html.heex`**: remove **Hours on this job** heading, timeclock explanatory copy, and **View all job hours** link from expanded job rows; keep **Add job hours…**, total, and recent entries table
+
 ## [0.9.39] - 2026-05-13
 
 ### Added
