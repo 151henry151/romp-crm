@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.57] - 2026-05-08
+
+### Changed
+
+- **LiveView disconnect toasts**: use **`alert-info`** styling and copy **`Reconnecting...`** (no error title) for transient client/server disconnect banners
+
 ## [0.9.56] - 2026-05-14
 
 ### Fixed
