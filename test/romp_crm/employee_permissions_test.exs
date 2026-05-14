@@ -19,6 +19,30 @@ defmodule RompCrm.EmployeePermissionsTest do
     assert EmployeePermissions.can_log_employee_time?(caps, 999)
   end
 
+  test "owner with self roster row (email only) gets linked for timeclock" do
+    owner = AccountsFixtures.user_fixture()
+    {:ok, biz} = Businesses.create_business(owner, %{name: "Solo"})
+
+    norm = owner.email |> String.trim() |> String.downcase()
+
+    {:ok, _} =
+      Employees.create_employee(%{
+        "business_id" => biz.id,
+        "name" => "Me",
+        "email" => norm,
+        "user_id" => nil,
+        "can_edit_jobs" => false,
+        "can_log_job_time" => true,
+        "can_log_own_employee_time" => true,
+        "can_log_employee_time_for_others" => false
+      })
+
+    caps = EmployeePermissions.for(owner, biz.id)
+    assert caps.owner
+    assert caps.linked_employee_id != nil
+    assert EmployeePermissions.can_punch_own_timeclock?(caps)
+  end
+
   test "member follows employee row flags" do
     owner = AccountsFixtures.user_fixture()
     {:ok, biz} = Businesses.create_business(owner, %{name: "Co"})

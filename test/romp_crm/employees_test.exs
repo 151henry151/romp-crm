@@ -33,6 +33,37 @@ defmodule RompCrm.EmployeesTest do
     end
   end
 
+  describe "get_or_link_employee_for_user/2" do
+    import RompCrm.AccountsFixtures
+    alias RompCrm.Repo
+
+    test "links roster row by email when user_id was nil (owner self-add)", %{biz: _biz} do
+      owner = user_fixture()
+      biz = business_fixture(%{owner_user: owner})
+
+      norm = owner.email |> String.trim() |> String.downcase()
+
+      {:ok, emp} =
+        Employees.create_employee(%{
+          "business_id" => biz.id,
+          "name" => "Self",
+          "email" => norm,
+          "user_id" => nil,
+          "can_edit_jobs" => false,
+          "can_log_job_time" => true,
+          "can_log_own_employee_time" => true,
+          "can_log_employee_time_for_others" => false
+        })
+
+      assert is_nil(emp.user_id)
+
+      linked = Employees.get_or_link_employee_for_user(owner, biz.id)
+      assert linked.id == emp.id
+      assert linked.user_id == owner.id
+      assert Repo.get!(Employee, emp.id).user_id == owner.id
+    end
+  end
+
   describe "get_employee!/2" do
     test "returns employee when found", %{biz: biz} do
       emp = employee_fixture(%{business_id: biz.id, name: "Henry"})
