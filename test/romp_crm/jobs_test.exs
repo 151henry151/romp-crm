@@ -127,6 +127,39 @@ defmodule RompCrm.JobsTest do
       assert job2.work_description == "Water heater; kitchen faucet on same visit"
     end
 
+    test "update_job/2 appends materials from partial list onto existing materials" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Morgan",
+                 "priority" => "normal",
+                 "status" => "pending",
+                 "work_description" => "Rough-in",
+                 "materials" => [
+                   %{"quantity" => 1, "description" => "First item"},
+                   %{"quantity" => 2, "description" => "Second item"}
+                 ]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+      assert length(job.materials) == 2
+
+      assert {:ok, %Job{} = job2} =
+               Jobs.update_job(job, %{
+                 "materials" => [%{"quantity" => 4, "description" => "Third item"}]
+               })
+
+      job2 = Jobs.get_job!(job2.id, b.id)
+      assert length(job2.materials) == 3
+      descs = job2.materials |> Enum.sort_by(& &1.sort_order) |> Enum.map(& &1.description)
+      assert descs == ["First item", "Second item", "Third item"]
+
+      third = Enum.find(job2.materials, &(&1.description == "Third item"))
+      assert third.quantity == 4.0
+    end
+
     test "update_job/2 zip-merges work_items without id when count matches (SMS date edits, no duplicate)" do
       b = business_fixture()
 

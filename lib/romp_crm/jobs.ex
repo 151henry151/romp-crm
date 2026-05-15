@@ -193,7 +193,7 @@ defmodule RompCrm.Jobs do
     case %Job{} |> Job.changeset(attrs) |> Repo.insert() do
       {:ok, job} ->
         job = Repo.preload(job, [:work_items], force: true)
-        :ok = sync_material_specs_list(job, mat_action)
+        :ok = sync_material_specs_list(job, material_sync_replace_all(mat_action))
         job = Repo.preload(job, [:work_items, :materials, :photos], force: true)
         broadcast(job.business_id, {:created, job})
         {:ok, job}
@@ -203,6 +203,12 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  @doc """
+  Updates **`job`** with **`attrs`**.
+
+  Nested **`"materials"`** (SMS / AI): each listed row is **appended** after existing material lines;
+  **`create_job/1`** still replaces the initial list from a single create payload.
+  """
   def update_job(%Job{} = job, attrs) do
     job = Repo.preload(job, [:work_items, :materials])
     attrs = normalize_job_nested_attrs(attrs)
@@ -212,7 +218,7 @@ defmodule RompCrm.Jobs do
     case job |> Job.changeset(attrs) |> Repo.update() do
       {:ok, job} ->
         job = Repo.preload(job, [:work_items], force: true)
-        :ok = sync_material_specs_list(job, mat_action)
+        :ok = sync_material_specs_list(job, material_sync_append_on_update(mat_action))
         job = Repo.preload(job, [:work_items, :materials, :photos], force: true)
         broadcast(job.business_id, {:updated, job})
         {:ok, job}
@@ -827,6 +833,14 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  defp material_sync_replace_all({:skip}), do: {:skip}
+  defp material_sync_replace_all({:sync, specs}), do: {:replace_all, specs}
+
+  # SMS updates send only new material lines; merge onto existing rows (same idea as
+  # **`merge_append_only_work_items`** for tasks).
+  defp material_sync_append_on_update({:skip}), do: {:skip}
+  defp material_sync_append_on_update({:sync, specs}), do: {:append, specs}
+
   defp normalize_material_specs(raw) when is_list(raw) do
     raw
     |> Enum.with_index()
@@ -881,45 +895,80 @@ defmodule RompCrm.Jobs do
 
   defp sync_material_specs_list(_job, {:skip}), do: :ok
 
-  defp sync_material_specs_list(job, {:sync, specs}) do
+  defp sync_material_specs_list(job, {:replace_all, specs}) do
     Repo.delete_all(from m in JobMaterial, where: m.job_id == ^job.id)
-
-    wis =
-      job
-      |> Ecto.assoc(:work_items)
-      |> Repo.all()
-      |> Enum.sort_by(&{&1.sort_order, &1.id})
+    wis = material_sync_work_items_sorted(job)
 
     Enum.each(specs, fn spec ->
-      wi_id =
-        cond do
-          is_integer(spec.job_work_item_id) ->
-            if Enum.any?(wis, &(&1.id == spec.job_work_item_id)),
-              do: spec.job_work_item_id,
-              else: nil
-
-          is_integer(spec.work_item_index) ->
-            case Enum.at(wis, spec.work_item_index) do
-              nil -> nil
-              wi -> wi.id
-            end
-
-          true ->
-            nil
-        end
-
-      %JobMaterial{}
-      |> JobMaterial.changeset(%{
-        job_id: job.id,
-        job_work_item_id: wi_id,
-        description: spec.description,
-        quantity: spec.quantity,
-        sort_order: spec.sort_order
-      })
-      |> Repo.insert!()
+      insert_job_material_row!(job, wis, spec, spec.sort_order)
     end)
 
     :ok
+  end
+
+  defp sync_material_specs_list(job, {:append, specs}) do
+    base = max_material_sort_order_for_job(job.id)
+    wis = material_sync_work_items_sorted(job)
+
+    specs
+    |> Enum.with_index()
+    |> Enum.each(fn {spec, i} ->
+      insert_job_material_row!(job, wis, spec, base + 1 + i)
+    end)
+
+    :ok
+  end
+
+  defp max_material_sort_order_for_job(job_id) when is_integer(job_id) do
+    q =
+      from m in JobMaterial,
+        where: m.job_id == ^job_id,
+        select: max(m.sort_order)
+
+    case Repo.one(q) do
+      nil -> -1
+      n when is_integer(n) -> n
+      _ -> -1
+    end
+  end
+
+  defp material_sync_work_items_sorted(job) do
+    job
+    |> Ecto.assoc(:work_items)
+    |> Repo.all()
+    |> Enum.sort_by(&{&1.sort_order, &1.id})
+  end
+
+  defp insert_job_material_row!(job, wis, spec, sort_order) when is_integer(sort_order) do
+    wi_id = resolve_material_work_item_id(spec, wis)
+
+    %JobMaterial{}
+    |> JobMaterial.changeset(%{
+      job_id: job.id,
+      job_work_item_id: wi_id,
+      description: spec.description,
+      quantity: spec.quantity,
+      sort_order: sort_order
+    })
+    |> Repo.insert!()
+  end
+
+  defp resolve_material_work_item_id(spec, wis) when is_list(wis) do
+    cond do
+      is_integer(spec.job_work_item_id) ->
+        if Enum.any?(wis, &(&1.id == spec.job_work_item_id)),
+          do: spec.job_work_item_id,
+          else: nil
+
+      is_integer(spec.work_item_index) ->
+        case Enum.at(wis, spec.work_item_index) do
+          nil -> nil
+          wi -> wi.id
+        end
+
+      true ->
+        nil
+    end
   end
 
   def find_work_item_id_by_title_substring(%Job{} = job, hint) when is_binary(hint) do

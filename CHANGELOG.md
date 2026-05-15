@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.67] - 2026-05-15
+
+### Fixed
+
+- **`Jobs.update_job/2`**: when **`materials`** are present (e.g. SMS add), **append** new material rows after existing ones instead of deleting all job materials and inserting only the new lines
+
+### Changed
+
+- **SMS Anthropic prompts**: document that **`updates.materials`** must list **only new** lines (server appends; repeating snapshot rows would duplicate)
+
 ## [0.9.66] - 2026-05-15
 
 ### Fixed

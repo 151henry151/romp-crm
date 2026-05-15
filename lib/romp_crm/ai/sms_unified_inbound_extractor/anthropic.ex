@@ -238,6 +238,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Optional: `"job_work_item_id"` (int from snapshot `work_items`) or `"work_item_index"` (0-based index in snapshot `work_items`) to tie the line to a task; omit both for whole-job supplies.
     Examples: `{"quantity":2,"description":"1 1/4\\\" P traps"}`, `{"quantity":1,"description":"wax seal"}`, `{"quantity":2,"description":"1/2\\\" PRS 90s"}`.
     Spoken counts in the SMS (**two**, **one**, …) must become **`quantity`**, not a prefix inside **`description`**.
+    On **job updates**, put **only newly added** material lines in **`updates.materials`** — the server **appends** them after existing rows. Do **not** repeat unchanged snapshot materials (that would duplicate lines).
 
     **Attach photo (MMS):** When the inbound message includes Twilio image URL(s) and the user is adding a picture to an existing job, include `"intent": "attach_photo"`, `"job_id": <int>`, `"media_url": "<exact URL from message>"` (or `"media_urls": [...]`), optional `"work_item_title": "<substring of a work item title>"` to attach to that line item.
 
