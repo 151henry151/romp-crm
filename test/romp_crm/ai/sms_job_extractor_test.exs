@@ -3,6 +3,30 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
 
   alias RompCrm.Ai.SmsJobExtractor
 
+  describe "normalize_update_patch/1" do
+    test "preserves material quantity from AI JSON for update patches" do
+      patch =
+        SmsJobExtractor.normalize_update_patch(%{
+          "materials" => [
+            %{"quantity" => 5, "description" => ~s(1/2" couplings)}
+          ]
+        })
+
+      assert [%{"description" => ~s(1/2" couplings), "quantity" => 5, "sort_order" => 0}] ==
+               patch.materials
+    end
+
+    test "preserves string material quantity" do
+      patch =
+        SmsJobExtractor.normalize_update_patch(%{
+          "materials" => [%{"quantity" => "3", "description" => "PVC tees"}]
+        })
+
+      assert [%{"description" => "PVC tees", "quantity" => "3", "sort_order" => 0}] ==
+               patch.materials
+    end
+  end
+
   describe "extract/2" do
     test "returns update_by_id when JSON includes job_id" do
       raw =

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.66] - 2026-05-15
+
+### Fixed
+
+- **`SmsJobExtractor.normalize_materials_for_patch/1`**: forward **`quantity`** from SMS/AI JSON into job create/update patches so **`Jobs.normalize_material_specs/1`** persists counts greater than one (previously only **`description`** was kept and quantity fell back to **1** when the count was not duplicated at the start of the description)
+
 ## [0.9.65] - 2026-05-14
 
 ### Added
