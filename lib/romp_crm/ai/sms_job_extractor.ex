@@ -321,6 +321,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
         %{"description" => desc, "sort_order" => i}
         |> maybe_put_int("job_work_item_id", wi_id)
         |> maybe_put_int("work_item_index", wi_idx)
+        |> put_material_quantity_preserved(row["quantity"])
       else
         nil
       end
@@ -329,6 +330,31 @@ defmodule RompCrm.Ai.SmsJobExtractor do
   end
 
   defp normalize_materials_for_patch(_), do: []
+
+  # Pass through model-supplied quantity so `Jobs.normalize_material_specs/1` can persist it.
+  # Without this, only `description` reached the DB and quantity defaulted to 1 when the prompt
+  # kept the count out of the text (e.g. `"quantity":4,"description":"1/2\" elbows"`).
+  defp put_material_quantity_preserved(map, raw) do
+    case normalize_material_quantity_raw(raw) do
+      nil -> map
+      q -> Map.put(map, "quantity", q)
+    end
+  end
+
+  defp normalize_material_quantity_raw(nil), do: nil
+  defp normalize_material_quantity_raw(v) when v == "", do: nil
+
+  defp normalize_material_quantity_raw(n) when is_integer(n), do: n
+  defp normalize_material_quantity_raw(n) when is_float(n), do: n
+
+  defp normalize_material_quantity_raw(n) when is_binary(n) do
+    case String.trim(n) do
+      "" -> nil
+      s -> s
+    end
+  end
+
+  defp normalize_material_quantity_raw(_), do: nil
 
   defp maybe_put_int(map, _key, nil), do: map
 
