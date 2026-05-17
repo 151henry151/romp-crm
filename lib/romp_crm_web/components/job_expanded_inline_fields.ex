@@ -74,6 +74,20 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         <.job_field
           variant={@variant}
           col=""
+          label="Email"
+          editing?={editing?(@edit_keys, EK.job(@job.id, "client_email"))}
+          edit_key={EK.job(@job.id, "client_email")}
+          job_id={@job.id}
+          field="client_email"
+        >
+          <:readonly>{display(@job.client_email)}</:readonly>
+          <:editor>
+            <input type="email" name="value" value={@job.client_email || ""} class="input input-bordered input-sm w-full min-w-0" />
+          </:editor>
+        </.job_field>
+        <.job_field
+          variant={@variant}
+          col=""
           label="Priority"
           editing?={editing?(@edit_keys, EK.job(@job.id, "priority"))}
           edit_key={EK.job(@job.id, "priority")}
@@ -202,6 +216,7 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         <p><span class="font-medium text-base-content/90">Client:</span> {@job.client_name}</p>
         <p><span class="font-medium text-base-content/90">Address:</span> {display(@job.address)}</p>
         <p><span class="font-medium text-base-content/90">Phone:</span> {display(@job.phone)}</p>
+        <p><span class="font-medium text-base-content/90">Email:</span> {display(@job.client_email)}</p>
         <p>
           <span class="font-medium text-base-content/90">Priority:</span>
           <%= if @job.priority == :high, do: "High", else: "Normal" %>

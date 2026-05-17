@@ -224,7 +224,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     Each element is one action object:
 
-    **Create lead:** `"intent": "create"` plus `"job": { "client_name", "address", "phone", ... }`.
+    **Create lead:** `"intent": "create"` plus `"job": { "client_name", "address", "phone", "client_email", ... }`.
 
     **Update job:** `"intent": "update"`, `"job_id": <int from jobs snapshot>`, `"updates": { only changed fields }`.
 

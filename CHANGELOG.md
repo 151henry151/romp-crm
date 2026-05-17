@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.69] - 2026-05-17
+
+### Added
+
+- **Jobs**: add optional **`client_email`** on job/customer records (migration, forms, inline edit, CSV export, SMS AI snapshot and extractor)
+
 ## [0.9.68] - 2026-05-16
 
 ### Added

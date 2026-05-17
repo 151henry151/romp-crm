@@ -14,6 +14,7 @@ defmodule RompCrm.Jobs.Job do
     field :client_name, :string
     field :address, :string
     field :phone, :string
+    field :client_email, :string
     field :work_description, :string
     field :priority, Ecto.Enum, values: @priorities, default: :normal
     field :status, Ecto.Enum, values: @statuses, default: :lead
@@ -37,6 +38,7 @@ defmodule RompCrm.Jobs.Job do
       :client_name,
       :address,
       :phone,
+      :client_email,
       :work_description,
       :priority,
       :status,

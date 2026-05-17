@@ -263,6 +263,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
             "client_name" => "Test SMS Lead",
             "address" => nil,
             "phone" => nil,
+            "client_email" => nil,
             "work_description" => String.slice(trimmed, 0, 500),
             "priority" => "normal",
             "status" => "lead",

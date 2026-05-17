@@ -251,6 +251,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     |> maybe_put_string(:client_name, m["client_name"])
     |> maybe_put_string(:address, m["address"])
     |> maybe_put_string(:phone, m["phone"])
+    |> maybe_put_string(:client_email, m["client_email"])
     |> maybe_put_string(:work_description, m["work_description"])
     |> maybe_put_string(:referred_by, m["referred_by"])
     |> maybe_put_string(:notes, m["notes"])
@@ -471,6 +472,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
       client_name: client_name,
       address: nilify_blank(m["address"]),
       phone: nilify_blank(m["phone"]),
+      client_email: nilify_blank(m["client_email"]),
       work_description: nilify_blank(m["work_description"]),
       priority: coerce_enum(m["priority"], Job.priorities(), :normal),
       status: coerce_enum(m["status"], Job.statuses(), :lead),

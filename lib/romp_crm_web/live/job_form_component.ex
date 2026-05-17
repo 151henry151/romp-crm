@@ -246,9 +246,10 @@ defmodule RompCrmWeb.JobFormComponent do
       >
         <.input field={@form[:client_name]} type="text" label="Client Name" required />
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <.input field={@form[:address]} type="text" label="Address" />
           <.input field={@form[:phone]} type="text" label="Phone" />
+          <.input field={@form[:client_email]} type="email" label="Email" />
         </div>
 
         <.input field={@form[:scheduled_on]} type="date" label="Job scheduled date (optional)" />

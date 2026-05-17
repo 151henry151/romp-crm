@@ -14,6 +14,7 @@ defmodule RompCrm.JobsTest do
       address: nil,
       client_name: nil,
       phone: nil,
+      client_email: nil,
       work_description: nil,
       referred_by: nil,
       notes: nil,
@@ -44,6 +45,7 @@ defmodule RompCrm.JobsTest do
         address: "some address",
         client_name: "some client_name",
         phone: "some phone",
+        client_email: "client@example.com",
         work_description: "some work_description",
         referred_by: "some referred_by",
         notes: "some notes",
@@ -56,6 +58,7 @@ defmodule RompCrm.JobsTest do
       assert job.address == "some address"
       assert job.client_name == "some client_name"
       assert job.phone == "some phone"
+      assert job.client_email == "client@example.com"
       assert job.work_description == "some work_description"
       assert job.referred_by == "some referred_by"
       assert job.notes == "some notes"
@@ -75,6 +78,7 @@ defmodule RompCrm.JobsTest do
         address: "some updated address",
         client_name: "some updated client_name",
         phone: "some updated phone",
+        client_email: "updated@example.com",
         work_description: "some updated work_description",
         referred_by: "some updated referred_by",
         notes: "some updated notes",
@@ -87,6 +91,7 @@ defmodule RompCrm.JobsTest do
       assert job.address == "some updated address"
       assert job.client_name == "some updated client_name"
       assert job.phone == "some updated phone"
+      assert job.client_email == "updated@example.com"
       assert job.work_description == "some updated work_description"
       assert job.referred_by == "some updated referred_by"
       assert job.notes == "some updated notes"
@@ -293,6 +298,19 @@ defmodule RompCrm.JobsTest do
                  %{"work_description_snippet" => "water shutoff"},
                  b.id
                )
+    end
+
+    test "snapshot_for_sms_ai/1 includes client_email when set" do
+      b = business_fixture()
+
+      job_fixture(%{
+        business_id: b.id,
+        client_name: "Email Client",
+        client_email: "pat@example.com"
+      })
+
+      [row] = Jobs.snapshot_for_sms_ai(b.id)
+      assert row["client_email"] == "pat@example.com"
     end
 
     test "find_job_for_sms_update/2 accepts address_snippet alone when exactly one job matches" do

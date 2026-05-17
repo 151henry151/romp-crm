@@ -7,7 +7,7 @@ defmodule RompCrm.BusinessAuditLogs.Detail do
   alias RompCrm.Jobs.MaterialSmsNormalize
 
   @scalar_fields ~w(
-    client_name address phone work_description notes next_action referred_by
+    client_name address phone client_email work_description notes next_action referred_by
     priority status scheduled_on scheduled_time
   )
 

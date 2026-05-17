@@ -16,6 +16,15 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
                patch.materials
     end
 
+    test "includes client_email in update patch" do
+      patch =
+        SmsJobExtractor.normalize_update_patch(%{
+          "client_email" => "pat@example.com"
+        })
+
+      assert patch.client_email == "pat@example.com"
+    end
+
     test "preserves string material quantity" do
       patch =
         SmsJobExtractor.normalize_update_patch(%{

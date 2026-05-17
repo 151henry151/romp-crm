@@ -910,7 +910,7 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   defp inline_job_field_allowed?(f)
-       when f in ~w(client_name address phone work_description notes referred_by next_action priority status scheduled_on),
+       when f in ~w(client_name address phone client_email work_description notes referred_by next_action priority status scheduled_on),
        do: true
 
   defp inline_job_field_allowed?(_), do: false
@@ -925,7 +925,7 @@ defmodule RompCrmWeb.JobsLive do
   defp build_inline_job_update_attrs("status", _), do: %{}
 
   defp build_inline_job_update_attrs(field, raw)
-       when field in ~w(client_name address phone work_description notes referred_by next_action) do
+       when field in ~w(client_name address phone client_email work_description notes referred_by next_action) do
     %{field => raw |> to_string()}
   end
 
