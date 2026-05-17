@@ -478,3 +478,44 @@ And **never** do this:
 <!-- phoenix:liveview-end -->
 
 <!-- usage-rules-end -->
+
+## Cursor Cloud specific instructions
+
+### Environment
+
+- **Erlang/Elixir**: Managed via `mise` (reads `.tool-versions`). Erlang 28.5, Elixir 1.19.5-otp-28.
+- **Database**: SQLite3 (embedded, file-based) — no external DB server needed.
+- **No Node.js** required — esbuild and tailwind are standalone binaries managed by Mix.
+
+### Running the app
+
+```bash
+mix phx.server          # starts on http://localhost:4000
+PHX_BIND=all mix phx.server  # binds 0.0.0.0 (note: dev.exs hardcodes 127.0.0.1; PHX_BIND is only honored in runtime.exs/prod)
+```
+
+To bind 0.0.0.0 in dev, temporarily override in the shell or edit `config/dev.exs` (do not commit).
+
+### Running tests
+
+```bash
+mix test                # 379 tests (1 pre-existing failure in accounts_test.exs:575)
+mix test test/path.exs  # single file
+mix test --failed       # re-run failures
+```
+
+### Lint / format / precommit
+
+```bash
+mix compile --warnings-as-errors   # strict compilation
+mix format --check-formatted       # check formatting
+mix precommit                      # compile + unlock unused + format + test (runs in :test env)
+```
+
+### Dev mailbox
+
+In dev mode, transactional emails (confirmation, magic link) go to `Swoosh.Adapters.Local` — view them at **http://localhost:4000/dev/mailbox**.
+
+### External services (all optional in dev/test)
+
+Twilio, Anthropic Claude, and PayPal are all stubbed in test config. No API keys needed to run tests or the dev server.
