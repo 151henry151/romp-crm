@@ -6,6 +6,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Accounts
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.BusinessAuditLogs
+  alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Businesses
   alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
@@ -338,9 +339,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 )
 
               {:ok, all_results} ->
-                record_sms_db_audits(business_id, user.id, message_sid, all_results)
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
+
+                record_sms_db_audits(business_id, user.id, %{
+                  twilio_message_sid: message_sid,
+                  sms_inbound: body_text,
+                  sms_outbound: reply
+                }, all_results)
 
                 sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
                   Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
@@ -403,142 +409,141 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp emp_op_target_employee_id({:emp_clock_out_by_id, id, _}), do: id
   defp emp_op_target_employee_id({:emp_lunch_by_id, id, _, _}), do: id
 
-  defp record_sms_db_audits(business_id, actor_user_id, message_sid, results) when is_list(results) do
-    base = %{twilio_message_sid: message_sid}
+  defp record_sms_db_audits(business_id, actor_user_id, sms_ctx, results) when is_list(results) do
+    base =
+      %{
+        twilio_message_sid: sms_ctx[:twilio_message_sid] || sms_ctx["twilio_message_sid"],
+        sms_inbound: sms_ctx[:sms_inbound] || sms_ctx["sms_inbound"],
+        sms_outbound: sms_ctx[:sms_outbound] || sms_ctx["sms_outbound"]
+      }
 
     Enum.each(results, fn r ->
       record_one_sms_audit(business_id, actor_user_id, base, r)
     end)
   end
 
+  defp record_one_sms_audit(bid, uid, base, {:created, %Job{} = job, changes}) do
+    audit_sms_entity(bid, uid, "jobs.create", "jobs", job.id, base, %{
+      client_name: job.client_name,
+      job_id: job.id,
+      changes: changes
+    })
+  end
+
   defp record_one_sms_audit(bid, uid, base, {:created, %Job{} = job}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "jobs.create",
-      entity_type: "jobs",
-      entity_id: job.id,
-      metadata: Map.merge(base, %{client_name: job.client_name})
+    job = Jobs.get_job!(job.id, bid)
+    record_one_sms_audit(bid, uid, base, {:created, job, Detail.changes_for_job_created(job)})
+  end
+
+  defp record_one_sms_audit(bid, uid, base, {:updated, %Job{} = job, fields, changes})
+       when is_list(fields) do
+    audit_sms_entity(bid, uid, "jobs.update", "jobs", job.id, base, %{
+      fields: fields,
+      client_name: job.client_name,
+      job_id: job.id,
+      changes: changes
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:updated, %Job{} = job, fields}) when is_list(fields) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "jobs.update",
-      entity_type: "jobs",
-      entity_id: job.id,
-      metadata: Map.merge(base, %{fields: fields, client_name: job.client_name})
-    })
+    record_one_sms_audit(bid, uid, base, {:updated, job, fields, []})
   end
 
   defp record_one_sms_audit(bid, uid, base, {:time_clocked_in, entry_id, name, at}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "time_entries.create",
-      entity_type: "time_entries",
-      entity_id: entry_id,
-      metadata: Map.merge(base, %{job_client_name: name, started_at: inspect(at)})
+    audit_sms_entity(bid, uid, "time_entries.create", "time_entries", entry_id, base, %{
+      changes: [
+        %{type: "time_clocked_in", job_client_name: name, started_at: format_audit_dt(at)}
+      ]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:time_clocked_out, entry_id, name, started_at, ended_at}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "time_entries.update",
-      entity_type: "time_entries",
-      entity_id: entry_id,
-      metadata:
-        Map.merge(base, %{
+    audit_sms_entity(bid, uid, "time_entries.update", "time_entries", entry_id, base, %{
+      changes: [
+        %{
+          type: "time_clocked_out",
           job_client_name: name,
-          started_at: inspect(started_at),
-          ended_at: inspect(ended_at)
-        })
+          started_at: format_audit_dt(started_at),
+          ended_at: format_audit_dt(ended_at)
+        }
+      ]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:emp_clocked_in, entry_id, emp_name, at}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "employee_time_entries.create",
-      entity_type: "employee_time_entries",
-      entity_id: entry_id,
-      metadata: Map.merge(base, %{employee_name: emp_name, clocked_in_at: inspect(at)})
+    audit_sms_entity(bid, uid, "employee_time_entries.create", "employee_time_entries", entry_id, base, %{
+      changes: [
+        %{type: "employee_time", action: "clock_in", employee_name: emp_name, at: format_audit_dt(at)}
+      ]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:emp_clocked_out, entry_id, emp_name, tin, tout}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "employee_time_entries.update",
-      entity_type: "employee_time_entries",
-      entity_id: entry_id,
-      metadata:
-        Map.merge(base, %{
+    audit_sms_entity(bid, uid, "employee_time_entries.update", "employee_time_entries", entry_id, base, %{
+      changes: [
+        %{
+          type: "employee_time",
+          action: "clock_out",
           employee_name: emp_name,
-          clocked_in_at: inspect(tin),
-          clocked_out_at: inspect(tout)
-        })
+          clocked_in_at: format_audit_dt(tin),
+          clocked_out_at: format_audit_dt(tout)
+        }
+      ]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:emp_lunched, entry_id, emp_name, ls, le}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "employee_time_entries.update",
-      entity_type: "employee_time_entries",
-      entity_id: entry_id,
-      metadata:
-        Map.merge(base, %{
+    audit_sms_entity(bid, uid, "employee_time_entries.update", "employee_time_entries", entry_id, base, %{
+      changes: [
+        %{
+          type: "employee_time",
+          action: "lunch",
           employee_name: emp_name,
-          lunch_start_at: inspect(ls),
-          lunch_end_at: inspect(le)
-        })
+          lunch_start_at: format_audit_dt(ls),
+          lunch_end_at: format_audit_dt(le)
+        }
+      ]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:photos_saved, %Job{} = job, saved, attempted}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "job_photos.create",
-      entity_type: "jobs",
-      entity_id: job.id,
-      metadata: Map.merge(base, %{client_name: job.client_name, saved: saved, attempted: attempted})
+    audit_sms_entity(bid, uid, "job_photos.create", "jobs", job.id, base, %{
+      client_name: job.client_name,
+      job_id: job.id,
+      changes: [%{type: "photos_attached", saved: saved, attempted: attempted}]
     })
   end
 
   defp record_one_sms_audit(bid, uid, base, {:reminder_created, %Reminder{} = r}) do
-    BusinessAuditLogs.record(%{
-      business_id: bid,
-      actor_user_id: uid,
-      source: "sms",
-      action: "reminders.create",
-      entity_type: "reminders",
-      entity_id: r.id,
-      metadata:
-        Map.merge(base, %{
-          fire_at: DateTime.to_iso8601(r.fire_at),
-          job_id: r.job_id
-        })
+    audit_sms_entity(bid, uid, "reminders.create", "reminders", r.id, base, %{
+      job_id: r.job_id,
+      changes: [
+        %{
+          type: "reminder_scheduled",
+          body: r.body,
+          fire_at: DateTime.to_iso8601(r.fire_at)
+        }
+      ]
     })
   end
 
   defp record_one_sms_audit(_, _, _, _), do: :ok
+
+  defp audit_sms_entity(bid, uid, action, entity_type, entity_id, base, extra) when is_map(extra) do
+    BusinessAuditLogs.record(%{
+      business_id: bid,
+      actor_user_id: uid,
+      source: "sms",
+      action: action,
+      entity_type: entity_type,
+      entity_id: entity_id,
+      metadata: Map.merge(base, extra)
+    })
+  end
+
+  defp format_audit_dt(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp format_audit_dt(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_iso8601(ndt)
+  defp format_audit_dt(other), do: inspect(other)
 
   defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)
        when is_binary(phone_norm) and phone_norm != "" do
@@ -1022,11 +1027,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
     case Jobs.create_job(attrs) do
       {:ok, %Job{} = job} ->
+        job = Jobs.get_job!(job.id, business_id)
+        changes = Detail.changes_for_job_created(job)
+
         Logger.info(
           "Twilio SMS create applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{job.id}"
         )
 
-        {:created, job}
+        {:created, job, changes}
 
       {:error, changeset} ->
         Logger.warning(
@@ -1068,14 +1076,21 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
           job ->
             patch = Enum.into(patch, %{}, fn {k, v} -> {to_string(k), v} end)
+            before_snap = Detail.job_snapshot(job)
 
             case Jobs.update_job(job, patch) do
               {:ok, %Job{} = updated_job} ->
+                updated_job = Jobs.get_job!(updated_job.id, business_id)
+                after_snap = Detail.job_snapshot(updated_job)
+
+                changes =
+                  Detail.changes_from_job_patch(job, patch, before_snap, after_snap)
+
                 Logger.info(
                   "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
                 )
 
-                {:updated, updated_job, Map.keys(patch)}
+                {:updated, updated_job, Map.keys(patch), changes}
 
               {:error, changeset} ->
                 Logger.warning(
@@ -1104,13 +1119,21 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
     case Jobs.find_job_for_sms_update(match, business_id) do
       {:ok, job} ->
+        before_snap = Detail.job_snapshot(job)
+
         case Jobs.update_job(job, patch) do
           {:ok, %Job{} = updated_job} ->
+            updated_job = Jobs.get_job!(updated_job.id, business_id)
+            after_snap = Detail.job_snapshot(updated_job)
+
+            changes =
+              Detail.changes_from_job_patch(job, patch, before_snap, after_snap)
+
             Logger.info(
               "Twilio SMS update applied: sid=#{message_sid} from=#{from} op_index=#{idx} job_id=#{updated_job.id} changed_fields=#{inspect(Map.keys(patch))}"
             )
 
-            {:updated, updated_job, Map.keys(patch)}
+            {:updated, updated_job, Map.keys(patch), changes}
 
           {:error, changeset} ->
             Logger.warning(

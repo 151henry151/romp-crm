@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.68] - 2026-05-16
+
+### Added
+
+- **`RompCrm.BusinessAuditLogs.Detail`**: build human-readable **`summary`**, structured **`changes`** (materials with quantity/description, work items, field updates), and optional **`sms_inbound`** / **`sms_outbound`** on audit metadata
+- **`audit_log.csv` export**: add **`summary`**, **`changes`**, **`sms_inbound`**, and **`sms_outbound`** columns (full JSON remains in **`metadata`**)
+
+### Changed
+
+- **SMS (`TwilioWebhookController`)**: record inbound/outbound message text on each successful SMS audit row; compute job create/update **`changes`** from the AI patch and before/after job snapshots (material lines appended on update)
+- **Web (`JobsLive`, `JobFormComponent`)**: audit material edit/delete, job delete, and root materials list replacements with explicit **`changes`**
+
 ## [0.9.67] - 2026-05-15
 
 ### Fixed

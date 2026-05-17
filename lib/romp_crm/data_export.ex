@@ -524,7 +524,8 @@ defmodule RompCrm.DataExport do
   def build_audit_log_csv(business_ids) do
     logs = BusinessAuditLogs.list_for_business_ids(business_ids)
 
-    header = ~w(id inserted_at business_id actor_user_id actor_email source action entity_type entity_id metadata)
+    header =
+      ~w(id inserted_at business_id actor_user_id actor_email source action entity_type entity_id summary changes sms_inbound sms_outbound metadata)
 
     lines =
       Enum.map(logs, fn l ->
@@ -533,6 +534,17 @@ defmodule RompCrm.DataExport do
             %{email: e} when is_binary(e) -> e
             _ -> ""
           end
+
+        meta = RompCrm.BusinessAuditLogs.Detail.decode_metadata(l.metadata)
+
+        summary = Map.get(meta, "summary") || Map.get(meta, :summary) || ""
+        sms_in = Map.get(meta, "sms_inbound") || Map.get(meta, :sms_inbound) || ""
+        sms_out = Map.get(meta, "sms_outbound") || Map.get(meta, :sms_outbound) || ""
+
+        changes =
+          meta
+          |> Map.get("changes", Map.get(meta, :changes, []))
+          |> RompCrm.BusinessAuditLogs.Detail.format_changes_for_csv()
 
         [
           l.id,
@@ -544,6 +556,10 @@ defmodule RompCrm.DataExport do
           l.action,
           l.entity_type,
           l.entity_id,
+          summary,
+          changes,
+          sms_in,
+          sms_out,
           l.metadata
         ]
         |> Enum.map(&csv_cell/1)

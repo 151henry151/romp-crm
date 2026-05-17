@@ -2,6 +2,7 @@ defmodule RompCrmWeb.JobFormComponent do
   use RompCrmWeb, :live_component
 
   alias RompCrm.BusinessAuditLogs
+  alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.Jobs.JobWorkItem
@@ -122,6 +123,8 @@ defmodule RompCrmWeb.JobFormComponent do
     case Jobs.create_job(params) do
       {:ok, job} ->
         :ok = Jobs.sync_root_materials_only(job, material_lines_to_list(material_lines))
+        job = Jobs.get_job!(job.id, bid)
+        lines = material_lines_to_list(material_lines)
 
         BusinessAuditLogs.record(%{
           business_id: bid,
@@ -130,7 +133,23 @@ defmodule RompCrmWeb.JobFormComponent do
           action: "jobs.create",
           entity_type: "jobs",
           entity_id: job.id,
-          metadata: %{client_name: job.client_name}
+          metadata: %{
+            client_name: job.client_name,
+            job_id: job.id,
+            changes:
+              Detail.changes_for_job_created(job) ++
+                if(lines == [],
+                  do: [],
+                  else: [
+                    %{
+                      type: "root_materials_replaced",
+                      job_id: job.id,
+                      client_name: job.client_name,
+                      lines: lines
+                    }
+                  ]
+                )
+          }
         })
 
         notify_parent({:saved, job})
@@ -152,6 +171,8 @@ defmodule RompCrmWeb.JobFormComponent do
       {:ok, job} ->
         :ok = Jobs.sync_root_materials_only(job, material_lines_to_list(material_lines))
 
+        lines = material_lines_to_list(material_lines)
+
         BusinessAuditLogs.record(%{
           business_id: bid,
           actor_user_id: uid,
@@ -159,7 +180,22 @@ defmodule RompCrmWeb.JobFormComponent do
           action: "jobs.update",
           entity_type: "jobs",
           entity_id: job.id,
-          metadata: %{client_name: job.client_name}
+          metadata: %{
+            client_name: job.client_name,
+            job_id: job.id,
+            changes:
+              if(lines == [],
+                do: [],
+                else: [
+                  %{
+                    type: "root_materials_replaced",
+                    job_id: job.id,
+                    client_name: job.client_name,
+                    lines: lines
+                  }
+                ]
+              )
+          }
         })
 
         notify_parent({:saved, job})

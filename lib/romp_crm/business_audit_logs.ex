@@ -10,6 +10,7 @@ defmodule RompCrm.BusinessAuditLogs do
   require Logger
 
   alias RompCrm.BusinessAuditLogs.Log
+  alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Repo
 
   @doc """
@@ -29,6 +30,8 @@ defmodule RompCrm.BusinessAuditLogs do
   Same as **`insert/1`** but returns **`:ok`** or **`:error`** and never raises from audit failures.
   """
   def record(attrs) when is_map(attrs) do
+    attrs = enrich_metadata_attrs(attrs)
+
     case insert(attrs) do
       {:ok, _} ->
         :ok
@@ -47,6 +50,20 @@ defmodule RompCrm.BusinessAuditLogs do
   end
 
   defp normalize_metadata(attrs), do: attrs
+
+  defp enrich_metadata_attrs(%{metadata: meta} = attrs) when is_map(meta) do
+    enriched =
+      Detail.enrich(meta,
+        changes: Map.get(meta, :changes, []),
+        sms_inbound: Map.get(meta, :sms_inbound),
+        sms_outbound: Map.get(meta, :sms_outbound),
+        summary: Map.get(meta, :summary)
+      )
+
+    %{attrs | metadata: enriched}
+  end
+
+  defp enrich_metadata_attrs(attrs), do: attrs
 
   def list_for_business_ids(business_ids, opts \\ []) when is_list(business_ids) do
     limit = Keyword.get(opts, :limit, 50_000)

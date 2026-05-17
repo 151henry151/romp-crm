@@ -266,7 +266,8 @@ defmodule RompCrm.Accounts.UserNotifier do
 
   defp data_export_file_blurb("time_log.csv"), do: "job + employee time"
 
-  defp data_export_file_blurb("audit_log.csv"), do: "business-scoped changes (actor id + email)"
+  defp data_export_file_blurb("audit_log.csv"),
+    do: "business-scoped audit (summary, SMS text, change details, full metadata JSON)"
 
   defp data_export_file_blurb(fname), do: fname
 

@@ -54,6 +54,10 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
         {:created, %Job{} = j} ->
           ["added #{short_client(j)}"]
 
+        {:updated, %Job{} = j, fields, _extra} when is_list(fields) ->
+          fs = fields |> Enum.map(&to_string/1) |> Enum.join(", ")
+          ["updated #{short_client(j)} (#{fs})"]
+
         {:updated, %Job{} = j, fields} when is_list(fields) ->
           fs = fields |> Enum.map(&to_string/1) |> Enum.join(", ")
           ["updated #{short_client(j)} (#{fs})"]

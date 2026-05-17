@@ -212,6 +212,10 @@ defmodule RompCrm.DataExportTest do
       assert csv =~ "jobs.create"
       assert csv =~ owner.email
       assert csv =~ "42"
+      assert csv =~ "summary"
+      assert csv =~ "sms_inbound"
+      assert csv =~ "sms_outbound"
+      assert csv =~ "changes"
     end
   end
 

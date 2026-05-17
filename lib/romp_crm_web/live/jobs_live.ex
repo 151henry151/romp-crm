@@ -163,7 +163,11 @@ defmodule RompCrmWeb.JobsLive do
                 action: "jobs.delete",
                 entity_type: "jobs",
                 entity_id: job.id,
-                metadata: %{client_name: job.client_name}
+                metadata: %{
+                  client_name: job.client_name,
+                  job_id: job.id,
+                  changes: [%{type: "job_deleted", job_id: job.id, client_name: job.client_name}]
+                }
               })
 
               expanded = socket.assigns.expanded_job_id
@@ -208,11 +212,7 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
-  def handle_event(
-        "open_edit_job_time_log",
-        %{"job_id" => job_id, "time_entry_id" => te_id},
-        socket
-      ) do
+  def handle_event("open_edit_job_time_log", %{"job_id" => job_id, "time_entry_id" => te_id}, socket) do
     if not socket.assigns.can_log_job_time do
       {:noreply, put_flash(socket, :error, "You do not have permission to log time on jobs.")}
     else
@@ -348,16 +348,7 @@ defmodule RompCrmWeb.JobsLive do
 
             true ->
               {:noreply,
-               save_job_time_log_apply(
-                 socket,
-                 job_id,
-                 bid,
-                 user,
-                 te_id,
-                 started_at,
-                 ended_at,
-                 notes
-               )}
+               save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, ended_at, notes)}
           end
         else
           {:error, :missing} ->
@@ -508,11 +499,8 @@ defmodule RompCrmWeb.JobsLive do
                      scheduled_on: scheduled_on,
                      scheduled_time: scheduled_time
                    }) do
-                {:ok, _} ->
-                  {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-
-                {:error, _} ->
-                  {:noreply, put_flash(socket, :error, "Could not update work item.")}
+                {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
+                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
@@ -553,20 +541,22 @@ defmodule RompCrmWeb.JobsLive do
               {:noreply, put_flash(socket, :error, "Job not found.")}
 
             job ->
+              row = Enum.find(job.materials || [], &(&1.id == mid))
+
               case Jobs.update_job_material(job, mid, %{quantity: qty, description: desc}) do
-                {:ok, _} -> {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
-                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update material.")}
+                {:ok, _} ->
+                  audit_material_change(socket, job, row, desc, qty, "job_materials.update")
+                  {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not update material.")}
               end
           end
       end
     end
   end
 
-  def handle_event(
-        "toggle_work_item_completed",
-        %{"job_id" => jid, "work_item_id" => wi_id},
-        socket
-      ) do
+  def handle_event("toggle_work_item_completed", %{"job_id" => jid, "work_item_id" => wi_id}, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
@@ -587,11 +577,8 @@ defmodule RompCrmWeb.JobsLive do
 
             wi ->
               case Jobs.update_job_work_item(job, wi_id, %{completed: not wi.completed}) do
-                {:ok, _} ->
-                  {:noreply, refresh_jobs(socket)}
-
-                {:error, _} ->
-                  {:noreply, put_flash(socket, :error, "Could not update work item.")}
+                {:ok, _} -> {:noreply, refresh_jobs(socket)}
+                {:error, _} -> {:noreply, put_flash(socket, :error, "Could not update work item.")}
               end
           end
       end
@@ -699,9 +686,15 @@ defmodule RompCrmWeb.JobsLive do
           {:noreply, put_flash(socket, :error, "Job not found.")}
 
         job ->
+          row = Enum.find(job.materials || [], &(&1.id == mid))
+
           case Jobs.delete_job_material(job, mid) do
-            {:ok, _} -> {:noreply, refresh_jobs(socket)}
-            {:error, _} -> {:noreply, put_flash(socket, :error, "Could not delete material.")}
+            {:ok, _} ->
+              audit_material_removed(socket, job, row)
+              {:noreply, refresh_jobs(socket)}
+
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Could not delete material.")}
           end
       end
     end
@@ -791,13 +784,65 @@ defmodule RompCrmWeb.JobsLive do
           |> Enum.map(fn {k, {m, _}} -> "#{k} #{m}" end)
           |> Enum.join("; ")
 
-        {:noreply,
-         put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
+        {:noreply, put_flash(socket, :error, if(msg != "", do: msg, else: "Could not save hours."))}
     end
   end
 
   defp drop_expand_edit(socket, key) do
     assign(socket, :job_expand_editing, MapSet.delete(socket.assigns.job_expand_editing, key))
+  end
+
+  defp audit_material_change(_socket, _job, nil, _desc, _qty, _action), do: :ok
+
+  defp audit_material_change(socket, job, before, desc, qty, action) do
+    before_desc = if is_map(before), do: before.description, else: nil
+    before_qty = if is_map(before), do: before.quantity, else: nil
+
+    BusinessAuditLogs.record(%{
+      business_id: socket.assigns.current_business_id,
+      actor_user_id: socket.assigns.current_scope.user.id,
+      source: "web",
+      action: action,
+      entity_type: "job_materials",
+      entity_id: if(is_map(before), do: before.id, else: nil),
+      metadata: %{
+        job_id: job.id,
+        client_name: job.client_name,
+        changes: [
+          %{
+            type: "material_updated",
+            material_id: if(is_map(before), do: before.id, else: nil),
+            before: %{description: before_desc, quantity: before_qty},
+            after_value: %{description: desc, quantity: qty}
+          }
+        ]
+      }
+    })
+  end
+
+  defp audit_material_removed(_socket, _job, nil), do: :ok
+
+  defp audit_material_removed(socket, job, m) do
+    BusinessAuditLogs.record(%{
+      business_id: socket.assigns.current_business_id,
+      actor_user_id: socket.assigns.current_scope.user.id,
+      source: "web",
+      action: "job_materials.delete",
+      entity_type: "job_materials",
+      entity_id: m.id,
+      metadata: %{
+        job_id: job.id,
+        client_name: job.client_name,
+        changes: [
+          %{
+            type: "material_removed",
+            material_id: m.id,
+            description: m.description,
+            quantity: m.quantity
+          }
+        ]
+      }
+    })
   end
 
   defp parse_scheduled_on_form_param(raw) do
@@ -870,9 +915,7 @@ defmodule RompCrmWeb.JobsLive do
 
   defp inline_job_field_allowed?(_), do: false
 
-  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal),
-    do: %{"priority" => raw}
-
+  defp build_inline_job_update_attrs("priority", raw) when raw in ~w(high normal), do: %{"priority" => raw}
   defp build_inline_job_update_attrs("priority", _), do: %{}
 
   defp build_inline_job_update_attrs("status", raw)
