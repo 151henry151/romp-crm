@@ -6,6 +6,8 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
     - `{:emp_clock_in_by_id, employee_id, clocked_in_at}`
     - `{:emp_clock_out_by_id, employee_id, clocked_out_at}`
     - `{:emp_lunch_by_id, employee_id, lunch_start_at, lunch_end_at}`
+    - `{:emp_log_shift_by_id, employee_id, clocked_in_at, clocked_out_at, lunch_start_at, lunch_end_at}`
+    - `{:emp_adjust_entry_by_id, entry_id, employee_id, patch_map}`
 
   **`employee_id`** must come from the employees snapshot (model-chosen); there is no server-side name match fallback.
 
@@ -92,6 +94,8 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
       "clock_in" -> parse_emp_clock_in(map)
       "clock_out" -> parse_emp_clock_out(map)
       "lunch" -> parse_emp_lunch(map)
+      "log_shift" -> parse_emp_log_shift(map)
+      "adjust_entry" -> parse_emp_adjust_entry(map)
       _ -> {:error, {:unknown_intent, intent}}
     end
   end
@@ -115,6 +119,92 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
       end
     end
   end
+
+  defp parse_emp_log_shift(map) do
+    with {:ok, clocked_in_at} <- parse_naive_dt(Map.get(map, "clocked_in_at")),
+         {:ok, clocked_out_at} <- parse_naive_dt(Map.get(map, "clocked_out_at")),
+         {:ok, emp_id} <- require_employee_id(map),
+         {:ok, lunch_start} <- optional_naive_dt(Map.get(map, "lunch_start_at")),
+         {:ok, lunch_end} <- optional_naive_dt(Map.get(map, "lunch_end_at")) do
+      {:ok, {:emp_log_shift_by_id, emp_id, clocked_in_at, clocked_out_at, lunch_start, lunch_end}}
+    end
+  end
+
+  defp parse_emp_adjust_entry(map) do
+    with {:ok, entry_id} <- coerce_entry_id(Map.get(map, "entry_id")),
+         {:ok, emp_id} <- require_employee_id(map),
+         {:ok, patch} <- build_adjust_patch(map) do
+      {:ok, {:emp_adjust_entry_by_id, entry_id, emp_id, patch}}
+    end
+  end
+
+  defp build_adjust_patch(map) do
+    Enum.reduce_while(
+      [
+        {:clocked_in_at, Map.get(map, "clocked_in_at")},
+        {:clocked_out_at, Map.get(map, "clocked_out_at")},
+        {:lunch_start_at, Map.get(map, "lunch_start_at")},
+        {:lunch_end_at, Map.get(map, "lunch_end_at")}
+      ],
+      {:ok, %{}},
+      fn {key, raw}, {:ok, acc} ->
+        case optional_naive_dt(raw) do
+          {:ok, nil} -> {:cont, {:ok, acc}}
+          {:ok, dt} -> {:cont, {:ok, Map.put(acc, key, dt)}}
+          {:error, _} = err -> {:halt, err}
+        end
+      end
+    )
+    |> case do
+      {:error, _} = err ->
+        err
+
+      {:ok, patch} ->
+        patch =
+          patch
+          |> maybe_put_string(:notes, Map.get(map, "notes"))
+
+        if patch == %{}, do: {:error, :empty_adjust_patch}, else: {:ok, patch}
+    end
+  end
+
+  defp maybe_put_string(acc, key, raw) when is_binary(raw) do
+    s = String.trim(raw)
+    if s == "", do: acc, else: Map.put(acc, key, s)
+  end
+
+  defp maybe_put_string(acc, _key, _), do: acc
+
+  defp optional_naive_dt(nil), do: {:ok, nil}
+  defp optional_naive_dt(""), do: {:ok, nil}
+
+  defp optional_naive_dt(raw) do
+    case parse_naive_dt(raw) do
+      {:ok, dt} -> {:ok, dt}
+      {:error, :missing_datetime} -> {:ok, nil}
+      err -> err
+    end
+  end
+
+  defp require_employee_id(map) do
+    case coerce_employee_id(Map.get(map, "employee_id")) do
+      {:ok, id} -> {:ok, id}
+      :missing -> {:error, :missing_employee_id}
+      err -> err
+    end
+  end
+
+  defp coerce_entry_id(nil), do: {:error, :missing_entry_id}
+  defp coerce_entry_id(v) when is_integer(v) and v > 0, do: {:ok, v}
+
+  defp coerce_entry_id(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {i, _} when i > 0 -> {:ok, i}
+      _ -> {:error, :invalid_entry_id}
+    end
+  end
+
+  defp coerce_entry_id(_), do: {:error, :invalid_entry_id}
 
   defp parse_emp_lunch(map) do
     with {:ok, lunch_start} <- parse_naive_dt(Map.get(map, "lunch_start_at")),

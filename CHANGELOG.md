@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.70] - 2026-05-17
+
+### Added
+
+- **Workday timeclock**: manually edit past punches and log past shifts on `/my-timeclock`; owners can manage entries on employee detail
+- **Employee time audit**: structured audit `changes` with `record_kind`, `via`, and field-level diffs distinguishing live punches, SMS punches, shift logs, and later adjustments
+- **SMS employee time**: `log_shift` (e.g. "Bob worked 8am–4pm") and `adjust_entry` intents; employee snapshot includes `recent_entries` for corrections
+- **DB**: `clock_in_kind` / `clock_out_kind` on `employee_time_entries` (`live_punch`, `sms_punch`, `manual_entry`, `sms_shift`)
+
+### Changed
+
+- **SMS unified prompt**: clarify workday timeclock vs job `time_actions`; document new employee intents
+
 ## [0.9.69] - 2026-05-17
 
 ### Added

@@ -10,6 +10,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Businesses
   alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
+  alias RompCrm.Employees.TimeEntryActions
   alias RompCrm.Jobs
   alias RompCrm.Reminders
   alias RompCrm.Jobs.Job
@@ -322,7 +323,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
               from: from,
               business_id: business_id,
               allowed_job_ids: allowed_job_ids,
-              user_id: user.id
+              user_id: user.id,
+              sms_audit_base: %{
+                twilio_message_sid: message_sid,
+                sms_inbound: body_text
+              }
             }
 
             case run_all_operations(
@@ -408,6 +413,8 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp emp_op_target_employee_id({:emp_clock_in_by_id, id, _}), do: id
   defp emp_op_target_employee_id({:emp_clock_out_by_id, id, _}), do: id
   defp emp_op_target_employee_id({:emp_lunch_by_id, id, _, _}), do: id
+  defp emp_op_target_employee_id({:emp_log_shift_by_id, id, _, _, _, _}), do: id
+  defp emp_op_target_employee_id({:emp_adjust_entry_by_id, _, id, _}), do: id
 
   defp record_sms_db_audits(business_id, actor_user_id, sms_ctx, results) when is_list(results) do
     base =
@@ -470,41 +477,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
     })
   end
 
-  defp record_one_sms_audit(bid, uid, base, {:emp_clocked_in, entry_id, emp_name, at}) do
-    audit_sms_entity(bid, uid, "employee_time_entries.create", "employee_time_entries", entry_id, base, %{
-      changes: [
-        %{type: "employee_time", action: "clock_in", employee_name: emp_name, at: format_audit_dt(at)}
-      ]
-    })
-  end
-
-  defp record_one_sms_audit(bid, uid, base, {:emp_clocked_out, entry_id, emp_name, tin, tout}) do
-    audit_sms_entity(bid, uid, "employee_time_entries.update", "employee_time_entries", entry_id, base, %{
-      changes: [
-        %{
-          type: "employee_time",
-          action: "clock_out",
-          employee_name: emp_name,
-          clocked_in_at: format_audit_dt(tin),
-          clocked_out_at: format_audit_dt(tout)
-        }
-      ]
-    })
-  end
-
-  defp record_one_sms_audit(bid, uid, base, {:emp_lunched, entry_id, emp_name, ls, le}) do
-    audit_sms_entity(bid, uid, "employee_time_entries.update", "employee_time_entries", entry_id, base, %{
-      changes: [
-        %{
-          type: "employee_time",
-          action: "lunch",
-          employee_name: emp_name,
-          lunch_start_at: format_audit_dt(ls),
-          lunch_end_at: format_audit_dt(le)
-        }
-      ]
-    })
-  end
+  defp record_one_sms_audit(_, _, _, {:emp_clocked_in, _, _, _}), do: :ok
+  defp record_one_sms_audit(_, _, _, {:emp_clocked_out, _, _, _, _}), do: :ok
+  defp record_one_sms_audit(_, _, _, {:emp_lunched, _, _, _, _}), do: :ok
+  defp record_one_sms_audit(_, _, _, {:emp_shift_logged, _, _, _, _, _}), do: :ok
+  defp record_one_sms_audit(_, _, _, {:emp_adjusted, _, _}), do: :ok
 
   defp record_one_sms_audit(bid, uid, base, {:photos_saved, %Job{} = job, saved, attempted}) do
     audit_sms_entity(bid, uid, "job_photos.create", "jobs", job.id, base, %{
@@ -576,7 +553,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
              job_ctx.message_sid,
              job_ctx.from,
              job_ctx.business_id,
-             allowed_employee_ids
+             allowed_employee_ids,
+             job_ctx.user_id,
+             Map.get(job_ctx, :sms_audit_base, %{})
            ),
          {:ok, rem_results} <- run_reminder_operations(rem_ops, job_ctx) do
       {:ok, job_results ++ time_results ++ emp_results ++ rem_results}
@@ -729,152 +708,177 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   # ── Employee time operations ──────────────────────────────────────────────
 
-  defp run_emp_operations(ops, sid, from, business_id, allowed_ids) do
+  defp run_emp_operations(ops, sid, from, business_id, allowed_ids, actor_user_id, audit_base) do
     results =
       ops
       |> Enum.with_index(1)
       |> Enum.map(fn {op, idx} ->
-        apply_emp_operation(op, idx, sid, from, business_id, allowed_ids)
+        apply_emp_operation(op, idx, sid, from, business_id, allowed_ids, actor_user_id, audit_base)
       end)
 
     {:ok, results}
   end
 
-  defp apply_emp_operation(
-         {:emp_clock_in_by_id, emp_id, clocked_in_at},
-         idx,
-         sid,
-         from,
-         business_id,
-         allowed_ids
-       ) do
+  defp apply_emp_operation(op, idx, sid, from, business_id, allowed_ids, actor_user_id, audit_base) do
+    emp_id = emp_op_target_employee_id(op)
+    audit_opts = [audit_extra: Map.put(audit_base, :sms_outbound, nil)]
+
     Logger.info(
-      "Twilio SMS emp clock_in: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
+      "Twilio SMS emp op: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{inspect(emp_id)} op=#{inspect(op)}"
     )
 
     if not MapSet.member?(allowed_ids, emp_id) do
-      Logger.info(
-        "Twilio SMS emp_clock_in skipped: sid=#{sid} op_index=#{idx} reason=:invalid_employee_id employee_id=#{emp_id}"
-      )
-
       {:skipped, :invalid_employee_id}
     else
       case Employees.get_employee(emp_id, business_id) do
         nil ->
-          Logger.info(
-            "Twilio SMS emp_clock_in skipped: sid=#{sid} reason=:employee_not_found employee_id=#{emp_id}"
-          )
-
           {:skipped, :employee_not_found}
 
         emp ->
-          case Employees.create_time_entry(%{
-                 business_id: business_id,
-                 employee_id: emp.id,
-                 clocked_in_at: clocked_in_at
-               }) do
-            {:ok, entry} ->
-              Logger.info(
-                "Twilio SMS emp_clock_in applied: sid=#{sid} employee_id=#{emp.id} entry_id=#{entry.id}"
-              )
-
-              {:emp_clocked_in, entry.id, emp.name, clocked_in_at}
-
-            {:error, cs} ->
-              Logger.warning("Twilio SMS emp_clock_in failed: #{inspect(cs.errors)}")
-              {:error, :emp_clock_in_failed}
-          end
+          apply_emp_operation_for_employee(
+            op,
+            emp,
+            business_id,
+            actor_user_id,
+            audit_opts,
+            sid,
+            idx
+          )
       end
     end
   end
 
-  defp apply_emp_operation(
-         {:emp_clock_out_by_id, emp_id, clocked_out_at},
-         idx,
-         sid,
-         from,
+  defp apply_emp_operation_for_employee(
+         {:emp_clock_in_by_id, _emp_id, clocked_in_at},
+         emp,
          business_id,
-         allowed_ids
+         actor_user_id,
+         audit_opts,
+         sid,
+         idx
        ) do
-    Logger.info(
-      "Twilio SMS emp clock_out: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
-    )
+    case TimeEntryActions.sms_clock_in(business_id, actor_user_id, emp, clocked_in_at, audit_opts) do
+      {:ok, entry} ->
+        Logger.info("Twilio SMS emp_clock_in applied: sid=#{sid} op_index=#{idx} entry_id=#{entry.id}")
+        {:emp_clocked_in, entry.id, emp.name, clocked_in_at}
 
-    if not MapSet.member?(allowed_ids, emp_id) do
-      Logger.info(
-        "Twilio SMS emp_clock_out skipped: sid=#{sid} reason=:invalid_employee_id employee_id=#{emp_id}"
-      )
+      {:error, :already_clocked_in, _} ->
+        {:skipped, :already_clocked_in}
 
-      {:skipped, :invalid_employee_id}
-    else
-      case Employees.get_open_entry(emp_id, business_id) do
-        nil ->
-          Logger.info(
-            "Twilio SMS emp_clock_out skipped: sid=#{sid} reason=:no_open_entry employee_id=#{emp_id}"
-          )
-
-          {:skipped, :no_open_entry}
-
-        entry ->
-          case Employees.update_time_entry(entry, %{clocked_out_at: clocked_out_at}) do
-            {:ok, updated} ->
-              Logger.info(
-                "Twilio SMS emp_clock_out applied: sid=#{sid} employee_id=#{emp_id} entry_id=#{updated.id}"
-              )
-
-              emp = Employees.get_employee(emp_id, business_id)
-              {:emp_clocked_out, updated.id, emp && emp.name, updated.clocked_in_at, clocked_out_at}
-
-            {:error, cs} ->
-              Logger.warning("Twilio SMS emp_clock_out failed: #{inspect(cs.errors)}")
-              {:error, :emp_clock_out_failed}
-          end
-      end
+      {:error, _} ->
+        {:error, :emp_clock_in_failed}
     end
   end
 
-  defp apply_emp_operation(
-         {:emp_lunch_by_id, emp_id, lunch_start, lunch_end},
-         idx,
-         sid,
-         from,
+  defp apply_emp_operation_for_employee(
+         {:emp_clock_out_by_id, _emp_id, clocked_out_at},
+         emp,
          business_id,
-         allowed_ids
+         actor_user_id,
+         audit_opts,
+         sid,
+         idx
        ) do
-    Logger.info(
-      "Twilio SMS emp lunch: sid=#{sid} from=#{from} op_index=#{idx} employee_id=#{emp_id}"
-    )
+    case TimeEntryActions.sms_clock_out(business_id, actor_user_id, emp, clocked_out_at, audit_opts) do
+      {:ok, updated} ->
+        Logger.info("Twilio SMS emp_clock_out applied: sid=#{sid} op_index=#{idx} entry_id=#{updated.id}")
+        {:emp_clocked_out, updated.id, emp.name, updated.clocked_in_at, clocked_out_at}
 
-    if not MapSet.member?(allowed_ids, emp_id) do
-      Logger.info(
-        "Twilio SMS emp_lunch skipped: sid=#{sid} reason=:invalid_employee_id employee_id=#{emp_id}"
-      )
+      {:error, :no_open_entry} ->
+        {:skipped, :no_open_entry}
 
-      {:skipped, :invalid_employee_id}
-    else
-      case Employees.get_open_entry(emp_id, business_id) do
-        nil ->
-          Logger.info(
-            "Twilio SMS emp_lunch skipped: sid=#{sid} reason=:no_open_entry employee_id=#{emp_id}"
-          )
+      {:error, _} ->
+        {:error, :emp_clock_out_failed}
+    end
+  end
 
-          {:skipped, :no_open_entry}
+  defp apply_emp_operation_for_employee(
+         {:emp_lunch_by_id, _emp_id, lunch_start, lunch_end},
+         emp,
+         business_id,
+         actor_user_id,
+         audit_opts,
+         sid,
+         idx
+       ) do
+    case TimeEntryActions.sms_lunch(business_id, actor_user_id, emp, lunch_start, lunch_end, audit_opts) do
+      {:ok, updated} ->
+        Logger.info("Twilio SMS emp_lunch applied: sid=#{sid} op_index=#{idx}")
+        {:emp_lunched, updated.id, emp.name, lunch_start, lunch_end}
 
-        entry ->
-          case Employees.update_time_entry(entry, %{
-                 lunch_start_at: lunch_start,
-                 lunch_end_at: lunch_end
-               }) do
-            {:ok, updated} ->
-              Logger.info("Twilio SMS emp_lunch applied: sid=#{sid} employee_id=#{emp_id}")
-              emp = Employees.get_employee(emp_id, business_id)
-              {:emp_lunched, updated.id, emp && emp.name, lunch_start, lunch_end}
+      {:error, :no_open_entry} ->
+        {:skipped, :no_open_entry}
 
-            {:error, cs} ->
-              Logger.warning("Twilio SMS emp_lunch failed: #{inspect(cs.errors)}")
-              {:error, :emp_lunch_failed}
-          end
+      {:error, _} ->
+        {:error, :emp_lunch_failed}
+    end
+  end
+
+  defp apply_emp_operation_for_employee(
+         {:emp_log_shift_by_id, _emp_id, tin, tout, ls, le},
+         emp,
+         business_id,
+         actor_user_id,
+         audit_opts,
+         sid,
+         idx
+       ) do
+    attrs = %{
+      clocked_in_at: tin,
+      clocked_out_at: tout,
+      lunch_start_at: ls,
+      lunch_end_at: le
+    }
+
+    extra = Keyword.get(audit_opts, :audit_extra, %{})
+
+    case TimeEntryActions.create_shift(business_id, actor_user_id, emp, attrs,
+           via: :sms,
+           clock_in_kind: :sms_shift,
+           clock_out_kind: :sms_shift,
+           audit_extra: extra
+         ) do
+      {:ok, entry} ->
+        Logger.info("Twilio SMS emp_log_shift applied: sid=#{sid} op_index=#{idx} entry_id=#{entry.id}")
+        {:emp_shift_logged, entry.id, emp.name, tin, tout}
+
+      {:error, _} ->
+        {:error, :emp_log_shift_failed}
+    end
+  end
+
+  defp apply_emp_operation_for_employee(
+         {:emp_adjust_entry_by_id, entry_id, _emp_id, patch},
+         emp,
+         business_id,
+         actor_user_id,
+         audit_opts,
+         sid,
+         idx
+       ) do
+    try do
+      entry = Employees.get_time_entry!(entry_id, business_id)
+
+      if entry.employee_id != emp.id do
+        {:skipped, :entry_employee_mismatch}
+      else
+        extra = Keyword.get(audit_opts, :audit_extra, %{})
+
+        case TimeEntryActions.adjust_entry(business_id, actor_user_id, emp, entry, patch,
+               via: :sms,
+               audit_extra: extra
+             ) do
+          {:ok, updated} ->
+            Logger.info("Twilio SMS emp_adjust applied: sid=#{sid} op_index=#{idx} entry_id=#{updated.id}")
+            {:emp_adjusted, updated.id, emp.name}
+
+          {:error, _} ->
+            {:error, :emp_adjust_failed}
+        end
       end
+    rescue
+      Ecto.NoResultsError ->
+        {:skipped, :entry_not_found}
     end
   end
 

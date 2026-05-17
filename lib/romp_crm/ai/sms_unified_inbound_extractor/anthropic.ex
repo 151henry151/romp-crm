@@ -273,17 +273,19 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     ---
 
-    ## employee_actions — employee clock-in, clock-out, lunch
+    ## employee_actions — workday timeclock (not job/client hours)
 
-    Each element uses **`employee_id`** from the employees snapshot only:
+    Each element uses **`employee_id`** from the employees snapshot. Use **`open_entry`** on that employee for clock_out/lunch; use **`recent_entries`** (with `entry_id`) for corrections.
 
-    - **Clock in:** `{ "intent": "clock_in", "employee_id": <int>, "clocked_in_at": "<ISO 8601>" }`
-    - **Clock out:** `{ "intent": "clock_out", "employee_id": <int>, "clocked_out_at": "<ISO 8601>" }`
-    - **Lunch:** `{ "intent": "lunch", "employee_id": <int>, "lunch_start_at": "<ISO 8601>", "lunch_end_at": "<ISO 8601>" }`
+    - **Clock in:** `{ "intent": "clock_in", "employee_id": <int>, "clocked_in_at": "<ISO 8601>" }` — e.g. "Bob arrived 8am"
+    - **Clock out:** `{ "intent": "clock_out", "employee_id": <int>, "clocked_out_at": "<ISO 8601>" }` — closes the open entry; e.g. "Bob left at 4pm"
+    - **Lunch:** `{ "intent": "lunch", "employee_id": <int>, "lunch_start_at": "...", "lunch_end_at": "..." }` — requires open entry
+    - **Log shift:** `{ "intent": "log_shift", "employee_id": <int>, "clocked_in_at": "...", "clocked_out_at": "...", optional lunch fields }` — both times in one message, e.g. "Bob worked 8am-4pm today"
+    - **Adjust entry:** `{ "intent": "adjust_entry", "entry_id": <int from recent_entries>, "employee_id": <int>, only changed time fields }`
 
-    Pick **`employee_id`** by reading names and context in the SMS against the snapshot — **no** free-text name match fields.
+    **Disambiguation:** If the SMS is about hours on a **specific client job** (snapshot job name/address context), use **`time_actions`** instead, not `employee_actions`. If unclear, ask one short question in **`assistant_sms`**.
 
-    Return `[]` if there are no employee time intents.
+    Return `[]` if there are no employee workday intents.
 
     ---
 

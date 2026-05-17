@@ -51,6 +51,9 @@
               <span class="text-base-content/80">
                 since {format_date(@open_entry.clocked_in_at)} {format_time(@open_entry.clocked_in_at)}
               </span>
+              <%= if @open_entry.clock_in_kind do %>
+                <span class="ml-2 text-xs text-base-content/60">({entry_kind_label(@open_entry.clock_in_kind)})</span>
+              <% end %>
             </div>
             <button
               type="button"
@@ -70,41 +73,135 @@
           <% end %>
         </div>
 
+        <div class="flex flex-wrap items-center gap-3">
+          <h2 class="text-base font-semibold text-base-content/90">Recent punches</h2>
+          <button
+            type="button"
+            phx-click="add_manual_shift"
+            class="text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            + Log past shift
+          </button>
+        </div>
+
         <%= if @recent_entries != [] do %>
-          <div>
-            <h2 class="text-base font-semibold text-base-content/90 mb-2">Recent punches</h2>
-            <div class="rounded-lg border border-base-300 bg-base-100 overflow-hidden text-sm">
-              <table class="w-full">
-                <thead class="bg-base-200/50 text-left text-xs text-base-content/70">
-                  <tr>
-                    <th class="px-3 py-2">In</th>
-                    <th class="px-3 py-2">Out</th>
-                    <th class="px-3 py-2">Worked</th>
+          <div class="rounded-lg border border-base-300 bg-base-100 overflow-hidden text-sm">
+            <table class="w-full">
+              <thead class="bg-base-200/50 text-left text-xs text-base-content/70">
+                <tr>
+                  <th class="px-3 py-2">In</th>
+                  <th class="px-3 py-2">Out</th>
+                  <th class="px-3 py-2">Worked</th>
+                  <th class="px-3 py-2">Type</th>
+                  <th class="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-base-300">
+                <%= for e <- @recent_entries do %>
+                  <tr id={"timeclock-entry-#{e.id}"}>
+                    <td class="px-3 py-2 whitespace-nowrap">{format_date(e.clocked_in_at)} {format_time(e.clocked_in_at)}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                      <%= if e.clocked_out_at do %>
+                        {format_date(e.clocked_out_at)} {format_time(e.clocked_out_at)}
+                      <% else %>
+                        <span class="text-green-600 font-medium text-xs">Open</span>
+                      <% end %>
+                    </td>
+                    <td class="px-3 py-2">
+                      <%= case RompCrm.Employees.EmployeeTimeEntry.format_duration(e) do %>
+                        <% nil -> %>
+                          —
+                        <% d -> %>
+                          {d}
+                      <% end %>
+                    </td>
+                    <td class="px-3 py-2 text-xs text-base-content/70">
+                      {entry_kind_label(e.clock_in_kind) || "—"}
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        phx-click="open_edit_entry"
+                        phx-value-id={e.id}
+                        class="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                      >
+                        Edit
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody class="divide-y divide-base-300">
-                  <%= for e <- @recent_entries do %>
-                    <tr>
-                      <td class="px-3 py-2 whitespace-nowrap">{format_date(e.clocked_in_at)} {format_time(e.clocked_in_at)}</td>
-                      <td class="px-3 py-2 whitespace-nowrap">
-                        <%= if e.clocked_out_at do %>
-                          {format_date(e.clocked_out_at)} {format_time(e.clocked_out_at)}
-                        <% else %>
-                          <span class="text-green-600 font-medium text-xs">Open</span>
-                        <% end %>
-                      </td>
-                      <td class="px-3 py-2">
-                        <%= case RompCrm.Employees.EmployeeTimeEntry.format_duration(e) do %>
-                          <% nil -> %>
-                            —
-                          <% d -> %>
-                            {d}
-                        <% end %>
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <p class="text-sm text-base-content/60">No punches yet.</p>
+        <% end %>
+
+        <%= if @editing_entry_id do %>
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="w-full max-w-lg rounded-xl border border-base-300 bg-base-100 p-5 shadow-xl">
+              <h3 class="text-lg font-semibold mb-4">
+                <%= if @editing_entry_id == :new, do: "Log past shift", else: "Edit time entry" %>
+              </h3>
+              <form
+                phx-submit={if @editing_entry_id == :new, do: "save_new_shift", else: "save_edit_entry"}
+                class="space-y-3"
+              >
+                <label class="block text-sm">
+                  <span class="font-medium text-base-content/80">Clock in</span>
+                  <input
+                    type="datetime-local"
+                    name="clocked_in_at"
+                    value={@edit_clocked_in_at}
+                    phx-change="edit_field"
+                    class="input input-bordered input-sm w-full mt-1"
+                    required
+                  />
+                </label>
+                <label class="block text-sm">
+                  <span class="font-medium text-base-content/80">Clock out (optional if still on clock)</span>
+                  <input
+                    type="datetime-local"
+                    name="clocked_out_at"
+                    value={@edit_clocked_out_at}
+                    phx-change="edit_field"
+                    class="input input-bordered input-sm w-full mt-1"
+                  />
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="block text-sm">
+                    <span class="font-medium text-base-content/80">Lunch start</span>
+                    <input
+                      type="datetime-local"
+                      name="lunch_start_at"
+                      value={@edit_lunch_start_at}
+                      phx-change="edit_field"
+                      class="input input-bordered input-sm w-full mt-1"
+                    />
+                  </label>
+                  <label class="block text-sm">
+                    <span class="font-medium text-base-content/80">Lunch end</span>
+                    <input
+                      type="datetime-local"
+                      name="lunch_end_at"
+                      value={@edit_lunch_end_at}
+                      phx-change="edit_field"
+                      class="input input-bordered input-sm w-full mt-1"
+                    />
+                  </label>
+                </div>
+                <label class="block text-sm">
+                  <span class="font-medium text-base-content/80">Notes</span>
+                  <textarea name="notes" rows="2" phx-change="edit_field" class="textarea textarea-bordered textarea-sm w-full mt-1">{@edit_notes}</textarea>
+                </label>
+                <p class="text-xs text-base-content/60">
+                  Changes are recorded in the audit log as manual adjustments (original punch type is preserved).
+                </p>
+                <div class="flex justify-end gap-2 pt-2">
+                  <button type="button" phx-click="close_edit_entry" class="btn btn-ghost btn-sm">Cancel</button>
+                  <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                </div>
+              </form>
             </div>
           </div>
         <% end %>

@@ -409,7 +409,71 @@ defmodule RompCrm.BusinessAuditLogs.Detail do
   defp change_sentence(%{type: "employee_time"} = c) do
     name = c[:employee_name] || c["employee_name"] || "employee"
     action = c[:action] || c["action"] || "update"
-    "#{action} for employee #{name}"
+    record_kind = c[:record_kind] || c["record_kind"]
+    via = c[:via] || c["via"]
+
+    prefix =
+      cond do
+        record_kind == "live_punch" and action == "clock_in" ->
+          "Live clock-in punch"
+
+        record_kind == "live_punch" and action == "clock_out" ->
+          "Live clock-out punch"
+
+        record_kind == "sms_punch" and action == "clock_in" ->
+          "SMS clock-in"
+
+        record_kind == "sms_punch" and action == "clock_out" ->
+          "SMS clock-out"
+
+        action == "shift_logged" ->
+          "Logged workday shift (SMS)"
+
+        action == "manual_entry" ->
+          "Manually entered workday shift"
+
+        action == "adjustment" ->
+          "Adjusted workday times"
+
+        action == "lunch" ->
+          "Recorded lunch break"
+
+        action == "delete" ->
+          "Deleted workday time entry"
+
+        true ->
+          action
+      end
+
+    via_bit = if via in [nil, ""], do: "", else: " (#{via})"
+    at_in = c[:clocked_in_at] || c["clocked_in_at"]
+    at_out = c[:clocked_out_at] || c["clocked_out_at"]
+
+    range =
+      cond do
+        at_in && at_out -> " #{at_in} – #{at_out}"
+        at_in -> " at #{at_in}"
+        true -> ""
+      end
+
+    diffs = c[:field_changes] || c["field_changes"] || []
+
+    diff_bit =
+      if diffs != [] do
+        parts =
+          Enum.map(diffs, fn d ->
+            f = d[:field] || d["field"]
+            b = d[:before] || d["before"]
+            a = d[:after] || d["after"]
+            "#{f}: #{inspect_value(b)} → #{inspect_value(a)}"
+          end)
+
+        " — " <> Enum.join(parts, "; ")
+      else
+        ""
+      end
+
+    "#{prefix} for #{name}#{via_bit}#{range}#{diff_bit}"
   end
 
   defp change_sentence(%{type: "reminder_scheduled"} = c) do

@@ -138,6 +138,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
 
     ## Action: lunch  (employee takes lunch break)
     Triggered by: "Henry took lunch from noon to 1pm", "Henry lunch 12-1", etc.
+    Requires an **open** clock-in on the snapshot for that employee.
     {
       "intent": "lunch",
       "employee_id": <integer from snapshot>,
@@ -145,8 +146,36 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
       "lunch_end_at": "<ISO 8601 datetime>"
     }
 
-    If you cannot identify the employee with confidence, use "match" instead of "employee_id":
-    { "intent": "clock_in", "match": {"name": "Henry"}, "clocked_in_at": "..." }
+    ## Action: log_shift  (record a full workday in one message)
+    Triggered by: "Bob worked from 8am to 4pm today", "Henry 7:30-3:30", etc.
+    Use when both start and end are stated (or implied) in one message — **not** job/client hours.
+    {
+      "intent": "log_shift",
+      "employee_id": <integer>,
+      "clocked_in_at": "<ISO 8601>",
+      "clocked_out_at": "<ISO 8601>",
+      "lunch_start_at": "<optional ISO 8601>",
+      "lunch_end_at": "<optional ISO 8601>"
+    }
+
+    ## Action: adjust_entry  (correct a past closed entry)
+    Use `entry_id` from the employee snapshot `recent_entries` list.
+    {
+      "intent": "adjust_entry",
+      "entry_id": <integer>,
+      "employee_id": <integer>,
+      "clocked_in_at": "<optional ISO 8601>",
+      "clocked_out_at": "<optional ISO 8601>",
+      "lunch_start_at": "<optional>",
+      "lunch_end_at": "<optional>",
+      "notes": "<optional string>"
+    }
+
+    ## Workday vs job time
+    - **Employee workday** (this extractor): shop/yard clock, "Bob clocked in", "Bob worked 8-4", arrivals/departures.
+    - **Job time** is separate — hours on a **client job** — do not emit employee_actions for those; return empty actions.
+
+    If you cannot identify the employee with confidence, ask in `assistant_sms` instead of guessing.
 
     ## Time inference
     - "8am" → T08:00:00, "4pm" → T16:00:00, "noon" → T12:00:00, "3:30pm" → T15:30:00
@@ -156,6 +185,8 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
     SMS "picked Henry up at 8am" → clock_in for Henry, clocked_in_at = today T08:00:00
     SMS "Henry took lunch from noon to 1pm" → lunch for Henry, 12:00–13:00
     SMS "dropped Henry off at home at 4pm" → clock_out for Henry, clocked_out_at = today T16:00:00
+    SMS "Bob worked from 8am to 4pm today" → log_shift for Bob, in/out today 08:00–16:00
+    SMS "Bob arrived 8am" (morning) → clock_in; later SMS "Bob left at 4pm" → clock_out (use open_entry)
     SMS "Angela's address is 123 Main" → no employee events → { "assistant_sms": null, "actions": [] }
     """
   end

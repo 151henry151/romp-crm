@@ -359,8 +359,21 @@ defmodule RompCrm.Employees do
 
     open_by_emp = Map.new(open_entries, fn te -> {te.employee_id, te} end)
 
+    recent_by_emp =
+      Repo.all(
+        from te in EmployeeTimeEntry,
+          where: te.business_id == ^business_id and not is_nil(te.clocked_out_at),
+          order_by: [desc: te.clocked_in_at],
+          limit: 200
+      )
+      |> Enum.group_by(& &1.employee_id)
+      |> Map.new(fn {eid, list} ->
+        {eid, Enum.take(list, 8)}
+      end)
+
     Enum.map(employees, fn emp ->
       open = Map.get(open_by_emp, emp.id)
+      recent = Map.get(recent_by_emp, emp.id, [])
 
       %{
         "id" => emp.id,
@@ -378,7 +391,16 @@ defmodule RompCrm.Employees do
             }
           else
             nil
-          end
+          end,
+        "recent_entries" =>
+          Enum.map(recent, fn te ->
+            %{
+              "entry_id" => te.id,
+              "clocked_in_at" => NaiveDateTime.to_iso8601(te.clocked_in_at),
+              "clocked_out_at" => NaiveDateTime.to_iso8601(te.clocked_out_at),
+              "clock_in_kind" => te.clock_in_kind && Atom.to_string(te.clock_in_kind)
+            }
+          end)
       }
     end)
   end

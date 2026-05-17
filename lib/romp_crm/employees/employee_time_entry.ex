@@ -9,6 +9,10 @@ defmodule RompCrm.Employees.EmployeeTimeEntry do
   use Ecto.Schema
   import Ecto.Changeset
 
+  @entry_kinds [:live_punch, :sms_punch, :manual_entry, :sms_shift]
+
+  def entry_kinds, do: @entry_kinds
+
   schema "employee_time_entries" do
     belongs_to :business, RompCrm.Businesses.Business
     belongs_to :employee, RompCrm.Employees.Employee
@@ -18,6 +22,8 @@ defmodule RompCrm.Employees.EmployeeTimeEntry do
     field :lunch_start_at, :naive_datetime
     field :lunch_end_at, :naive_datetime
     field :notes, :string
+    field :clock_in_kind, Ecto.Enum, values: @entry_kinds
+    field :clock_out_kind, Ecto.Enum, values: @entry_kinds
 
     timestamps(type: :utc_datetime)
   end
@@ -31,7 +37,9 @@ defmodule RompCrm.Employees.EmployeeTimeEntry do
       :clocked_out_at,
       :lunch_start_at,
       :lunch_end_at,
-      :notes
+      :notes,
+      :clock_in_kind,
+      :clock_out_kind
     ])
     |> validate_required([:business_id, :employee_id, :clocked_in_at])
     |> unique_constraint([:business_id, :employee_id],

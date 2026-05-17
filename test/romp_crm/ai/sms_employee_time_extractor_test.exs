@@ -153,6 +153,28 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractorTest do
                SmsEmployeeTimeExtractor.extract(raw, [])
     end
 
+    test "log_shift returns emp_log_shift_by_id" do
+      raw =
+        "STUB_JSON " <>
+          Jason.encode!(%{
+            "actions" => [
+              %{
+                "intent" => "log_shift",
+                "employee_id" => 2,
+                "clocked_in_at" => "2026-05-11T08:00:00",
+                "clocked_out_at" => "2026-05-11T16:00:00"
+              }
+            ]
+          })
+
+      assert {:ok,
+              %{
+                operations: [
+                  {:emp_log_shift_by_id, 2, ~N[2026-05-11 08:00:00], ~N[2026-05-11 16:00:00], nil, nil}
+                ]
+              }} = SmsEmployeeTimeExtractor.extract(raw, [])
+    end
+
     test "empty actions returns empty operations" do
       raw = "STUB_JSON " <> Jason.encode!(%{"assistant_sms" => nil, "actions" => []})
       assert {:ok, %{operations: []}} = SmsEmployeeTimeExtractor.extract(raw, [])

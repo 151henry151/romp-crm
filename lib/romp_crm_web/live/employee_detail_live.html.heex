@@ -65,7 +65,14 @@
 
     <%!-- Time log --%>
     <div>
-      <h2 class="text-base font-semibold text-base-content/80 mb-3">Time Entries</h2>
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="text-base font-semibold text-base-content/80">Time Entries</h2>
+        <%= if @can_manage_time do %>
+          <button type="button" phx-click="add_manual_shift" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+            + Log shift
+          </button>
+        <% end %>
+      </div>
       <div class="overflow-x-auto rounded-lg border border-base-300 bg-base-100 [-webkit-overflow-scrolling:touch]">
         <table class="w-full min-w-[36rem] text-sm" id="employee-time-table">
           <thead>
@@ -75,12 +82,16 @@
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Out</th>
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Lunch</th>
               <th class="text-left px-4 py-3 font-medium text-base-content/80">Hours</th>
+              <th class="text-left px-4 py-3 font-medium text-base-content/80">Type</th>
+              <%= if @can_manage_time do %>
+                <th class="px-4 py-3"></th>
+              <% end %>
             </tr>
           </thead>
           <tbody class="divide-y divide-base-300">
             <%= if @entries == [] do %>
               <tr id="employee-time-empty">
-                <td colspan="5" class="px-4 py-12 text-center text-base-content/60">
+                <td colspan={if @can_manage_time, do: 7, else: 6} class="px-4 py-12 text-center text-base-content/60">
                   No time entries yet for this employee.
                 </td>
               </tr>
@@ -120,11 +131,57 @@
                       <span id={"emp-entry-dur-#{entry.id}"}>{dur}</span>
                   <% end %>
                 </td>
+                <td class="px-4 py-3 text-xs text-base-content/70">{entry_kind_label(entry.clock_in_kind)}</td>
+                <%= if @can_manage_time do %>
+                  <td class="px-4 py-3 text-right whitespace-nowrap space-x-2">
+                    <button type="button" phx-click="open_edit_entry" phx-value-id={entry.id} class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+                    <button type="button" phx-click="delete_entry" phx-value-id={entry.id} data-confirm="Delete this time entry?" class="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>
+                  </td>
+                <% end %>
               </tr>
             <% end %>
           </tbody>
         </table>
       </div>
+
+      <%= if @editing_entry_id && @can_manage_time do %>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div class="w-full max-w-lg rounded-xl border border-base-300 bg-base-100 p-5 shadow-xl">
+            <h3 class="text-lg font-semibold mb-4">
+              <%= if @editing_entry_id == :new, do: "Log shift for #{@employee.name}", else: "Edit time entry" %>
+            </h3>
+            <form phx-submit={if @editing_entry_id == :new, do: "save_new_shift", else: "save_edit_entry"} class="space-y-3">
+              <label class="block text-sm">
+                <span class="font-medium">Clock in</span>
+                <input type="datetime-local" name="clocked_in_at" value={@edit_clocked_in_at} phx-change="edit_field" class="input input-bordered input-sm w-full mt-1" required />
+              </label>
+              <label class="block text-sm">
+                <span class="font-medium">Clock out</span>
+                <input type="datetime-local" name="clocked_out_at" value={@edit_clocked_out_at} phx-change="edit_field" class="input input-bordered input-sm w-full mt-1" />
+              </label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block text-sm">
+                  <span class="font-medium">Lunch start</span>
+                  <input type="datetime-local" name="lunch_start_at" value={@edit_lunch_start_at} phx-change="edit_field" class="input input-bordered input-sm w-full mt-1" />
+                </label>
+                <label class="block text-sm">
+                  <span class="font-medium">Lunch end</span>
+                  <input type="datetime-local" name="lunch_end_at" value={@edit_lunch_end_at} phx-change="edit_field" class="input input-bordered input-sm w-full mt-1" />
+                </label>
+              </div>
+              <label class="block text-sm">
+                <span class="font-medium">Notes</span>
+                <textarea name="notes" rows="2" phx-change="edit_field" class="textarea textarea-bordered textarea-sm w-full mt-1">{@edit_notes}</textarea>
+              </label>
+              <p class="text-xs text-base-content/60">Saved changes appear in the audit log as manual adjustments.</p>
+              <div class="flex justify-end gap-2 pt-2">
+                <button type="button" phx-click="close_edit_entry" class="btn btn-ghost btn-sm">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      <% end %>
     </div>
   </div>
 </Layouts.app>
