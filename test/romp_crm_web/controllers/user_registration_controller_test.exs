@@ -206,6 +206,31 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       end)
     end
 
+    test "promo registration emails get cardless trial without signed t param", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        conn =
+          post(conn, ~p"/users/register", %{
+            "user" => valid_user_attributes(email: "jvzieger@icloud.com")
+          })
+
+        assert redirected_to(conn) == ~p"/users/log-in"
+        assert conn.assigns.flash["info"] =~ "30 days"
+
+        user = Accounts.get_user_by_email("jvzieger@icloud.com")
+        assert %DateTime{} = user.gift_access_until
+        assert DateTime.after?(user.gift_access_until, DateTime.utc_now(:second))
+      end)
+    end
+
+    test "register page hides paywall for promo registration email query param", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        conn = get(conn, ~p"/users/register?#{[email: "jzieger2@gmail.com"]}")
+        response = html_response(conn, 200)
+        refute response =~ "monthly"
+        assert response =~ "30"
+      end)
+    end
+
     test "cardless trial signup for duplicate pending paywall email redirects to subscribe", %{conn: conn} do
       with_subscription_paywall_enabled(fn ->
         email = unique_user_email()

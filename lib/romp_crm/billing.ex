@@ -20,6 +20,31 @@ defmodule RompCrm.Billing do
     RompCrm.ApplicationConfig.subscription_paywall_enabled?()
   end
 
+  @default_cardless_promo_registration_emails [
+    "jvzieger@icloud.com",
+    "jzieger2@gmail.com"
+  ]
+
+  @doc """
+  Emails that receive the 30-day cardless trial on normal sign-up (same as the signed promo link).
+  Override with application env `:cardless_promo_registration_emails` (downcased list).
+  """
+  def cardless_promo_registration_emails do
+    Application.get_env(
+      :romp_crm,
+      :cardless_promo_registration_emails,
+      @default_cardless_promo_registration_emails
+    )
+  end
+
+  def cardless_promo_registration_email?(email) when is_binary(email) do
+    email = email |> String.trim() |> String.downcase()
+
+    email != "" and email in cardless_promo_registration_emails()
+  end
+
+  def cardless_promo_registration_email?(_), do: false
+
   def subscription_active?(%User{subscription_status: status})
       when status in ["active", "invited_member"],
       do: true

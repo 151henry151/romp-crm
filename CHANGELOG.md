@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.71] - 2026-05-19
+
+### Added
+
+- **Registration**: grant 30-day cardless trial (no PayPal) for `jvzieger@icloud.com` and `jzieger2@gmail.com` on normal sign-up, matching the signed promo link flow
+
 ## [0.9.70] - 2026-05-17
 
 ### Added

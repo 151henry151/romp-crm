@@ -65,7 +65,7 @@ defmodule RompCrmWeb.UserRegistrationController do
         invitation_registration: invitation_registration?,
         gift_registration: gift_registration?,
         gift_token: gift_token,
-        cardless_trial: get_session(conn, :cardless_trial_signup) == true
+        cardless_trial: cardless_trial_signup?(conn, initial_email)
       )
     )
   end
@@ -85,9 +85,20 @@ defmodule RompCrmWeb.UserRegistrationController do
         |> delete_session(:cardless_trial_signup)
         |> put_flash(:error, "That promotional link is invalid.")
 
+      promo_email?(params) ->
+        put_session(conn, :cardless_trial_signup, true)
+
       true ->
         delete_session(conn, :cardless_trial_signup)
     end
+  end
+
+  defp promo_email?(params) when is_map(params) do
+    params
+    |> Map.get("email", "")
+    |> to_string()
+    |> String.trim()
+    |> Billing.cardless_promo_registration_email?()
   end
 
   def create(conn, params) do
@@ -123,13 +134,13 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: true,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: get_session(conn, :cardless_trial_signup) == true
+            cardless_trial: cardless_trial_signup?(conn, attrs)
           )
         )
 
       :standard_paywall ->
         gift_ok = gift_raw != nil && gift_pending?(gift_raw)
-        cardless? = Billing.paywall_enabled?() and get_session(conn, :cardless_trial_signup) == true
+        cardless? = cardless_trial_signup?(conn, attrs)
 
         cond do
           gift_ok ->
@@ -246,7 +257,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: true,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: get_session(conn, :cardless_trial_signup) == true
+            cardless_trial: cardless_trial_signup?(conn, attrs)
           )
         )
     end
@@ -267,7 +278,7 @@ defmodule RompCrmWeb.UserRegistrationController do
         invitation_registration: invitation_registration?,
         gift_registration: gift_registration?,
         gift_token: gift_token,
-        cardless_trial: get_session(conn, :cardless_trial_signup) == true
+        cardless_trial: cardless_trial_signup?(conn, attrs)
       )
     )
   end
@@ -353,7 +364,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: true,
             gift_token: gift_tok,
-            cardless_trial: get_session(conn, :cardless_trial_signup) == true
+            cardless_trial: cardless_trial_signup?(conn, attrs)
           )
         )
     end
@@ -411,10 +422,20 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: get_session(conn, :cardless_trial_signup) == true
+            cardless_trial: cardless_trial_signup?(conn, attrs)
           )
         )
     end
+  end
+
+  defp cardless_trial_signup?(conn, email) when is_binary(email) do
+    Billing.paywall_enabled?() and
+      (get_session(conn, :cardless_trial_signup) == true or
+         Billing.cardless_promo_registration_email?(email))
+  end
+
+  defp cardless_trial_signup?(conn, attrs) when is_map(attrs) do
+    cardless_trial_signup?(conn, register_email(attrs))
   end
 
   defp register_email(attrs) when is_map(attrs) do
@@ -478,7 +499,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: gift_reg?,
             gift_token: gift_tok2,
-            cardless_trial: get_session(conn, :cardless_trial_signup) == true
+            cardless_trial: cardless_trial_signup?(conn, attrs)
           )
         )
     end
