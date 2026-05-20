@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.73] - 2026-05-20
+
+### Changed
+
+- **PayPal billing**: set `PAYPAL_TRIAL_DAYS` default to 0 and provision plans without a PayPal trial cycle (in-app signup trial remains 30 days via `SIGNUP_TRIAL_DAYS`)
+- **Config**: decouple `signup_trial_days` from `paypal_trial_days` in `runtime.exs`
+
 ## [0.9.72] - 2026-05-19
 
 ### Changed

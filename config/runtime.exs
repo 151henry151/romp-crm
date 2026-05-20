@@ -153,7 +153,7 @@ if config_env() == :prod do
   paypal_trial_days =
     case System.get_env("PAYPAL_TRIAL_DAYS") |> to_string() |> String.trim() do
       "" ->
-        30
+        0
 
       s ->
         case Integer.parse(s) do
@@ -162,7 +162,24 @@ if config_env() == :prod do
 
           _ ->
             raise """
-            environment variable PAYPAL_TRIAL_DAYS must be an integer from 0 to 365 (default 30).
+            environment variable PAYPAL_TRIAL_DAYS must be an integer from 0 to 365 (default 0).
+            """
+        end
+    end
+
+  signup_trial_days =
+    case System.get_env("SIGNUP_TRIAL_DAYS") |> to_string() |> String.trim() do
+      "" ->
+        30
+
+      s ->
+        case Integer.parse(s) do
+          {n, _} when n >= 1 and n <= 365 ->
+            n
+
+          _ ->
+            raise """
+            environment variable SIGNUP_TRIAL_DAYS must be an integer from 1 to 365 (default 30).
             """
         end
     end
@@ -278,7 +295,7 @@ if config_env() == :prod do
     paypal_skip_webhook_verify: paypal_skip_verify_effective,
     paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name,
     paypal_trial_days: paypal_trial_days,
-    signup_trial_days: paypal_trial_days,
+    signup_trial_days: signup_trial_days,
     email_logo_url: email_logo_url,
     email_brand_base_url: email_brand_base_url
 

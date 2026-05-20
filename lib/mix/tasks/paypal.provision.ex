@@ -14,9 +14,9 @@ defmodule Mix.Tasks.Paypal.Provision do
     * `PAYPAL_WEBHOOK_URL` — listener URL (default `https://rompcrm.com/romp-crm/webhooks/paypal`)
     * `PAYPAL_MONTHLY_PRICE` — default `25.00` USD
     * `PAYPAL_ANNUAL_PRICE` — default `240.00` USD (12× \$20/mo)
-    * `PAYPAL_TRIAL_DAYS` — default **`14`** (`0` disables the trial cycle — not recommended for hosted paywall)
+    * `PAYPAL_TRIAL_DAYS` — default **`0`** (`0` = no PayPal trial cycle; bill on subscribe). Use a positive value only if you want an extra PayPal-side trial after the in-app trial.
 
-  Plans include a **\$0 trial** billing cycle (`TRIAL` tenure) so PayPal collects a payment method but does not charge until the regular cycle begins after the trial.
+  When `PAYPAL_TRIAL_DAYS` > 0, plans include a **\$0 trial** billing cycle (`TRIAL` tenure) before the regular cycle.
 
   Prints IDs to stdout and writes **`deploy/paypal-provision-result.env`** (gitignored) for merging into `.env.production`.
 
@@ -128,7 +128,7 @@ defmodule Mix.Tasks.Paypal.Provision do
   end
 
   defp trial_days_from_env do
-    case Integer.parse(System.get_env("PAYPAL_TRIAL_DAYS") || "14") do
+    case Integer.parse(System.get_env("PAYPAL_TRIAL_DAYS") || "0") do
       {n, _} when n >= 0 and n <= 365 ->
         n
 

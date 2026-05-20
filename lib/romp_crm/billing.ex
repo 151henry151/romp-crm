@@ -64,10 +64,10 @@ defmodule RompCrm.Billing do
   end
 
   @doc """
-  Free-trial length in days (matches **`PAYPAL_TRIAL_DAYS`** / provisioned PayPal plan cycles).
+  PayPal plan trial cycle length in days (`0` = bill immediately; app signup trial is separate).
   """
   def paypal_trial_days do
-    Application.get_env(:romp_crm, :paypal_trial_days, 30)
+    Application.get_env(:romp_crm, :paypal_trial_days, 0)
   end
 
   @doc """
