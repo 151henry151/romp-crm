@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.72] - 2026-05-19
+
+### Changed
+
+- **Registration**: all hosted sign-ups receive a 30-day trial with no credit card; PayPal billing is required only after trial expiry via the subscription page
+- **Trial defaults**: set `PAYPAL_TRIAL_DAYS` and `signup_trial_days` default to 30 (was 14)
+
 ## [0.9.71] - 2026-05-19
 
 ### Added

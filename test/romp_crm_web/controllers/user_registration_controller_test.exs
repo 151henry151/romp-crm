@@ -88,13 +88,23 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       assert redirected_to(conn) == ~p"/"
     end
 
-    test "valid signed t enables cardless trial UI when paywall enabled", %{conn: conn} do
+    test "paywall enabled shows cardless trial UI without signed t param", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        conn = get(conn, ~p"/users/register")
+        body = html_response(conn, 200)
+        refute body =~ "Billing plan"
+        assert body =~ "no credit card"
+        assert body =~ "30"
+        assert get_session(conn, :cardless_trial_signup) == true
+      end)
+    end
+
+    test "valid signed t still enables cardless trial UI when paywall enabled", %{conn: conn} do
       with_subscription_paywall_enabled(fn ->
         t = CardlessTrialToken.sign()
         conn = get(conn, ~p"/users/register?#{[t: t]}")
         body = html_response(conn, 200)
         refute body =~ "Billing plan"
-        assert body =~ "special link"
         assert get_session(conn, :cardless_trial_signup) == true
       end)
     end
@@ -104,21 +114,6 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
         conn = get(conn, ~p"/users/register?#{[t: "not-a-valid-token"]}")
         _body = html_response(conn, 200)
         assert conn.assigns.flash["error"] =~ "promotional link"
-        refute get_session(conn, :cardless_trial_signup)
-      end)
-    end
-
-    test "register without t clears cardless session after a valid t visit", %{conn: conn} do
-      with_subscription_paywall_enabled(fn ->
-        t = CardlessTrialToken.sign()
-
-        conn =
-          conn
-          |> get(~p"/users/register?#{[t: t]}")
-          |> get(~p"/users/register")
-
-        body = html_response(conn, 200)
-        assert body =~ "Billing plan"
         refute get_session(conn, :cardless_trial_signup)
       end)
     end
@@ -206,28 +201,22 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       end)
     end
 
-    test "promo registration emails get cardless trial without signed t param", %{conn: conn} do
+    test "standard signup gets cardless trial without signed t param", %{conn: conn} do
       with_subscription_paywall_enabled(fn ->
+        email = unique_user_email()
+
         conn =
           post(conn, ~p"/users/register", %{
-            "user" => valid_user_attributes(email: "jvzieger@icloud.com")
+            "user" => valid_user_attributes(email: email)
           })
 
         assert redirected_to(conn) == ~p"/users/log-in"
         assert conn.assigns.flash["info"] =~ "30 days"
+        assert conn.assigns.flash["info"] =~ "no credit card"
 
-        user = Accounts.get_user_by_email("jvzieger@icloud.com")
+        user = Accounts.get_user_by_email(email)
         assert %DateTime{} = user.gift_access_until
         assert DateTime.after?(user.gift_access_until, DateTime.utc_now(:second))
-      end)
-    end
-
-    test "register page hides paywall for promo registration email query param", %{conn: conn} do
-      with_subscription_paywall_enabled(fn ->
-        conn = get(conn, ~p"/users/register?#{[email: "jzieger2@gmail.com"]}")
-        response = html_response(conn, 200)
-        refute response =~ "monthly"
-        assert response =~ "30"
       end)
     end
 

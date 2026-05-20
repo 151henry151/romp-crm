@@ -153,7 +153,7 @@ if config_env() == :prod do
   paypal_trial_days =
     case System.get_env("PAYPAL_TRIAL_DAYS") |> to_string() |> String.trim() do
       "" ->
-        14
+        30
 
       s ->
         case Integer.parse(s) do
@@ -162,7 +162,7 @@ if config_env() == :prod do
 
           _ ->
             raise """
-            environment variable PAYPAL_TRIAL_DAYS must be an integer from 0 to 365 (default 14).
+            environment variable PAYPAL_TRIAL_DAYS must be an integer from 0 to 365 (default 30).
             """
         end
     end
@@ -244,6 +244,12 @@ if config_env() == :prod do
       url -> url
     end
 
+  twilio_voice_forward_e164 =
+    case System.get_env("TWILIO_VOICE_FORWARD_TO") |> to_string() |> String.trim() do
+      "" -> nil
+      s -> s
+    end
+
   config :romp_crm,
     twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
@@ -253,11 +259,7 @@ if config_env() == :prod do
     anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
     twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
     twilio_voice_webhook_public_url: System.get_env("TWILIO_VOICE_WEBHOOK_PUBLIC_URL"),
-    twilio_voice_forward_e164:
-      (case System.get_env("TWILIO_VOICE_FORWARD_TO") |> to_string() |> String.trim() do
-         "" -> "+18024587299"
-         s -> s
-       end),
+    twilio_voice_forward_e164: twilio_voice_forward_e164,
     skip_twilio_signature_validation:
       System.get_env("SKIP_TWILIO_SIGNATURE_VALIDATION") == "true",
     mail_from_name: mail_from_name,
@@ -276,6 +278,7 @@ if config_env() == :prod do
     paypal_skip_webhook_verify: paypal_skip_verify_effective,
     paypal_brand_name: System.get_env("PAYPAL_BRAND_NAME") || mail_from_name,
     paypal_trial_days: paypal_trial_days,
+    signup_trial_days: paypal_trial_days,
     email_logo_url: email_logo_url,
     email_brand_base_url: email_brand_base_url
 

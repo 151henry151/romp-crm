@@ -11,7 +11,7 @@
               Gift subscription — no payment. Use the email address from your gift message.
             <% else %>
               <%= if @cardless_trial do %>
-                Promotional sign-up — 30 days full access with no card; add PayPal before it ends to continue.
+                Free {@signup_trial_days}-day trial — no credit card required to start.
               <% else %>
                 Already registered?
                 <.link navigate={~p"/users/log-in"} class="font-semibold text-brand hover:underline">
@@ -39,7 +39,7 @@
 
     <%= if @cardless_trial && !@gift_registration && !@invitation_registration do %>
       <div class="alert alert-info mb-4 text-sm" role="status">
-        You’re on a special link: create your account here with no credit card. You’ll get 30 days of access, then add PayPal on the subscription page to stay subscribed.
+        Create your account with no credit card. You get {@signup_trial_days} days of full access, then subscribe on the subscription page to keep using Romp CRM.
       </div>
     <% end %>
 

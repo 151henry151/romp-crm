@@ -26,6 +26,8 @@ defmodule RompCrmWeb.UserRegistrationController do
 
   defp new_register_form(conn, params, gift_token_raw) do
     {gift_registration?, gift_token, gift_email} = gift_registration_context(gift_token_raw)
+    {invitation_registration?, _inv} = invitation_context(conn)
+    skip_cardless? = gift_registration? or invitation_registration?
 
     conn =
       cond do
@@ -39,7 +41,7 @@ defmodule RompCrmWeb.UserRegistrationController do
           conn
       end
 
-    conn = apply_cardless_trial_session(conn, params)
+    conn = apply_cardless_trial_session(conn, params, skip_cardless?)
 
     initial_email =
       cond do
@@ -55,8 +57,6 @@ defmodule RompCrmWeb.UserRegistrationController do
 
     changeset = Accounts.change_user_email(%User{email: initial_email})
 
-    {invitation_registration?, _inv} = invitation_context(conn)
-
     render(
       conn,
       :new,
@@ -65,40 +65,26 @@ defmodule RompCrmWeb.UserRegistrationController do
         invitation_registration: invitation_registration?,
         gift_registration: gift_registration?,
         gift_token: gift_token,
-        cardless_trial: cardless_trial_signup?(conn, initial_email)
+        cardless_trial: cardless_trial_signup?(skip_cardless?)
       )
     )
   end
 
-  defp apply_cardless_trial_session(conn, params) do
+  defp apply_cardless_trial_session(conn, params, skip_cardless?) do
     raw = params |> Map.get("t") |> to_string() |> String.trim()
 
     cond do
-      not Billing.paywall_enabled?() ->
+      skip_cardless? or not Billing.paywall_enabled?() ->
         delete_session(conn, :cardless_trial_signup)
 
-      raw != "" and CardlessTrialToken.valid?(raw) ->
-        put_session(conn, :cardless_trial_signup, true)
-
-      raw != "" ->
+      raw != "" and not CardlessTrialToken.valid?(raw) ->
         conn
         |> delete_session(:cardless_trial_signup)
         |> put_flash(:error, "That promotional link is invalid.")
 
-      promo_email?(params) ->
-        put_session(conn, :cardless_trial_signup, true)
-
       true ->
-        delete_session(conn, :cardless_trial_signup)
+        put_session(conn, :cardless_trial_signup, true)
     end
-  end
-
-  defp promo_email?(params) when is_map(params) do
-    params
-    |> Map.get("email", "")
-    |> to_string()
-    |> String.trim()
-    |> Billing.cardless_promo_registration_email?()
   end
 
   def create(conn, params) do
@@ -134,33 +120,19 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: true,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: cardless_trial_signup?(conn, attrs)
+            cardless_trial: false
           )
         )
 
       :standard_paywall ->
         gift_ok = gift_raw != nil && gift_pending?(gift_raw)
-        cardless? = cardless_trial_signup?(conn, attrs)
 
         cond do
           gift_ok ->
             finish_create_with_gift(conn, attrs, gift_raw)
 
-          cardless? ->
+          Billing.paywall_enabled?() ->
             finish_create_cardless_trial(conn, attrs)
-
-          Billing.paywall_enabled?() and not Billing.valid_plan?(plan) ->
-            conn
-            |> put_flash(:error, "Choose monthly or annual billing.")
-            |> render_register_form(attrs)
-
-          Billing.paywall_enabled?() and not Billing.plan_configured?(plan) ->
-            conn
-            |> put_flash(
-              :error,
-              "This server is not configured for that plan yet. Try the other option or contact support."
-            )
-            |> render_register_form(attrs)
 
           true ->
             finish_create(conn, attrs, plan)
@@ -257,7 +229,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: true,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: cardless_trial_signup?(conn, attrs)
+            cardless_trial: false
           )
         )
     end
@@ -269,6 +241,7 @@ defmodule RompCrmWeb.UserRegistrationController do
     {invitation_registration?, _} = invitation_context(conn)
     gift_token = get_session(conn, :pending_gift_token) |> to_string() |> String.trim()
     {gift_registration?, gift_token, _} = gift_registration_context(gift_token)
+    skip_cardless? = gift_registration? or invitation_registration?
 
     render(
       conn,
@@ -278,7 +251,7 @@ defmodule RompCrmWeb.UserRegistrationController do
         invitation_registration: invitation_registration?,
         gift_registration: gift_registration?,
         gift_token: gift_token,
-        cardless_trial: cardless_trial_signup?(conn, attrs)
+        cardless_trial: cardless_trial_signup?(skip_cardless?)
       )
     )
   end
@@ -294,6 +267,7 @@ defmodule RompCrmWeb.UserRegistrationController do
         subscription_paywall:
           Billing.paywall_enabled?() && !invitation_registration && !gift_registration &&
             !cardless_trial,
+        signup_trial_days: Billing.signup_trial_days(),
         paypal_trial_days: Billing.paypal_trial_days(),
         invitation_registration: invitation_registration,
         gift_registration: gift_registration,
@@ -364,7 +338,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: true,
             gift_token: gift_tok,
-            cardless_trial: cardless_trial_signup?(conn, attrs)
+            cardless_trial: false
           )
         )
     end
@@ -373,6 +347,7 @@ defmodule RompCrmWeb.UserRegistrationController do
   defp finish_create_cardless_trial(conn, attrs) do
     email = register_email(attrs)
     existed_before? = email != "" and Accounts.get_user_by_email(email) != nil
+    trial_days = Billing.signup_trial_days()
 
     case Accounts.register_user(attrs) do
       {:ok, user} ->
@@ -388,7 +363,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             |> redirect(to: ~p"/subscribe")
 
           true ->
-            case Accounts.apply_cardless_promo_trial(user, 30) do
+            case Accounts.apply_cardless_promo_trial(user, trial_days) do
               {:ok, user} ->
                 {:ok, _} =
                   Accounts.deliver_login_instructions(
@@ -400,7 +375,7 @@ defmodule RompCrmWeb.UserRegistrationController do
                 |> delete_session(:cardless_trial_signup)
                 |> put_flash(
                   :info,
-                  "Check #{user.email} for your sign-in link. You have 30 days of full access without a card; add PayPal on the subscription page before then to keep using the app."
+                  cardless_trial_flash(user.email, trial_days)
                 )
                 |> redirect(to: ~p"/users/log-in")
 
@@ -422,21 +397,18 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: false,
             gift_token: "",
-            cardless_trial: cardless_trial_signup?(conn, attrs)
+            cardless_trial: cardless_trial_signup?(false)
           )
         )
     end
   end
 
-  defp cardless_trial_signup?(conn, email) when is_binary(email) do
-    Billing.paywall_enabled?() and
-      (get_session(conn, :cardless_trial_signup) == true or
-         Billing.cardless_promo_registration_email?(email))
+  defp cardless_trial_flash(email, days) do
+    "Check #{email} for your sign-in link. You have #{days} days of full access with no credit card; subscribe on the subscription page before then to keep using the app."
   end
 
-  defp cardless_trial_signup?(conn, attrs) when is_map(attrs) do
-    cardless_trial_signup?(conn, register_email(attrs))
-  end
+  defp cardless_trial_signup?(false), do: Billing.paywall_enabled?()
+  defp cardless_trial_signup?(true), do: false
 
   defp register_email(attrs) when is_map(attrs) do
     (Map.get(attrs, "email") || Map.get(attrs, :email) || "")
@@ -445,51 +417,28 @@ defmodule RompCrmWeb.UserRegistrationController do
     |> String.downcase()
   end
 
-  defp finish_create(conn, attrs, plan) do
+  defp finish_create(conn, attrs, _plan) do
     case Accounts.register_user(attrs) do
       {:ok, user} ->
-        if Billing.paywall_enabled?() do
-          return_url = fn -> url(conn, ~p"/subscribe/paypal/return") end
-          cancel_url = fn -> url(conn, ~p"/subscribe/paypal/cancel") end
-
-          case Billing.start_paypal_checkout(user, plan, return_url, cancel_url) do
-            {:ok, %{approve_url: approve}} ->
-              conn
-              |> delete_session(:cardless_trial_signup)
-              |> put_session(:pending_paywall_user_id, user.id)
-              |> put_session(:pending_paywall_plan, plan)
-              |> redirect(external: approve)
-
-            {:error, _} ->
-              conn
-              |> put_flash(
-                :error,
-                "Could not start PayPal checkout. Try again in a minute or resume from the subscription page."
-              )
-              |> put_session(:pending_paywall_user_id, user.id)
-              |> put_session(:pending_paywall_plan, plan)
-              |> redirect(to: ~p"/subscribe")
-          end
-        else
-          {:ok, _} =
-            Accounts.deliver_login_instructions(
-              user,
-              &url(~p"/users/log-in/#{&1}")
-            )
-
-          conn
-          |> delete_session(:cardless_trial_signup)
-          |> put_flash(
-            :info,
-            "An email was sent to #{user.email}, please access it to confirm your account."
+        {:ok, _} =
+          Accounts.deliver_login_instructions(
+            user,
+            &url(~p"/users/log-in/#{&1}")
           )
-          |> redirect(to: ~p"/users/log-in")
-        end
+
+        conn
+        |> delete_session(:cardless_trial_signup)
+        |> put_flash(
+          :info,
+          "An email was sent to #{user.email}, please access it to confirm your account."
+        )
+        |> redirect(to: ~p"/users/log-in")
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {invitation_registration?, _} = invitation_context(conn)
         gift_tok = get_session(conn, :pending_gift_token) |> to_string() |> String.trim()
         {gift_reg?, gift_tok2, _} = gift_registration_context(gift_tok)
+        skip_cardless? = gift_reg? or invitation_registration?
 
         render(
           conn,
@@ -499,7 +448,7 @@ defmodule RompCrmWeb.UserRegistrationController do
             invitation_registration: invitation_registration?,
             gift_registration: gift_reg?,
             gift_token: gift_tok2,
-            cardless_trial: cardless_trial_signup?(conn, attrs)
+            cardless_trial: cardless_trial_signup?(skip_cardless?)
           )
         )
     end
