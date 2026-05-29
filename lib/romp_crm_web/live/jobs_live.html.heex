@@ -98,19 +98,7 @@
               />
               <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
               <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
-              <%= if job.photos != [] && job.photos do %>
-                <div class="pt-2 flex flex-wrap gap-2">
-                  <%= for ph <- job.photos do %>
-                    <a href={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)}
-                        alt="Job photo"
-                        class="h-16 w-16 object-cover rounded border border-base-300"
-                      />
-                    </a>
-                  <% end %>
-                </div>
-              <% end %>
+              <.job_photos_section job={job} can_edit_jobs={@can_edit_jobs} />
               <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
               <% total = TimeTracking.format_total_for_job(job.id, @current_business_id) %>
               <div class="pt-2 border-t border-base-300">
@@ -292,19 +280,11 @@
                       edit_keys={@job_expand_editing}
                       wrapper_class="lg:col-span-2 pt-1"
                     />
-                    <%= if job.photos != [] && job.photos do %>
-                      <div class="lg:col-span-2 pt-2 flex flex-wrap gap-2">
-                        <%= for ph <- job.photos do %>
-                          <a href={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)}
-                              alt="Job photo"
-                              class="h-20 w-20 object-cover rounded border border-base-300"
-                            />
-                          </a>
-                        <% end %>
-                      </div>
-                    <% end %>
+                    <.job_photos_section
+                      job={job}
+                      can_edit_jobs={@can_edit_jobs}
+                      wrapper_class="lg:col-span-2 pt-1"
+                    />
                     <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
                     <div class="lg:col-span-2 pt-2 border-t border-base-300">
                       <div class="flex flex-wrap items-center justify-end gap-2 mb-2">
@@ -494,5 +474,13 @@
       patch={~p"/"}
     />
   </.modal>
+<% end %>
+<%= if @add_photos_job_id do %>
+  <.job_add_photos_modal
+    job_id={@add_photos_job_id}
+    client_name={@add_photos_client_name}
+    saved_count={@add_photos_saved_count}
+    upload_url={~p"/jobs/#{@add_photos_job_id}/photos"}
+  />
 <% end %>
 </Layouts.app>

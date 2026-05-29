@@ -450,6 +450,15 @@ defmodule RompCrm.Jobs do
             source_media_url: source_media_url
           })
           |> Repo.insert()
+          |> case do
+            {:ok, photo} ->
+              updated = get_job!(job.id, business_id)
+              broadcast(business_id, {:updated, updated})
+              {:ok, photo}
+
+            other ->
+              other
+          end
         end
       end
     end

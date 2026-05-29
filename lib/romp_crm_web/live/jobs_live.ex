@@ -4,6 +4,8 @@ defmodule RompCrmWeb.JobsLive do
   import RompCrmWeb.JobExpandLists
   import RompCrmWeb.JobExpandedInlineFields
   import RompCrmWeb.JobDeleteBar, only: [job_delete_bar: 1]
+  import RompCrmWeb.JobPhotosSection, only: [job_photos_section: 1]
+  import RompCrmWeb.JobAddPhotosModal, only: [job_add_photos_modal: 1]
 
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
@@ -45,7 +47,10 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:job_time_notes, "")
      |> assign(:log_time_entry_id, nil)
      |> assign(:job_delete_steps, %{})
-     |> assign(:job_expand_editing, MapSet.new())}
+     |> assign(:job_expand_editing, MapSet.new())
+     |> assign(:add_photos_job_id, nil)
+     |> assign(:add_photos_client_name, "")
+     |> assign(:add_photos_saved_count, 0)}
   end
 
   @impl true
@@ -110,6 +115,13 @@ defmodule RompCrmWeb.JobsLive do
   defp refresh_jobs(socket) do
     bid = socket.assigns.current_business_id
     assign(socket, :jobs, Jobs.list_jobs(bid))
+  end
+
+  defp close_add_photos_modal(socket) do
+    socket
+    |> assign(:add_photos_job_id, nil)
+    |> assign(:add_photos_client_name, "")
+    |> assign(:add_photos_saved_count, 0)
   end
 
   defp refresh_time_entries(socket) do
@@ -295,6 +307,44 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:job_time_started_at, "")
      |> assign(:job_time_ended_at, "")
      |> assign(:job_time_notes, "")}
+  end
+
+  def handle_event("open_add_photos", %{"job_id" => job_id}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to upload photos.")}
+    else
+      job_id = String.to_integer(job_id)
+      bid = socket.assigns.current_business_id
+      job = Jobs.get_job!(job_id, bid)
+
+      {:noreply,
+       socket
+       |> assign(:add_photos_job_id, job_id)
+       |> assign(:add_photos_client_name, job.client_name || "Job")
+       |> assign(:add_photos_saved_count, 0)
+       |> assign(:expanded_job_id, job_id)}
+    end
+  end
+
+  def handle_event("close_add_photos", _params, socket) do
+    {:noreply, close_add_photos_modal(socket)}
+  end
+
+  def handle_event("job_photo_uploaded", %{"count" => count}, socket) do
+    count =
+      case Integer.parse(to_string(count)) do
+        {n, _} when n > 0 -> n
+        _ -> 1
+      end
+
+    {:noreply,
+     socket
+     |> assign(:add_photos_saved_count, socket.assigns.add_photos_saved_count + count)
+     |> refresh_jobs()}
+  end
+
+  def handle_event("job_photo_upload_failed", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Could not save photo. Try again.")}
   end
 
   def handle_event("job_time_field", params, socket) do

@@ -43,6 +43,7 @@ defmodule RompCrmWeb.CoreComponents do
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :on_cancel, JS, default: %JS{}
+  attr :cancel_on_click_away, :boolean, default: true
   slot :inner_block, required: true
 
   def modal(assigns) do
@@ -68,7 +69,7 @@ defmodule RompCrmWeb.CoreComponents do
         <div class="flex min-h-full items-center justify-center p-4">
           <div
             id={"#{@id}-container"}
-            phx-click-away={@on_cancel}
+            phx-click-away={@cancel_on_click_away && @on_cancel}
             phx-window-keydown={@on_cancel}
             phx-key="escape"
             data-theme="light"

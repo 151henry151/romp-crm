@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.9.84] - 2026-05-18
+
+### Fixed
+
+- **Web job photos (mobile)**: surface server/nginx upload errors in the modal (including photo too large)
+- **Web job photos**: include `_csrf_token` in multipart POST body as well as the CSRF header
+
+## [0.9.83] - 2026-05-18
+
+### Fixed
+
+- **Web job photos (mobile)**: replace LiveView uploads with direct `fetch` POST to `/jobs/:id/photos` (JSON response); gallery and camera use native overlaid file inputs (iOS-compatible)
+- **Web job photos (mobile)**: show **Use camera** as a native capture input on small screens; desktop keeps webcam capture
+
+## [0.9.82] - 2026-05-18
+
+### Fixed
+
+- **Web job photos (mobile)**: accept all `image/*` types; wrap gallery file input inside the button label (iOS picker registration)
+- **Web job photos (mobile)**: disable modal click-away dismiss so returning from the native camera does not cancel the upload
+- **Web job photos (camera)**: pass upload name `job_photos` to client hooks (was incorrectly using upload ref)
+- **Web job photos (camera)**: on mobile, **Use camera** opens the phone camera directly; on desktop, opens webcam capture automatically
+
+### Changed
+
+- **Web job photos**: save each photo automatically when upload completes; modal shows saved count and a **Done** button instead of manual **Upload N photo(s)**
+
+## [0.9.81] - 2026-05-18
+
+### Added
+
+- **Web job photos**: add **Add photos…** on expanded jobs; modal supports gallery pick, drag-and-drop, webcam capture, and phone camera (`capture="environment"`)
+- **Jobs**: broadcast `{:updated, job}` after a photo is saved so the list refreshes without reload
+
 ## [0.9.80] - 2026-05-29
 
 ### Added
