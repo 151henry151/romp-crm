@@ -22,4 +22,14 @@ defmodule RompCrmWeb.PathPrefix do
       prefix -> String.trim_trailing(prefix, "/") <> normalized_path
     end
   end
+
+  @doc "Public URL for a file under `priv/static/` (e.g. job photo `relative_path`)."
+  def static_upload_path(relative_path) when is_binary(relative_path) do
+    relative_path
+    |> String.trim()
+    |> then(fn p ->
+      if String.starts_with?(p, "/"), do: p, else: "/" <> p
+    end)
+    |> request_path()
+  end
 end

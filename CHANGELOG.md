@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.9.79] - 2026-05-29
+
+### Fixed
+
+- **SMS replies**: when photos were saved but the model's `assistant_sms` is still a "which job?" style question, send the save confirmation instead of the clarify text
+
+## [0.9.78] - 2026-05-29
+
+### Fixed
+
+- **SMS MMS photos**: record Twilio `source_media_url` on `job_photos` and skip re-downloading the same URL on a job (prevents duplicate files when the user clarifies the job in a follow-up text)
+- **SMS AI**: instruct model to ask which job before attaching when ambiguous, and not to re-attach URLs already saved on that job in the thread
+
+## [0.9.77] - 2026-05-29
+
+### Fixed
+
+- **Job photos**: store and serve uploads from persistent `var/static` (or `JOB_PHOTO_STATIC_DIR`) instead of the versioned release `priv/static` tree, so photos survive `mix release` upgrades
+- **Job photos**: add `scripts/migrate-job-photo-uploads-to-var-static.sh` to recover files left under old release directories
+
+## [0.9.76] - 2026-05-29
+
+### Fixed
+
+- **SMS MMS orphan attach**: do not attach photo-only messages using client names from older texts; require a caption on the current MMS; attach only this message's `MediaUrl`, not URLs from prior inbound rows
+
+## [0.9.75] - 2026-05-29
+
+### Fixed
+
+- **SMS MMS**: parse `Content-Type` from Twilio/Req download responses when the header value is a list (e.g. `["image/jpeg"]`), so orphan photo attach no longer crashes the webhook before the reply SMS is sent
+
+## [0.9.74] - 2026-05-29
+
+### Fixed
+
+- **SMS MMS**: store non-empty inbound body text (attachment URLs) when Twilio sends an image-only message; avoid HTTP 500 from blank `body` validation
+- **SMS MMS**: attach photos from current webhook or recent conversation URLs when the AI omits `attach_photo` but job context is inferable from recent messages
+- **Jobs UI**: serve job photo thumbnails and links with the app path prefix (`PathPrefix.static_upload_path/1`)
+
 ## [0.9.73] - 2026-05-20
 
 ### Changed

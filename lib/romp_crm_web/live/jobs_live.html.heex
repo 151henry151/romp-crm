@@ -101,9 +101,9 @@
               <%= if job.photos != [] && job.photos do %>
                 <div class="pt-2 flex flex-wrap gap-2">
                   <%= for ph <- job.photos do %>
-                    <a href={"/" <> ph.relative_path} target="_blank" rel="noopener noreferrer">
+                    <a href={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)} target="_blank" rel="noopener noreferrer">
                       <img
-                        src={"/" <> ph.relative_path}
+                        src={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)}
                         alt="Job photo"
                         class="h-16 w-16 object-cover rounded border border-base-300"
                       />
@@ -295,9 +295,9 @@
                     <%= if job.photos != [] && job.photos do %>
                       <div class="lg:col-span-2 pt-2 flex flex-wrap gap-2">
                         <%= for ph <- job.photos do %>
-                          <a href={"/" <> ph.relative_path} target="_blank" rel="noopener noreferrer">
+                          <a href={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)} target="_blank" rel="noopener noreferrer">
                             <img
-                              src={"/" <> ph.relative_path}
+                              src={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)}
                               alt="Job photo"
                               class="h-20 w-20 object-cover rounded border border-base-300"
                             />

@@ -241,6 +241,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     On **job updates**, put **only newly added** material lines in **`updates.materials`** — the server **appends** them after existing rows. Do **not** repeat unchanged snapshot materials (that would duplicate lines).
 
     **Attach photo (MMS):** When the inbound message includes Twilio image URL(s) and the user is adding a picture to an existing job, include `"intent": "attach_photo"`, `"job_id": <int>`, `"media_url": "<exact URL from message>"` (or `"media_urls": [...]`), optional `"work_item_title": "<substring of a work item title>"` to attach to that line item.
+    If the contractor is only answering **which job** photos belong to (text reply, no new images), attach each URL **once** — omit URLs you already attached to that `job_id` in this thread. When several jobs could match, use **empty** `job_actions` and ask one clarifying question in **`assistant_sms`** (do not attach until the job is clear).
 
     Optional fallback when you truly cannot pick an id: `"match"` + `"updates"` (same as job-only flow).
 

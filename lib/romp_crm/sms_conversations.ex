@@ -92,6 +92,22 @@ defmodule RompCrm.SmsConversations do
     |> Enum.join("\n")
   end
 
+  @doc "Recent inbound message bodies (newest first), for MMS job/photo inference."
+  def recent_inbound_bodies(business_id, phone_normalized, opts \\ [])
+      when is_integer(business_id) and is_binary(phone_normalized) do
+    limit = Keyword.get(opts, :limit, 5)
+
+    Repo.all(
+      from m in Message,
+        where: m.business_id == ^business_id,
+        where: m.phone_normalized == ^phone_normalized,
+        where: m.direction == "inbound",
+        order_by: [desc: m.id],
+        limit: ^limit,
+        select: m.body
+    )
+  end
+
   @doc """
   Append the current inbound SMS and the assistant reply we sent (two rows, one transaction).
 
@@ -104,27 +120,24 @@ defmodule RompCrm.SmsConversations do
     outbound_body = String.slice(String.trim(outbound_body), 0, 6000)
 
     Repo.transaction(fn ->
-      %Message{}
-      |> Message.changeset(%{
-        business_id: business_id,
-        user_id: user_id,
-        phone_normalized: phone_normalized,
-        direction: "inbound",
-        body: inbound_body
-      })
-      |> Repo.insert!()
-
-      %Message{}
-      |> Message.changeset(%{
-        business_id: business_id,
-        user_id: user_id,
-        phone_normalized: phone_normalized,
-        direction: "outbound",
-        body: outbound_body
-      })
-      |> Repo.insert!()
-
-      :ok
+      with {:ok, _} <- insert_message(business_id, user_id, phone_normalized, "inbound", inbound_body),
+           {:ok, _} <- insert_message(business_id, user_id, phone_normalized, "outbound", outbound_body) do
+        :ok
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
     end)
+  end
+
+  defp insert_message(business_id, user_id, phone_normalized, direction, body) do
+    %Message{}
+    |> Message.changeset(%{
+      business_id: business_id,
+      user_id: user_id,
+      phone_normalized: phone_normalized,
+      direction: direction,
+      body: body
+    })
+    |> Repo.insert()
   end
 end

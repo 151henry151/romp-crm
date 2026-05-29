@@ -328,5 +328,21 @@ defmodule RompCrm.JobsTest do
 
       assert got.id == j.id
     end
+
+    test "add_job_photo skips duplicate source_media_url on same job" do
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+      bytes = :crypto.strong_rand_bytes(64)
+
+      assert {:ok, _} =
+               Jobs.add_job_photo(job, b.id, bytes, "image/jpeg", nil,
+                 source_media_url: "https://api.twilio.com/2010-04-01/Accounts/AC/Media/ME1"
+               )
+
+      assert {:ok, :duplicate_skipped} =
+               Jobs.add_job_photo(job, b.id, bytes, "image/jpeg", nil,
+                 source_media_url: "https://api.twilio.com/2010-04-01/Accounts/AC/Media/ME1"
+               )
+    end
   end
 end

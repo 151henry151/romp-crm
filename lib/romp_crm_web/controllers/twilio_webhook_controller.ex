@@ -16,6 +16,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Jobs.Job
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
+  alias RompCrm.SmsMms
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -224,6 +225,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   defp deliver_inbound_sms(conn, user, business_id) do
     body_text = (conn.body_params["Body"] || "") |> to_string()
+    body_stored = SmsMms.body_for_storage(body_text, conn.body_params)
     body_for_ai = inbound_sms_body_for_extraction(body_text, conn.body_params)
     from = conn.body_params["From"] |> to_string()
     to_num = conn.body_params["To"] |> to_string()
@@ -298,20 +300,48 @@ defmodule RompCrmWeb.TwilioWebhookController do
             reply =
               "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
               Map.merge(log_base, %{outcome: "permission_denied", results: []})
             )
 
           all_ops == [] ->
-            msg = first_nonempty([assistant])
+            results =
+              append_orphan_mms_attach(
+                [],
+                business_id,
+                phone_norm,
+                body_text,
+                conn.body_params,
+                jobs_snapshot
+              )
 
-            reply =
-              msg ||
-                "No changes applied. Open Romp CRM or include clearer job/time details."
+            if results != [] do
+              combined_assistant = first_nonempty([assistant])
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
-              Map.merge(log_base, %{outcome: "no_db_operations", results: []})
-            )
+              reply =
+                SmsReplyBuilder.compose(combined_assistant, results) ||
+                  "Photo saved."
+
+              record_sms_db_audits(business_id, user.id, %{
+                twilio_message_sid: message_sid,
+                sms_inbound: body_stored,
+                sms_outbound: reply
+              }, results)
+
+              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+                Map.merge(log_base, %{outcome: "operations_applied", results: results})
+              )
+            else
+              msg = first_nonempty([assistant])
+
+              reply =
+                msg ||
+                  "No changes applied. Open Romp CRM or include clearer job/time details."
+
+              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+                Map.merge(log_base, %{outcome: "no_db_operations", results: []})
+              )
+            end
 
           true ->
             Logger.info(
@@ -326,7 +356,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               user_id: user.id,
               sms_audit_base: %{
                 twilio_message_sid: message_sid,
-                sms_inbound: body_text
+                sms_inbound: body_stored
               }
             }
 
@@ -339,21 +369,55 @@ defmodule RompCrmWeb.TwilioWebhookController do
                    allowed_employee_ids
                  ) do
               {:clarify, msg} ->
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, msg,
-                  Map.merge(log_base, %{outcome: "clarify", results: []})
-                )
+                results =
+                  append_orphan_mms_attach(
+                    [],
+                    business_id,
+                    phone_norm,
+                    body_text,
+                    conn.body_params,
+                    jobs_snapshot
+                  )
+
+                if results != [] do
+                  reply = SmsReplyBuilder.compose(msg, results) || "Photo saved."
+
+                  record_sms_db_audits(business_id, user.id, %{
+                    twilio_message_sid: message_sid,
+                    sms_inbound: body_stored,
+                    sms_outbound: reply
+                  }, results)
+
+                  sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+                    Map.merge(log_base, %{outcome: "operations_applied", results: results})
+                  )
+                else
+                  sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, msg,
+                    Map.merge(log_base, %{outcome: "clarify", results: []})
+                  )
+                end
 
               {:ok, all_results} ->
+                all_results =
+                  append_orphan_mms_attach(
+                    all_results,
+                    business_id,
+                    phone_norm,
+                    body_text,
+                    conn.body_params,
+                    jobs_snapshot
+                  )
+
                 combined_assistant = first_nonempty([assistant])
                 reply = SmsReplyBuilder.compose(combined_assistant, all_results)
 
                 record_sms_db_audits(business_id, user.id, %{
                   twilio_message_sid: message_sid,
-                  sms_inbound: body_text,
+                  sms_inbound: body_stored,
                   sms_outbound: reply
                 }, all_results)
 
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply,
+                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
                   Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
                 )
             end
@@ -366,7 +430,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
         reply = sms_extraction_failed_reply(reason)
 
-        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_text, reply, %{
+        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
           message_sid: message_sid,
           outcome: "extraction_error",
           planned_job_ops: [],
@@ -385,13 +449,46 @@ defmodule RompCrmWeb.TwilioWebhookController do
          user,
          business_id,
          phone_norm,
-         inbound_body,
+         inbound_stored_body,
          reply_text,
          _log_extra
        ) do
     _ = Messages.send_sms(from, reply_text)
-    maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, reply_text)
+    maybe_record_sms_exchange(business_id, user, phone_norm, inbound_stored_body, reply_text)
     twiml_ok(conn)
+  end
+
+  defp append_orphan_mms_attach(results, business_id, phone_norm, body_text, params, jobs_snapshot)
+       when is_list(results) and is_list(jobs_snapshot) do
+    case SmsMms.maybe_attach_orphan_mms(
+           results,
+           business_id,
+           phone_norm,
+           body_text,
+           params,
+           jobs_snapshot
+         ) do
+      {:ok, {:photos_saved, %Job{} = job, saved, attempted}} ->
+        Logger.info(
+          "Twilio SMS orphan MMS attach: business_id=#{business_id} job_id=#{job.id} saved=#{saved}"
+        )
+
+        results ++ [{:photos_saved, job, saved, attempted}]
+
+      :skip ->
+        results
+
+      {:error, reason} ->
+        Logger.warning("Twilio SMS orphan MMS attach failed: #{inspect(reason)}")
+        results
+    end
+  rescue
+    e ->
+      Logger.error(
+        "Twilio SMS orphan MMS attach crashed: business_id=#{business_id} #{Exception.format(:error, e, __STACKTRACE__)}"
+      )
+
+      results
   end
 
   defp filter_sms_operations_by_permissions(job_ops, time_ops, emp_ops, rem_ops, caps) do
@@ -993,11 +1090,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
               end
 
             results = Enum.map(urls, fn url -> Jobs.add_job_photo_from_url(job, business_id, url, wi_id) end)
-            ok_ct = Enum.count(results, &match?({:ok, _}, &1))
 
-            if ok_ct > 0 do
+            ok_ct = Enum.count(results, &match?({:ok, %RompCrm.Jobs.JobPhoto{}}, &1))
+            skip_ct = Enum.count(results, &match?({:ok, :duplicate_skipped}, &1))
+
+            if ok_ct > 0 or skip_ct == length(urls) do
               Logger.info(
-                "Twilio SMS attach_photos applied: sid=#{message_sid} op_index=#{idx} job_id=#{job.id} saved=#{ok_ct}/#{length(urls)}"
+                "Twilio SMS attach_photos applied: sid=#{message_sid} op_index=#{idx} job_id=#{job.id} saved=#{ok_ct} skipped=#{skip_ct}/#{length(urls)}"
               )
 
               {:photos_saved, job, ok_ct, length(urls)}

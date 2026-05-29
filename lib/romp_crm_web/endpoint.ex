@@ -16,6 +16,9 @@ defmodule RompCrmWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+  # Job photos live outside the release tree (see `JOB_PHOTO_STATIC_DIR` / `var/static`).
+  plug RompCrmWeb.Plugs.StaticJobPhotoUploads
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # When code reloading is disabled (e.g., in production),

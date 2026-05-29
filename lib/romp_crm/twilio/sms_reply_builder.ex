@@ -16,6 +16,7 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
   """
   def compose(assistant_sms \\ nil, results) when is_list(results) do
     summary = summarize_results(results)
+    assistant = assistant_sms |> to_string() |> String.trim()
 
     failure_ct =
       Enum.count(results, fn r ->
@@ -27,8 +28,11 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
         failure_ct > 0 and summary != "" ->
           summary
 
-        is_binary(assistant_sms) and String.trim(assistant_sms) != "" ->
-          String.trim(assistant_sms)
+        photos_saved?(results) and clarifying_assistant_sms?(assistant) and summary != "" ->
+          summary
+
+        assistant != "" ->
+          assistant
 
         summary != "" ->
           summary
@@ -39,6 +43,24 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
 
     base |> merge_with_failures(failure_ct) |> truncate()
   end
+
+  defp photos_saved?(results) do
+    Enum.any?(results, fn
+      {:photos_saved, %Job{}, saved, _attempted} when is_integer(saved) and saved > 0 -> true
+      _ -> false
+    end)
+  end
+
+  defp clarifying_assistant_sms?(text) when is_binary(text) do
+    t = String.downcase(text)
+
+    String.contains?(text, "?") or
+      (String.contains?(t, "which job") and String.contains?(t, "photo")) or
+      (String.contains?(t, "which client") and String.contains?(t, "photo")) or
+      String.contains?(t, "or one of the other")
+  end
+
+  defp clarifying_assistant_sms?(_), do: false
 
   defp merge_with_failures(text, 0), do: text
 

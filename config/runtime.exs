@@ -32,6 +32,15 @@ if config_env() == :prod do
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
+  job_photo_static_dir =
+    case System.get_env("JOB_PHOTO_STATIC_DIR") |> to_string() |> String.trim() do
+      "" -> Path.expand("var/static", File.cwd!())
+      path -> Path.expand(path)
+    end
+
+  File.mkdir_p!(Path.join(job_photo_static_dir, "uploads"))
+  config :romp_crm, :job_photo_static_dir, job_photo_static_dir
+
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """

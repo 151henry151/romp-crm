@@ -409,9 +409,15 @@ defmodule RompCrm.Jobs do
 
   @doc """
   Saves a photo for a job (optionally scoped to a work item). Writes under **`priv/static/uploads/job-photos/`**.
+
+  Options:
+
+    * `:source_media_url` — Twilio MMS URL; skips insert when that URL is already stored on this job
   """
-  def add_job_photo(%Job{} = job, business_id, bytes, content_type, work_item_id \\ nil)
+  def add_job_photo(%Job{} = job, business_id, bytes, content_type, work_item_id \\ nil, opts \\ [])
       when is_integer(business_id) and is_binary(bytes) do
+    source_media_url = Keyword.get(opts, :source_media_url)
+
     if job.business_id != business_id do
       {:error, :wrong_business}
     else
@@ -424,25 +430,42 @@ defmodule RompCrm.Jobs do
       if work_item_id == :invalid do
         {:error, :invalid_work_item}
       else
-        ext = ext_from_content_type(content_type)
-        id_str = Ecto.UUID.generate()
-        rel = "uploads/job-photos/#{business_id}/#{job.id}/#{id_str}#{ext}"
-        abs = RompCrm.JobUploads.absolute_path(rel)
-        :ok = File.mkdir_p(Path.dirname(abs))
-        :ok = File.write!(abs, bytes)
+        if duplicate_source_media_url?(job.id, source_media_url) do
+          {:ok, :duplicate_skipped}
+        else
+          ext = ext_from_content_type(content_type)
+          id_str = Ecto.UUID.generate()
+          rel = "uploads/job-photos/#{business_id}/#{job.id}/#{id_str}#{ext}"
+          abs = RompCrm.JobUploads.absolute_path(rel)
+          :ok = File.mkdir_p(Path.dirname(abs))
+          :ok = File.write!(abs, bytes)
 
-        %JobPhoto{}
-        |> JobPhoto.changeset(%{
-          job_id: job.id,
-          job_work_item_id: work_item_id,
-          relative_path: rel,
-          content_type: content_type,
-          byte_size: byte_size(bytes)
-        })
-        |> Repo.insert()
+          %JobPhoto{}
+          |> JobPhoto.changeset(%{
+            job_id: job.id,
+            job_work_item_id: work_item_id,
+            relative_path: rel,
+            content_type: content_type,
+            byte_size: byte_size(bytes),
+            source_media_url: source_media_url
+          })
+          |> Repo.insert()
+        end
       end
     end
   end
+
+  defp duplicate_source_media_url?(job_id, url) when is_integer(job_id) and is_binary(url) do
+    url = String.trim(url)
+
+    url != "" and
+      Repo.exists?(
+        from p in JobPhoto,
+          where: p.job_id == ^job_id and p.source_media_url == ^url
+      )
+  end
+
+  defp duplicate_source_media_url?(_job_id, _url), do: false
 
   defp verify_work_item_belongs(job_id, wi_id) do
     case Repo.get_by(JobWorkItem, id: wi_id, job_id: job_id) do
@@ -475,16 +498,23 @@ defmodule RompCrm.Jobs do
     else
       auth = Base.encode64("#{account_sid}:#{token}")
 
-      case Req.get(url, headers: [{"authorization", "Basic #{auth}"}], receive_timeout: 60_000) do
-        {:ok, %{status: 200, body: body, headers: h}} when is_binary(body) ->
-          ct = content_type_from_headers(h)
-          add_job_photo(job, business_id, body, ct, work_item_id)
+      if duplicate_source_media_url?(job.id, url) do
+        {:ok, :duplicate_skipped}
+      else
+        case Req.get(url, headers: [{"authorization", "Basic #{auth}"}], receive_timeout: 60_000) do
+          {:ok, %{status: 200, body: body, headers: h}} when is_binary(body) ->
+            ct = content_type_from_headers(h)
 
-        {:ok, %{status: s}} ->
-          {:error, {:download_failed, s}}
+            add_job_photo(job, business_id, body, ct, work_item_id,
+              source_media_url: String.trim(url)
+            )
 
-        {:error, reason} ->
-          {:error, {:download_failed, reason}}
+          {:ok, %{status: s}} ->
+            {:error, {:download_failed, s}}
+
+          {:error, reason} ->
+            {:error, {:download_failed, reason}}
+        end
       end
     end
   end
@@ -492,11 +522,22 @@ defmodule RompCrm.Jobs do
   defp content_type_from_headers(headers) do
     headers
     |> Enum.find_value("image/jpeg", fn
-      {"content-type", v} -> List.first(String.split(v, ";"))
-      {"Content-Type", v} -> List.first(String.split(v, ";"))
+      {"content-type", v} -> content_type_primary(v)
+      {"Content-Type", v} -> content_type_primary(v)
       _ -> nil
     end)
   end
+
+  defp content_type_primary(v) do
+    case header_value_to_string(v) do
+      "" -> nil
+      s -> s |> String.trim() |> String.split(";") |> List.first()
+    end
+  end
+
+  defp header_value_to_string(v) when is_binary(v), do: v
+  defp header_value_to_string([h | _]) when is_binary(h), do: h
+  defp header_value_to_string(_), do: ""
 
   defp normalize_job_nested_attrs(attrs) when is_map(attrs) do
     attrs = stringify_keys_shallow(attrs)

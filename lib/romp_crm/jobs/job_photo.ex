@@ -9,14 +9,23 @@ defmodule RompCrm.Jobs.JobPhoto do
     field :relative_path, :string
     field :content_type, :string
     field :byte_size, :integer
+    field :source_media_url, :string
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(row, attrs) do
     row
-    |> cast(attrs, [:job_id, :job_work_item_id, :relative_path, :content_type, :byte_size])
+    |> cast(attrs, [
+      :job_id,
+      :job_work_item_id,
+      :relative_path,
+      :content_type,
+      :byte_size,
+      :source_media_url
+    ])
     |> validate_required([:job_id, :relative_path])
     |> validate_length(:relative_path, max: 500)
+    |> validate_length(:source_media_url, max: 500)
   end
 end
