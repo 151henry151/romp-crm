@@ -17,7 +17,9 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.SmsMms
+  alias RompCrm.SmsPendingJobProposals
   alias RompCrm.TimeTracking
+  alias RompCrm.Twilio.MmsImageDownload
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
   alias RompCrm.Twilio.Signature
@@ -255,13 +257,106 @@ defmodule RompCrmWeb.TwilioWebhookController do
       |> Reminders.decode_prefs_json()
       |> Map.get("timezone", "America/New_York")
 
+    if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
+      case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
+        {:ok, results} ->
+          reply =
+            SmsReplyBuilder.compose(nil, results)
+            |> case do
+              "" -> "Confirmed—created the proposed job(s) in Romp CRM."
+              r -> r
+            end
+
+          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "pending_proposals_confirmed",
+            results: results
+          })
+
+        :none ->
+          :continue_extract
+
+        {:error, :wrong_user} ->
+          reply = "Couldn't apply pending jobs for this account."
+
+          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "pending_proposals_wrong_user",
+            results: []
+          })
+      end
+    else
+      :continue_extract
+    end
+    |> case do
+      %Plug.Conn{} = done_conn ->
+        done_conn
+
+      :continue_extract ->
+        mms_urls = SmsMms.media_urls_from_params(conn.body_params)
+
+        mms_image_blocks =
+          mms_urls
+          |> MmsImageDownload.fetch_for_vision()
+          |> tap(fn blocks ->
+            if mms_urls != [] and blocks == [] do
+              Logger.warning(
+                "Twilio SMS MMS vision: sid=#{message_sid} could not download #{length(mms_urls)} image(s) for analysis"
+              )
+            end
+          end)
+
+        extract_and_deliver_sms_ops(
+          conn,
+          user,
+          business_id,
+          from,
+          phone_norm,
+          body_text,
+          body_stored,
+          body_for_ai,
+          message_sid,
+          jobs_snapshot,
+          allowed_job_ids,
+          open_time_entries,
+          employees_snapshot,
+          allowed_employee_ids,
+          prior_turns,
+          reminder_wall_tz,
+          mms_urls,
+          mms_image_blocks
+        )
+    end
+  end
+
+  defp extract_and_deliver_sms_ops(
+         conn,
+         user,
+         business_id,
+         from,
+         phone_norm,
+         body_text,
+         body_stored,
+         body_for_ai,
+         message_sid,
+         jobs_snapshot,
+         allowed_job_ids,
+         open_time_entries,
+         employees_snapshot,
+         allowed_employee_ids,
+         prior_turns,
+         reminder_wall_tz,
+         mms_urls,
+         mms_image_blocks
+       ) do
     case SmsUnifiedInboundExtractor.extract(
            body_for_ai,
            jobs_snapshot,
            open_time_entries,
            employees_snapshot,
            prior_turns,
-           reminder_wall_tz: reminder_wall_tz
+           reminder_wall_tz: reminder_wall_tz,
+           mms_image_blocks: mms_image_blocks
          ) do
       {:ok,
        %{
@@ -269,158 +364,56 @@ defmodule RompCrmWeb.TwilioWebhookController do
          job_operations: job_ops_raw,
          time_operations: time_ops_raw,
          emp_operations: emp_ops_raw,
-         reminder_operations: rem_ops_raw
+         reminder_operations: rem_ops_raw,
+         proposed_job_creates: proposed_raw,
+         image_kind: image_kind
        }} ->
-        caps = EmployeePermissions.for(user, business_id)
+        proposed = fill_proposal_media_urls(proposed_raw, mms_urls)
 
-        {job_ops, time_ops, emp_ops, rem_ops} =
-          filter_sms_operations_by_permissions(
+        if proposed != [] do
+          SmsPendingJobProposals.store!(
+            business_id,
+            user.id,
+            phone_norm,
+            image_kind,
+            proposed
+          )
+
+          Logger.info(
+            "Twilio SMS proposed job creates: sid=#{message_sid} business_id=#{business_id} count=#{length(proposed)} image_kind=#{inspect(image_kind)}"
+          )
+
+          reply =
+            first_nonempty([assistant]) ||
+              default_proposal_reply(proposed)
+
+          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "proposed_job_creates",
+            proposed_count: length(proposed),
+            image_kind: image_kind,
+            results: []
+          })
+        else
+          deliver_extracted_sms_ops(
+            conn,
+            user,
+            business_id,
+            from,
+            phone_norm,
+            body_text,
+            body_stored,
+            message_sid,
+            jobs_snapshot,
+            allowed_job_ids,
+            allowed_employee_ids,
+            assistant,
             job_ops_raw,
             time_ops_raw,
             emp_ops_raw,
             rem_ops_raw,
-            caps
+            conn.body_params
           )
-
-        had_extracted_ops =
-          job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != []
-
-        all_ops = job_ops ++ time_ops ++ emp_ops ++ rem_ops
-
-        log_base = %{
-          message_sid: message_sid,
-          planned_job_ops: job_ops_raw,
-          planned_time_ops: time_ops_raw,
-          planned_emp_ops: emp_ops_raw,
-          planned_reminder_ops: rem_ops_raw
-        }
-
-        cond do
-          all_ops == [] and had_extracted_ops ->
-            reply =
-              "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
-
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
-              Map.merge(log_base, %{outcome: "permission_denied", results: []})
-            )
-
-          all_ops == [] ->
-            results =
-              append_orphan_mms_attach(
-                [],
-                business_id,
-                phone_norm,
-                body_text,
-                conn.body_params,
-                jobs_snapshot
-              )
-
-            if results != [] do
-              combined_assistant = first_nonempty([assistant])
-
-              reply =
-                SmsReplyBuilder.compose(combined_assistant, results) ||
-                  "Photo saved."
-
-              record_sms_db_audits(business_id, user.id, %{
-                twilio_message_sid: message_sid,
-                sms_inbound: body_stored,
-                sms_outbound: reply
-              }, results)
-
-              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
-                Map.merge(log_base, %{outcome: "operations_applied", results: results})
-              )
-            else
-              msg = first_nonempty([assistant])
-
-              reply =
-                msg ||
-                  "No changes applied. Open Romp CRM or include clearer job/time details."
-
-              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
-                Map.merge(log_base, %{outcome: "no_db_operations", results: []})
-              )
-            end
-
-          true ->
-            Logger.info(
-              "Twilio SMS parsed operations: sid=#{message_sid} count=#{length(all_ops)} from=#{from}"
-            )
-
-            job_ctx = %{
-              message_sid: message_sid,
-              from: from,
-              business_id: business_id,
-              allowed_job_ids: allowed_job_ids,
-              user_id: user.id,
-              sms_audit_base: %{
-                twilio_message_sid: message_sid,
-                sms_inbound: body_stored
-              }
-            }
-
-            case run_all_operations(
-                   job_ops,
-                   time_ops,
-                   emp_ops,
-                   rem_ops,
-                   job_ctx,
-                   allowed_employee_ids
-                 ) do
-              {:clarify, msg} ->
-                results =
-                  append_orphan_mms_attach(
-                    [],
-                    business_id,
-                    phone_norm,
-                    body_text,
-                    conn.body_params,
-                    jobs_snapshot
-                  )
-
-                if results != [] do
-                  reply = SmsReplyBuilder.compose(msg, results) || "Photo saved."
-
-                  record_sms_db_audits(business_id, user.id, %{
-                    twilio_message_sid: message_sid,
-                    sms_inbound: body_stored,
-                    sms_outbound: reply
-                  }, results)
-
-                  sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
-                    Map.merge(log_base, %{outcome: "operations_applied", results: results})
-                  )
-                else
-                  sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, msg,
-                    Map.merge(log_base, %{outcome: "clarify", results: []})
-                  )
-                end
-
-              {:ok, all_results} ->
-                all_results =
-                  append_orphan_mms_attach(
-                    all_results,
-                    business_id,
-                    phone_norm,
-                    body_text,
-                    conn.body_params,
-                    jobs_snapshot
-                  )
-
-                combined_assistant = first_nonempty([assistant])
-                reply = SmsReplyBuilder.compose(combined_assistant, all_results)
-
-                record_sms_db_audits(business_id, user.id, %{
-                  twilio_message_sid: message_sid,
-                  sms_inbound: body_stored,
-                  sms_outbound: reply
-                }, all_results)
-
-                sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
-                  Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
-                )
-            end
         end
 
       {:error, reason} ->
@@ -441,6 +434,197 @@ defmodule RompCrmWeb.TwilioWebhookController do
           results: []
         })
     end
+  end
+
+  defp deliver_extracted_sms_ops(
+         conn,
+         user,
+         business_id,
+         from,
+         phone_norm,
+         body_text,
+         body_stored,
+         message_sid,
+         jobs_snapshot,
+         allowed_job_ids,
+         allowed_employee_ids,
+         assistant,
+         job_ops_raw,
+         time_ops_raw,
+         emp_ops_raw,
+         rem_ops_raw,
+         body_params
+       ) do
+    caps = EmployeePermissions.for(user, business_id)
+
+    {job_ops, time_ops, emp_ops, rem_ops} =
+      filter_sms_operations_by_permissions(
+        job_ops_raw,
+        time_ops_raw,
+        emp_ops_raw,
+        rem_ops_raw,
+        caps
+      )
+
+    had_extracted_ops =
+      job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != []
+
+    all_ops = job_ops ++ time_ops ++ emp_ops ++ rem_ops
+
+    log_base = %{
+      message_sid: message_sid,
+      planned_job_ops: job_ops_raw,
+      planned_time_ops: time_ops_raw,
+      planned_emp_ops: emp_ops_raw,
+      planned_reminder_ops: rem_ops_raw
+    }
+
+    cond do
+      all_ops == [] and had_extracted_ops ->
+        reply =
+          "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
+
+        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+          Map.merge(log_base, %{outcome: "permission_denied", results: []})
+        )
+
+      all_ops == [] ->
+        results =
+          append_orphan_mms_attach(
+            [],
+            business_id,
+            phone_norm,
+            body_text,
+            body_params,
+            jobs_snapshot
+          )
+
+        if results != [] do
+          combined_assistant = first_nonempty([assistant])
+
+          reply =
+            SmsReplyBuilder.compose(combined_assistant, results) ||
+              "Photo saved."
+
+          record_sms_db_audits(business_id, user.id, %{
+            twilio_message_sid: message_sid,
+            sms_inbound: body_stored,
+            sms_outbound: reply
+          }, results)
+
+          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+            Map.merge(log_base, %{outcome: "operations_applied", results: results})
+          )
+        else
+          msg = first_nonempty([assistant])
+
+          reply =
+            msg ||
+              "No changes applied. Open Romp CRM or include clearer job/time details."
+
+          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+            Map.merge(log_base, %{outcome: "no_db_operations", results: []})
+          )
+        end
+
+      true ->
+        Logger.info(
+          "Twilio SMS parsed operations: sid=#{message_sid} count=#{length(all_ops)} from=#{from}"
+        )
+
+        job_ctx = %{
+          message_sid: message_sid,
+          from: from,
+          business_id: business_id,
+          allowed_job_ids: allowed_job_ids,
+          user_id: user.id,
+          sms_audit_base: %{
+            twilio_message_sid: message_sid,
+            sms_inbound: body_stored
+          }
+        }
+
+        case run_all_operations(
+               job_ops,
+               time_ops,
+               emp_ops,
+               rem_ops,
+               job_ctx,
+               allowed_employee_ids
+             ) do
+          {:clarify, msg} ->
+            results =
+              append_orphan_mms_attach(
+                [],
+                business_id,
+                phone_norm,
+                body_text,
+                body_params,
+                jobs_snapshot
+              )
+
+            if results != [] do
+              reply = SmsReplyBuilder.compose(msg, results) || "Photo saved."
+
+              record_sms_db_audits(business_id, user.id, %{
+                twilio_message_sid: message_sid,
+                sms_inbound: body_stored,
+                sms_outbound: reply
+              }, results)
+
+              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+                Map.merge(log_base, %{outcome: "operations_applied", results: results})
+              )
+            else
+              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, msg,
+                Map.merge(log_base, %{outcome: "clarify", results: []})
+              )
+            end
+
+          {:ok, all_results} ->
+            all_results =
+              append_orphan_mms_attach(
+                all_results,
+                business_id,
+                phone_norm,
+                body_text,
+                body_params,
+                jobs_snapshot
+              )
+
+            combined_assistant = first_nonempty([assistant])
+            reply = SmsReplyBuilder.compose(combined_assistant, all_results)
+
+            record_sms_db_audits(business_id, user.id, %{
+              twilio_message_sid: message_sid,
+              sms_inbound: body_stored,
+              sms_outbound: reply
+            }, all_results)
+
+            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+              Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
+            )
+        end
+    end
+  end
+
+  defp fill_proposal_media_urls(proposals, mms_urls) when is_list(proposals) do
+    Enum.map(proposals, fn %{job_attrs: attrs, attach_media_urls: urls} ->
+      urls = if urls == [], do: mms_urls, else: urls
+      %{job_attrs: attrs, attach_media_urls: urls}
+    end)
+  end
+
+  defp default_proposal_reply(proposals) when is_list(proposals) do
+    lines =
+      proposals
+      |> Enum.with_index(1)
+      |> Enum.map_join("\n", fn {%{job_attrs: attrs}, i} ->
+        name = Map.get(attrs, :client_name) || Map.get(attrs, "client_name") || "Lead"
+        "#{i}) #{name}"
+      end)
+
+    "I read #{length(proposals)} lead(s) from the image:\n#{lines}\nReply CONFIRM to create these in Romp CRM."
   end
 
   defp sms_reply_and_log(

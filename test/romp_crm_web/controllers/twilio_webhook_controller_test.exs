@@ -323,6 +323,63 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
     assert Jobs.get_job!(job.id, biz_b.id).address == "Via picker routing"
   end
 
+  test "POST /webhooks/twilio/sms stores proposed creates until CONFIRM", %{
+    conn: conn,
+    sms_business: biz
+  } do
+    propose_body =
+      "STUB_PROPOSE " <>
+        Jason.encode!(%{
+          "assistant_sms" =>
+            "I read a text from Jimmy Wang. Reply CONFIRM to create this lead.",
+          "image_kind" => "sms_screenshot",
+          "proposed_job_creates" => [
+            %{
+              "job" => %{
+                "client_name" => "Jimmy Wang",
+                "address" => "123 Bonehead Drive",
+                "work_description" => "Leaking sink faucet",
+                "status" => "lead"
+              },
+              "attach_media_urls" => []
+            }
+          ],
+          "job_actions" => [],
+          "time_actions" => [],
+          "employee_actions" => [],
+          "reminder_actions" => []
+        })
+
+    log =
+      capture_log([level: :info], fn ->
+        conn =
+          post(conn, ~p"/webhooks/twilio/sms", %{
+            "Body" => propose_body,
+            "From" => "+15555550123",
+            "MessageSid" => "SMstubpropose1"
+          })
+
+        assert response(conn, 200) =~ "<Response>"
+      end)
+
+    assert log =~ "proposed job creates"
+    refute Jobs.list_jobs(biz.id) |> Enum.any?(&(&1.client_name == "Jimmy Wang"))
+
+    capture_log([level: :info], fn ->
+      conn =
+        build_conn()
+        |> post(~p"/webhooks/twilio/sms", %{
+          "Body" => "confirm",
+          "From" => "+15555550123",
+          "MessageSid" => "SMstubconfirm1"
+        })
+
+      assert response(conn, 200) =~ "<Response>"
+    end)
+
+    assert Jobs.list_jobs(biz.id) |> Enum.any?(&(&1.client_name == "Jimmy Wang"))
+  end
+
   test "POST /webhooks/twilio/voice returns TwiML Dial to configured forward number", %{
     conn: conn
   } do

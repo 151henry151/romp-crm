@@ -10,15 +10,17 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         open_te_snapshot \\ [],
         employees_snapshot \\ [],
         prior_turns \\ [],
-        _opts \\ []
+        opts \\ []
       )
-      when is_binary(raw_message) and is_list(prior_turns) do
+      when is_binary(raw_message) and is_list(prior_turns) and is_list(opts) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
     model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}
     else
+      mms_image_blocks = Keyword.get(opts, :mms_image_blocks, [])
+
       call_claude(
         api_key,
         model,
@@ -26,7 +28,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         jobs_snapshot,
         open_te_snapshot,
         employees_snapshot,
-        prior_turns
+        prior_turns,
+        mms_image_blocks
       )
     end
   end
@@ -38,8 +41,19 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          jobs_snapshot,
          open_te_snapshot,
          employees_snapshot,
-         prior_turns
+         prior_turns,
+         mms_image_blocks
        ) do
+    user_blocks =
+      build_user_content_blocks(
+        raw_message,
+        jobs_snapshot,
+        open_te_snapshot,
+        employees_snapshot,
+        prior_turns,
+        mms_image_blocks
+      )
+
     body = %{
       model: model,
       max_tokens: 8192,
@@ -47,14 +61,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       messages: [
         %{
           role: "user",
-          content:
-            user_content(
-              raw_message,
-              jobs_snapshot,
-              open_te_snapshot,
-              employees_snapshot,
-              prior_turns
-            )
+          content: user_blocks
         }
       ]
     }
@@ -115,7 +122,32 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     end
   end
 
-  defp user_content(
+  defp build_user_content_blocks(
+         raw_message,
+         jobs_snapshot,
+         open_te_snapshot,
+         employees_snapshot,
+         prior_turns,
+         mms_image_blocks
+       ) do
+    text = user_content_text(raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot, prior_turns)
+
+    image_blocks =
+      Enum.map(mms_image_blocks, fn %{media_type: mt, data: b64} ->
+        %{
+          type: "image",
+          source: %{
+            type: "base64",
+            media_type: mt,
+            data: b64
+          }
+        }
+      end)
+
+    image_blocks ++ [%{type: "text", text: text}]
+  end
+
+  defp user_content_text(
          raw_message,
          jobs_snapshot,
          open_te_snapshot,
@@ -210,6 +242,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     ## Output shape (always)
     {
       "assistant_sms": "<short SMS ≤480 chars to send back; past tense confirmations or one clarifying question>",
+      "image_kind": "<see MMS images section when photos attached>",
+      "proposed_job_creates": [ ... ],
       "job_actions": [ ... ],
       "time_actions": [ ... ],
       "employee_actions": [ ... ],
@@ -217,6 +251,10 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     }
 
     Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
+
+    **`image_kind`:** When MMS images are attached, set one of: `sms_screenshot`, `email_screenshot`, `handwritten_note`, `other`, or `none` (job-site / equipment photo, not readable correspondence). Omit or `none` when there are no images.
+
+    **`proposed_job_creates`:** Array of proposed new leads/jobs from **readable correspondence** images only (see MMS images). Default `[]`.
 
     ---
 
@@ -242,6 +280,29 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     **Attach photo (MMS):** When the inbound message includes Twilio image URL(s) and the user is adding a picture to an existing job, include `"intent": "attach_photo"`, `"job_id": <int>`, `"media_url": "<exact URL from message>"` (or `"media_urls": [...]`), optional `"work_item_title": "<substring of a work item title>"` to attach to that line item.
     If the contractor is only answering **which job** photos belong to (text reply, no new images), attach each URL **once** — omit URLs you already attached to that `job_id` in this thread. When several jobs could match, use **empty** `job_actions` and ask one clarifying question in **`assistant_sms`** (do not attach until the job is clear).
+
+    ---
+
+    ## MMS images (screenshots, email, handwritten notes)
+
+    When one or more **images** are attached to this message, **look at each image** before deciding actions.
+
+    **Classify `image_kind`:**
+    - `sms_screenshot` — phone text-message thread screenshot (iMessage, Android Messages, etc.)
+    - `email_screenshot` — email app or inbox screenshot
+    - `handwritten_note` — paper note, whiteboard, or photo of handwriting listing job(s)
+    - `none` / `other` — job-site photo, part, meter reading, etc. (not primarily text correspondence)
+
+    **When `image_kind` is `sms_screenshot`, `email_screenshot`, or `handwritten_note`:**
+    1. Read **all** visible text (names, phone numbers, addresses, problem description, availability windows, email addresses).
+    2. For **each distinct customer/job** you can identify, add one element to **`proposed_job_creates`** (do **not** put these in **`job_actions`** yet — the server waits for contractor confirmation):
+       `{ "job": { "client_name", "address", "phone", "client_email", "work_description", "notes", "status": "lead" or "pending", "scheduled_on", "work_items": [...] }, "attach_media_urls": ["<each exact Twilio MediaUrl from the message, for every proposal>"] }`
+    3. On SMS screenshots, use the **customer's** phone number shown in the thread (not the contractor's). Put availability / scheduling hints in **`notes`** if they do not map to **`scheduled_on`**.
+    4. For a **handwritten note** with multiple leads, use **one `proposed_job_creates` entry per lead**; include the **same** `attach_media_urls` on **each** entry so the note image is stored on every created job after confirmation.
+    5. Set **`assistant_sms`** to a concise **proposal** listing each lead (name, address, work, phone) and end with: **Reply CONFIRM to create these, or correct any field in a text.** Do **not** use past-tense "created" language.
+    6. Keep **`job_actions`** empty except you may omit attach_photo until after confirmation (photos attach when they confirm).
+
+    **When `image_kind` is `none` or `other`:** use normal **`attach_photo`** / job update rules; **`proposed_job_creates`** should be `[]`.
 
     Optional fallback when you truly cannot pick an id: `"match"` + `"updates"` (same as job-only flow).
 

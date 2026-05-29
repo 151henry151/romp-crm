@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.80] - 2026-05-29
+
+### Added
+
+- **SMS MMS vision**: send inbound images to Claude; classify SMS/email screenshots and handwritten notes
+- **SMS proposed leads**: extract lead/job fields from correspondence images into `proposed_job_creates`; store pending until contractor replies CONFIRM (or yes/create); attach source image to each created job
+- **DB**: `sms_pending_job_proposals` table for per-phone pending proposals
+
 ## [0.9.79] - 2026-05-29
 
 ### Fixed

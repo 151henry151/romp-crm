@@ -455,6 +455,9 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     end
   end
 
+  @doc false
+  def normalize_proposed_job_attrs(attrs) when is_map(attrs), do: normalize_create(attrs)
+
   defp normalize_create(attrs) when is_map(attrs) do
     m =
       attrs

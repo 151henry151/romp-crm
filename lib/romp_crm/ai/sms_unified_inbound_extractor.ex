@@ -19,7 +19,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
   @doc """
   Returns:
 
-    * **`{:ok, %{assistant_sms, job_operations, time_operations, emp_operations, reminder_operations}}`**
+    * **`{:ok, %{assistant_sms, job_operations, time_operations, emp_operations, reminder_operations, proposed_job_creates, image_kind}}`**
     * **`{:error, reason}`**
 
   **`prior_turns`** — list of **`{:contractor | :assistant, String.t()}`** oldest-first (same phone / business);
@@ -80,17 +80,30 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
     reminder_actions = Map.get(map, "reminder_actions")
     reminder_actions = if is_list(reminder_actions), do: reminder_actions, else: []
 
+    proposed_raw = Map.get(map, "proposed_job_creates")
+    proposed = RompCrm.Ai.SmsProposedCreates.parse_list(proposed_raw)
+    image_kind = RompCrm.Ai.SmsProposedCreates.parse_image_kind(Map.get(map, "image_kind"))
+
     with {:ok, job_ops} <- SmsJobExtractor.parse_actions_list(job_actions),
          {:ok, time_ops} <- SmsTimeExtractor.parse_actions_list(time_actions),
          {:ok, emp_ops} <- SmsEmployeeTimeExtractor.parse_actions_list(employee_actions),
          {:ok, rem_ops} <- SmsReminderExtractor.parse_actions_list(reminder_actions, opts) do
+      job_ops =
+        if proposed != [] do
+          Enum.reject(job_ops, &match?({:create, _}, &1))
+        else
+          job_ops
+        end
+
       {:ok,
        %{
          assistant_sms: assistant,
          job_operations: job_ops,
          time_operations: time_ops,
          emp_operations: emp_ops,
-         reminder_operations: rem_ops
+         reminder_operations: rem_ops,
+         proposed_job_creates: proposed,
+         image_kind: image_kind
        }}
     end
   end

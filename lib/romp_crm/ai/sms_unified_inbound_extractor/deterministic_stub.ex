@@ -57,8 +57,14 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
            "job_actions" => [],
            "time_actions" => [],
            "employee_actions" => [],
-           "reminder_actions" => []
+           "reminder_actions" => [],
+           "proposed_job_creates" => [],
+           "image_kind" => "none"
          }}
+
+      String.starts_with?(trimmed, "STUB_PROPOSE ") ->
+        json = String.trim(String.replace(trimmed, "STUB_PROPOSE ", ""))
+        stub_propose(json)
 
       true ->
         {:ok, default_create(trimmed)}
@@ -227,6 +233,23 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
     end
   end
 
+  defp stub_propose(json) do
+    case Jason.decode(json) do
+      {:ok, %{} = map} ->
+        {:ok,
+         map
+         |> Map.put_new("job_actions", [])
+         |> Map.put_new("time_actions", [])
+         |> Map.put_new("employee_actions", [])
+         |> Map.put_new("reminder_actions", [])
+         |> Map.put_new("proposed_job_creates", [])
+         |> Map.put_new("image_kind", "sms_screenshot")}
+
+      {:error, _} ->
+        {:error, :stub_bad_json}
+    end
+  end
+
   defp stub_json(json) do
     case Jason.decode(json) do
       {:ok, %{} = map} ->
@@ -275,7 +298,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
       ],
       "time_actions" => [],
       "employee_actions" => [],
-      "reminder_actions" => []
+      "reminder_actions" => [],
+      "proposed_job_creates" => [],
+      "image_kind" => "none"
     }
   end
 end
