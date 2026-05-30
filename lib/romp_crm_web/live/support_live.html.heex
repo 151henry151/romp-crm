@@ -7,8 +7,9 @@
   current_business_id={@current_business_id}
   my_businesses={@my_businesses}
   is_business_owner={@is_business_owner}
+  content_width={:wide}
 >
-  <div class="mx-auto max-w-lg space-y-6 text-base-content">
+  <div class="space-y-6 text-base-content">
     <.header>
       Support
       <:subtitle>
@@ -16,8 +17,8 @@
       </:subtitle>
     </.header>
 
-    <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm space-y-4">
-      <div>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
         <h2 class="text-sm font-semibold text-base-content">Phone</h2>
         <a
           href="tel:+18022780965"
@@ -30,7 +31,7 @@
         </p>
       </div>
 
-      <div class="border-t border-base-300 pt-4">
+      <div class="rounded-lg border border-base-300 bg-base-100 p-5 shadow-sm">
         <h2 class="text-sm font-semibold text-base-content">Email</h2>
         <a
           href="mailto:support@rompcrm.com"

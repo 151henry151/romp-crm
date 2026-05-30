@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.99] - 2026-05-18
+
+### Changed
+
+- **Layout**: unify CRM workspace page width at **`max-w-[min(100%,100rem)]`** (~1600px) for header and main content; remove per-page **`max-w-lg` / `max-w-3xl` / `max-w-5xl`** caps on Businesses, Support, Chat, Reminders, Admin, Settings, and Subscribe
+- **Businesses**, **Reminders**, **Workday timeclock**, **Support**: use responsive multi-column layouts on large screens to use horizontal space
+
 ## [0.9.98] - 2026-05-18
 
 ### Fixed

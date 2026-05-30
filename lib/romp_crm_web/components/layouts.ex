@@ -35,7 +35,9 @@ defmodule RompCrmWeb.Layouts do
 
   attr :content_width, :atom,
     default: :narrow,
-    doc: "`:narrow` (~672px) for forms; `:wide` (~1280px) to match the Jobs list layout"
+    doc: "`:narrow` (~672px) for auth/onboarding forms; `:wide` (~1600px max) for CRM workspace pages"
+
+  @app_shell_max "max-w-[min(100%,100rem)]"
 
   attr :show_workspace_nav, :boolean,
     default: false,
@@ -57,12 +59,13 @@ defmodule RompCrmWeb.Layouts do
   def app(assigns) do
     assigns =
       assigns
+      |> assign(:app_shell_class, @app_shell_max)
       |> assign(:main_inner_class, main_inner_max(assigns.content_width))
       |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
 
     ~H"""
     <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
-      <div class="mx-auto max-w-screen-xl">
+      <div class={["mx-auto w-full", @app_shell_class]}>
         <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
           <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
             <div class="shrink-0 lg:hidden">
@@ -164,7 +167,7 @@ defmodule RompCrmWeb.Layouts do
     """
   end
 
-  defp main_inner_max(:wide), do: "max-w-screen-xl"
+  defp main_inner_max(:wide), do: @app_shell_max
   defp main_inner_max(:narrow), do: "max-w-2xl"
 
   defp main_vertical_padding(:wide), do: "py-6"

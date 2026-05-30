@@ -7,8 +7,9 @@
   current_business_id={@current_business_id}
   my_businesses={@my_businesses}
   is_business_owner={@is_business_owner}
+  content_width={:wide}
 >
-  <div class="mx-auto max-w-lg space-y-8 text-base-content">
+  <div class="space-y-8 text-base-content">
     <.header>
       Businesses
       <:subtitle>
@@ -20,8 +21,12 @@
       </:subtitle>
     </.header>
 
-    <%= if @may_create_business do %>
-      <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm">
+    <div class={[
+      "grid gap-8",
+      @may_create_business && "xl:grid-cols-[min(22rem,100%)_1fr] xl:items-start"
+    ]}>
+      <%= if @may_create_business do %>
+        <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm xl:sticky xl:top-6">
         <h2 class="text-sm font-semibold text-base-content">Create a business</h2>
         <.form
           for={@form}
@@ -33,11 +38,11 @@
           <.input field={@form[:name]} type="text" label="Business name" required />
           <.button class="btn btn-primary w-full" type="submit">Create</.button>
         </.form>
-      </div>
-    <% end %>
+        </div>
+      <% end %>
 
-    <div class="space-y-4">
-      <h2 class="text-sm font-semibold text-base-content">Your businesses</h2>
+      <div class="space-y-4 min-w-0">
+        <h2 class="text-sm font-semibold text-base-content">Your businesses</h2>
       <%= if @businesses == [] do %>
         <p class="text-sm text-base-content/70">
           <%= if @may_create_business do %>
@@ -47,6 +52,7 @@
           <% end %>
         </p>
       <% else %>
+        <div class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <%= for b <- @businesses do %>
           <div class="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm space-y-3">
             <div class="flex items-start justify-between gap-2">
@@ -105,7 +111,9 @@
             <% end %>
           </div>
         <% end %>
+        </div>
       <% end %>
+      </div>
     </div>
 
     <p class="text-center">

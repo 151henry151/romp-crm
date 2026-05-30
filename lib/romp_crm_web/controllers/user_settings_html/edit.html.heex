@@ -5,6 +5,7 @@
   current_business_id={@current_business_id}
   my_businesses={@my_businesses}
   is_business_owner={@is_business_owner}
+  content_width={:wide}
 >
   <div class="text-center">
     <.header>
@@ -14,7 +15,7 @@
   </div>
 
   <%= if @show_paypal_subscription_help do %>
-    <div class="mx-auto max-w-lg mb-6 rounded-lg border border-base-300 bg-base-200/40 p-4 text-left text-sm text-base-content">
+    <div class="mb-6 rounded-lg border border-base-300 bg-base-200/40 p-4 text-left text-sm text-base-content">
       <p class="font-semibold">Subscription billing (PayPal)</p>
       <%= if @paypal_trial_days > 0 do %>
         <p class="mt-2 text-base-content/80">
@@ -54,6 +55,8 @@
     </div>
   <% end %>
 
+  <div class="grid gap-10 xl:grid-cols-2 xl:items-start text-left">
+  <section class="space-y-6">
   <.form :let={f} for={@profile_changeset} action={~p"/users/settings"} id="update_profile">
     <input type="hidden" name="action" value="update_profile" />
 
@@ -157,11 +160,11 @@
 
     <.button variant="primary" phx-disable-with="Saving...">Save profile</.button>
   </.form>
+  </section>
 
-  <div class="divider" />
-
+  <section class="space-y-6">
   <h2 class="text-lg font-semibold text-base-content mb-1">Data export (CSV)</h2>
-  <p class="text-sm text-base-content/70 mb-4 max-w-lg mx-auto text-left">
+  <p class="text-sm text-base-content/70 mb-4">
     Owner workspaces only (not invited-only memberships).
     <span class="font-medium text-base-content/90">Jobs</span>,
     <span class="font-medium text-base-content/90">Employees</span>,
@@ -176,7 +179,7 @@
     action={~p"/users/settings"}
     method="post"
     id="data_export"
-    class="mt-4 max-w-lg mx-auto text-left space-y-3"
+    class="mt-4 space-y-3"
   >
     <input type="hidden" name="_method" value="put" />
 
@@ -258,7 +261,7 @@
       ]}
     />
 
-    <p class="text-xs text-base-content/60 mb-1 max-w-lg mx-auto text-left">
+    <p class="text-xs text-base-content/60 mb-1">
       Scheduled sends use the selections above (UTC cadence from last success).
       <span class="font-semibold">Save export preferences</span> stores schedule + checkboxes.
     </p>
@@ -334,4 +337,6 @@
       Save Password
     </.button>
   </.form>
+  </section>
+  </div>
 </Layouts.app>

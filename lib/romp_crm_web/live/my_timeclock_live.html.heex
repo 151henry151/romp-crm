@@ -12,7 +12,7 @@
   <div class="space-y-6">
     <div>
       <h1 class="text-xl font-semibold text-base-content">Workday timeclock</h1>
-      <p class="text-sm text-base-content/70 max-w-2xl mt-1">
+      <p class="text-sm text-base-content/70 mt-1">
         Punch in when you start working for <span class="font-medium text-base-content/90">this business</span>
         and punch out when you stop. This is <span class="font-medium text-base-content/90">not</span> the same as
         logging hours on a client job — use the Jobs board → open a job → <span class="font-medium text-base-content/90">Add job hours</span> for that.
@@ -22,7 +22,7 @@
     <%= if is_nil(@employee) do %>
       <div
         id="timeclock-no-employee"
-        class="rounded-lg border border-amber-300/60 bg-amber-50/10 px-4 py-6 text-sm text-base-content/90 max-w-2xl"
+        class="rounded-lg border border-amber-300/60 bg-amber-50/10 px-4 py-6 text-sm text-base-content/90"
       >
         <p class="font-semibold text-base-content mb-2">You are not on the employee roster (or your account is not linked).</p>
         <%= if @is_business_owner do %>
@@ -36,12 +36,13 @@
       </div>
     <% else %>
       <%= if not @can_punch do %>
-        <div class="rounded-lg border border-base-300 bg-base-100 px-4 py-4 text-sm text-base-content/80 max-w-2xl">
+        <div class="rounded-lg border border-base-300 bg-base-100 px-4 py-4 text-sm text-base-content/80">
           Your permissions do not include using the workday timeclock. Ask the business owner to enable
           <span class="font-medium text-base-content/90">log own employee time</span> for your profile.
         </div>
       <% else %>
-        <div class="rounded-xl border border-base-300 bg-base-100 p-5 max-w-xl shadow-sm">
+        <div class="grid gap-8 lg:grid-cols-[min(22rem,100%)_1fr] lg:items-start">
+        <div class="rounded-xl border border-base-300 bg-base-100 p-5 shadow-sm lg:sticky lg:top-6">
           <p class="text-sm text-base-content/70 mb-1">Logged in as</p>
           <p class="text-lg font-semibold text-base-content mb-4">{@employee.name}</p>
 
@@ -73,6 +74,7 @@
           <% end %>
         </div>
 
+        <div class="min-w-0 space-y-4">
         <div class="flex flex-wrap items-center gap-3">
           <h2 class="text-base font-semibold text-base-content/90">Recent punches</h2>
           <button
@@ -136,6 +138,8 @@
         <% else %>
           <p class="text-sm text-base-content/60">No punches yet.</p>
         <% end %>
+        </div>
+        </div>
 
         <%= if @editing_entry_id do %>
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
