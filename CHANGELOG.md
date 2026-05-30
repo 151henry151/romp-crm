@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.107] - 2026-05-30
+
+### Changed
+
+- **Jobs (web form)**: rename work item date label from "Scheduled (optional)" to "Scheduled"
+
 ## [0.9.106] - 2026-05-30
 
 ### Added
