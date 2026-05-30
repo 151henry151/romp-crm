@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.109] - 2026-05-30
+
+### Changed
+
+- **README**: trim screenshots to four landing-page highlights (jobs list, job detail, tasks/materials, SMS lead capture); remove **hromp.com** references from public URL and Twilio examples
+
 ## [0.9.108] - 2026-05-30
 
 ### Changed

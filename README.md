@@ -6,12 +6,7 @@ The OTP application is **`:romp_crm`** with modules under **`RompCrm.*`** and **
 
 ## Public URLs
 
-The app is mounted under **`/romp-crm`** behind nginx (Phoenix routes stay at **`/`** on the upstream port; the proxy **strips** the prefix — see below).
-
-| Host | Example |
-|------|---------|
-| **hromp.com** | `https://hromp.com/romp-crm/` |
-| **rompcrm.com** | `https://rompcrm.com/romp-crm/` |
+The hosted product is at **https://rompcrm.com/romp-crm/**. The app is mounted under **`/romp-crm`** behind nginx (Phoenix routes stay at **`/`** on the upstream port; the proxy **strips** the prefix — see below).
 
 ## Self-hosting
 
@@ -50,7 +45,7 @@ The trailing slash on **`proxy_pass`** makes nginx map `/romp-crm/foo` → `/foo
 
 ### Twilio webhook
 
-Use your real hostname, for example **`https://rompcrm.com/romp-crm/webhooks/twilio/sms`** or **`https://hromp.com/romp-crm/webhooks/twilio/sms`** — HTTP POST — nginx strips the prefix → Phoenix **`/webhooks/twilio/sms`**.
+Use your real hostname, for example **`https://rompcrm.com/romp-crm/webhooks/twilio/sms`** — HTTP POST — nginx strips the prefix → Phoenix **`/webhooks/twilio/sms`**.
 
 | Env | Purpose |
 |-----|---------|
@@ -77,7 +72,7 @@ SMS-driven job updates, workspaces, job list with expandable rows (hours, materi
 
 ## Screenshots
 
-Same shots as the **[rompcrm.com](https://rompcrm.com/)** landing page carousel. Assets live under **[`docs/screencaps/`](docs/screencaps/)**.
+Four highlights from the **[rompcrm.com](https://rompcrm.com/)** landing page carousel. Assets live under **[`docs/screencaps/`](docs/screencaps/)**.
 
 <table>
   <tr>
@@ -94,78 +89,6 @@ Same shots as the **[rompcrm.com](https://rompcrm.com/)** landing page carousel.
     </td>
     <td align="center">
       <img src="docs/screencaps/app-screenshot-02.png" alt="Create leads by text" width="100%" /><br /><em>Create leads by text</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-03.png" alt="Scan handwritten notes" width="100%" /><br /><em>Scan handwritten notes</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-04.png" alt="In-app AI chat" width="100%" /><br /><em>In-app AI chat</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-05.png" alt="Update jobs by text" width="100%" /><br /><em>Update jobs by text</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-06.png" alt="SMS assistant replies" width="100%" /><br /><em>SMS assistant replies</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-09.png" alt="Completed job record" width="100%" /><br /><em>Completed job record</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-10.png" alt="Job site photos" width="100%" /><br /><em>Job site photos</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-11.png" alt="Add job photos" width="100%" /><br /><em>Add job photos</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-12.png" alt="Assign photos via SMS" width="100%" /><br /><em>Assign photos via SMS</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-13.png" alt="Log job hours" width="100%" /><br /><em>Log job hours</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-14.png" alt="Client job time log" width="100%" /><br /><em>Client job time log</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-15.png" alt="Workday timeclock punch" width="100%" /><br /><em>Workday timeclock punch</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-16.png" alt="Log past shifts" width="100%" /><br /><em>Log past shifts</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-17.png" alt="Upcoming SMS reminders" width="100%" /><br /><em>Upcoming SMS reminders</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-18.png" alt="Daily task reminders" width="100%" /><br /><em>Daily task reminders</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-19.png" alt="Schedule SMS reminders" width="100%" /><br /><em>Schedule SMS reminders</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-20.png" alt="Full app navigation" width="100%" /><br /><em>Full app navigation</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-21.png" alt="Manage your team" width="100%" /><br /><em>Manage your team</em>
-    </td>
-    <td align="center">
-      <img src="docs/screencaps/app-screenshot-22.png" alt="Multiple businesses support" width="100%" /><br /><em>Multiple businesses support</em>
     </td>
   </tr>
 </table>
