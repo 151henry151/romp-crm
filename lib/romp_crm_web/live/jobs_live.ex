@@ -1248,10 +1248,10 @@ defmodule RompCrmWeb.JobsLive do
   defp status_label(:in_progress), do: "In Progress"
   defp status_label(:done), do: "Done"
 
-  defp status_class(:lead), do: "bg-blue-100 text-blue-800"
-  defp status_class(:pending), do: "bg-amber-100 text-amber-800"
-  defp status_class(:in_progress), do: "bg-green-100 text-green-800"
-  defp status_class(:done), do: "bg-gray-100 text-gray-600"
+  defp status_class(:lead), do: "bg-blue-100 text-blue-800 dark:bg-blue-900/45 dark:text-blue-200"
+  defp status_class(:pending), do: "bg-amber-100 text-amber-800 dark:bg-amber-900/45 dark:text-amber-200"
+  defp status_class(:in_progress), do: "bg-green-100 text-green-800 dark:bg-green-900/45 dark:text-green-200"
+  defp status_class(:done), do: "bg-base-200 text-base-content/70 dark:bg-base-300/40 dark:text-base-content/80"
 
   defp priority_class(:high), do: "bg-red-100 text-red-800"
   defp priority_class(:normal), do: ""

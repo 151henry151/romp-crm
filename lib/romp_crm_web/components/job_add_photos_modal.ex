@@ -20,11 +20,11 @@ defmodule RompCrmWeb.JobAddPhotosModal do
       on_cancel={JS.push("close_add_photos")}
     >
       <div class="pr-8 max-w-lg">
-        <h2 id="job-add-photos-modal-title" class="text-lg font-semibold text-gray-900">
+        <h2 id="job-add-photos-modal-title" class="text-lg font-semibold text-base-content">
           Add photos
         </h2>
-        <p class="mt-1 text-sm text-gray-600">
-          For <span class="font-medium text-gray-800">{@client_name}</span>.
+        <p class="mt-1 text-sm text-base-content/70">
+          For <span class="font-medium text-base-content/90">{@client_name}</span>.
           Photos save automatically when selected or captured.
         </p>
 
@@ -33,10 +33,10 @@ defmodule RompCrmWeb.JobAddPhotosModal do
           phx-hook="JobPhotoUpload"
           phx-update="ignore"
           data-upload-url={@upload_url}
-          class="mt-5 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50/80 p-4"
+          class="mt-5 rounded-lg border-2 border-dashed border-base-300 bg-base-200/40 p-4"
         >
           <div class="flex flex-col sm:flex-row gap-2">
-            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">
+            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content hover:opacity-90">
               <input
                 data-role="gallery-input"
                 type="file"
@@ -49,7 +49,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
             </label>
 
             <%!-- Mobile: tap opens native camera directly via overlaid file input --%>
-            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 sm:hidden">
+            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-base-300 bg-base-100 px-4 py-2.5 text-sm font-semibold text-base-content hover:bg-base-200 sm:hidden">
               <input
                 data-role="camera-input"
                 type="file"
@@ -65,7 +65,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
             <button
               type="button"
               data-role="desktop-camera-btn"
-              class="hidden sm:inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              class="hidden sm:inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-base-300 bg-base-100 px-4 py-2.5 text-sm font-semibold text-base-content hover:bg-base-200"
             >
               <.icon name="hero-camera" class="h-5 w-5" />
               Use camera
@@ -75,7 +75,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
           <div data-role="webcam-panel" class="hidden mt-4 space-y-3">
             <video
               data-role="webcam-video"
-              class="hidden w-full max-h-64 rounded-lg border border-gray-300 bg-black object-contain"
+              class="hidden w-full max-h-64 rounded-lg border border-base-300 bg-black object-contain"
               playsinline
               muted
               autoplay
@@ -84,17 +84,17 @@ defmodule RompCrmWeb.JobAddPhotosModal do
             <button
               type="button"
               data-role="webcam-capture"
-              class="hidden rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500"
+              class="hidden btn btn-primary btn-xs"
             >
               Capture photo
             </button>
           </div>
 
-          <p data-role="status" class="mt-3 min-h-[1.25rem] text-xs text-gray-500" />
+          <p data-role="status" class="mt-3 min-h-[1.25rem] text-xs text-base-content/60" />
         </div>
 
         <%= if @saved_count > 0 do %>
-          <p class="mt-3 text-sm font-medium text-green-700">
+          <p class="mt-3 text-sm font-medium text-success">
             {if @saved_count == 1,
               do: "1 photo saved on this job.",
               else: "#{@saved_count} photos saved on this job."}
@@ -102,11 +102,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
         <% end %>
 
         <div class="mt-5 flex flex-wrap gap-2">
-          <button
-            type="button"
-            phx-click="close_add_photos"
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-          >
+          <button type="button" phx-click="close_add_photos" class="btn btn-primary btn-sm">
             Done
           </button>
         </div>

@@ -56,7 +56,7 @@ defmodule RompCrmWeb.CoreComponents do
     >
       <div
         id={"#{@id}-bg"}
-        class="fixed inset-0 bg-gray-900/50 transition-opacity"
+        class="fixed inset-0 bg-black/50 transition-opacity"
         aria-hidden="true"
       />
       <div
@@ -72,11 +72,14 @@ defmodule RompCrmWeb.CoreComponents do
             phx-click-away={@cancel_on_click_away && @on_cancel}
             phx-window-keydown={@on_cancel}
             phx-key="escape"
-            data-theme="light"
-            class="w-full max-w-2xl rounded-xl bg-white p-6 text-gray-900 shadow-xl ring-1 ring-gray-200"
+            class="relative w-full max-w-2xl rounded-xl bg-base-100 p-6 text-base-content shadow-xl ring-1 ring-base-300"
           >
             <div class="absolute top-4 right-4">
-              <button phx-click={@on_cancel} type="button" class="text-gray-400 hover:text-gray-600">
+              <button
+                phx-click={@on_cancel}
+                type="button"
+                class="text-base-content/45 hover:text-base-content/80"
+              >
                 <.icon name="hero-x-mark" class="size-5" />
               </button>
             </div>

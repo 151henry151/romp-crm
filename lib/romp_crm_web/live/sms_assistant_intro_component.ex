@@ -36,10 +36,10 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
         show={@show}
         on_cancel={JS.push("sms_intro_skip", target: @myself)}
       >
-        <h2 id="sms-assistant-intro-modal-title" class="pr-8 text-lg font-semibold text-gray-900">
+        <h2 id="sms-assistant-intro-modal-title" class="pr-8 text-lg font-semibold text-base-content">
           Text your Romp CRM assistant
         </h2>
-        <p class="mt-3 text-sm leading-relaxed text-gray-700">
+        <p class="mt-3 text-sm leading-relaxed text-base-content/75">
           Add your mobile to text the assistant about jobs and lists, or skip and add it later in Account Settings.
           Each number can only be on one Romp CRM account; if you use it elsewhere, remove it there first.
         </p>

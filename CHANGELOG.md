@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.98] - 2026-05-18
+
+### Fixed
+
+- **Modals**: remove forced light theme from shared `<.modal>`; use daisyUI `base-*` tokens so New Job, Add photos, Add job hours, employee, and SMS intro modals follow dark/light mode
+- **Modals**: replace hardcoded gray/white form styling in job-hours and add-photos modals with theme-aware inputs and buttons
+- **Jobs**: add dark-mode styling for status badges on the job list
+
 ## [0.9.97] - 2026-05-18
 
 ### Fixed
