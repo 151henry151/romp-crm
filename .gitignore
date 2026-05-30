@@ -55,3 +55,6 @@ npm-debug.log
 # PayPal / local secrets (never commit)
 .env.paypal.local
 
+# Customer data exports (never commit)
+Plumbing_Jobs.xlsx - All Jobs.csv
+
