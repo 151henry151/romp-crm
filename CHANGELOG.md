@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.104] - 2026-05-30
+
+### Fixed
+
+- **Chat**: fix 500 on `/chat` caused by `attr` declarations bound to the wrong component (`chat_compose` missing `placeholder`)
+
 ## [0.9.103] - 2026-05-30
 
 ### Added

@@ -71,25 +71,6 @@ defmodule RompCrmWeb.ChatComponents do
   attr :placeholder, :string, default: "Message the RompCRM agent…"
   attr :disabled, :boolean, default: false
 
-  attr :id, :string, default: "chat-typing-indicator"
-
-  def chat_typing_indicator(assigns) do
-    ~H"""
-    <div id={@id} class="mt-2 flex w-full flex-col items-start" aria-live="polite" aria-label="RompCRM agent is typing">
-      <div class="mb-0.5 px-1 text-[10px] font-medium tracking-wide text-base-content/55">
-        RompCRM agent
-      </div>
-      <div class={[
-        "max-w-[min(85%,20rem)] px-3 py-2 text-sm leading-snug text-base-content/70",
-        "rounded-[1.125rem] rounded-bl-[0.35rem] shadow-sm",
-        bubble_tone(:agent)
-      ]}>
-        <span class="chat-typing-dots">RompCRM is typing</span>
-      </div>
-    </div>
-    """
-  end
-
   def chat_compose(assigns) do
     ~H"""
     <form
@@ -112,6 +93,25 @@ defmodule RompCrmWeb.ChatComponents do
         Send
       </button>
     </form>
+    """
+  end
+
+  attr :id, :string, default: "chat-typing-indicator"
+
+  def chat_typing_indicator(assigns) do
+    ~H"""
+    <div id={@id} class="mt-2 flex w-full flex-col items-start" aria-live="polite" aria-label="RompCRM agent is typing">
+      <div class="mb-0.5 px-1 text-[10px] font-medium tracking-wide text-base-content/55">
+        RompCRM agent
+      </div>
+      <div class={[
+        "max-w-[min(85%,20rem)] px-3 py-2 text-sm leading-snug text-base-content/70",
+        "rounded-[1.125rem] rounded-bl-[0.35rem] shadow-sm",
+        bubble_tone(:agent)
+      ]}>
+        <span class="chat-typing-dots">RompCRM is typing</span>
+      </div>
+    </div>
     """
   end
 
