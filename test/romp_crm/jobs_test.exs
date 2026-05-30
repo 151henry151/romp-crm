@@ -344,5 +344,84 @@ defmodule RompCrm.JobsTest do
                  source_media_url: "https://api.twilio.com/2010-04-01/Accounts/AC/Media/ME1"
                )
     end
+
+    test "delete_job_photo removes row and file" do
+      prev = Application.get_env(:romp_crm, :job_photo_static_dir)
+      dir = Path.join(System.tmp_dir!(), "romp-crm-photo-delete-test-#{System.unique_integer()}")
+      File.mkdir_p!(dir)
+      Application.put_env(:romp_crm, :job_photo_static_dir, dir)
+
+      on_exit(fn ->
+        File.rm_rf(dir)
+
+        if prev do
+          Application.put_env(:romp_crm, :job_photo_static_dir, prev)
+        else
+          Application.delete_env(:romp_crm, :job_photo_static_dir)
+        end
+      end)
+
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+      bytes = :crypto.strong_rand_bytes(64)
+
+      assert {:ok, photo} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      abs = RompCrm.JobUploads.absolute_path(photo.relative_path)
+      assert File.exists?(abs)
+
+      assert {:ok, _} = Jobs.delete_job_photo(job, b.id, photo.id)
+      refute File.exists?(abs)
+      refute Repo.get(RompCrm.Jobs.JobPhoto, photo.id)
+    end
+
+    test "move_job_photo swaps gallery order" do
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+      bytes = :crypto.strong_rand_bytes(8)
+
+      assert {:ok, a} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      assert {:ok, b_row} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+
+      assert {:ok, _} = Jobs.move_job_photo(job, b.id, b_row.id, :up)
+
+      job = Jobs.get_job!(job.id, b.id)
+      ids = Enum.map(job.photos, & &1.id)
+      assert ids == [b_row.id, a.id]
+    end
+
+    test "delete_all_job_photos removes all rows and files" do
+      prev = Application.get_env(:romp_crm, :job_photo_static_dir)
+      dir = Path.join(System.tmp_dir!(), "romp-crm-photo-delete-all-#{System.unique_integer()}")
+      File.mkdir_p!(dir)
+      Application.put_env(:romp_crm, :job_photo_static_dir, dir)
+
+      on_exit(fn ->
+        File.rm_rf(dir)
+
+        if prev do
+          Application.put_env(:romp_crm, :job_photo_static_dir, prev)
+        else
+          Application.delete_env(:romp_crm, :job_photo_static_dir)
+        end
+      end)
+
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+      bytes = :crypto.strong_rand_bytes(64)
+
+      assert {:ok, a} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      assert {:ok, b_row} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      abs_a = RompCrm.JobUploads.absolute_path(a.relative_path)
+      abs_b = RompCrm.JobUploads.absolute_path(b_row.relative_path)
+      assert File.exists?(abs_a)
+      assert File.exists?(abs_b)
+
+      assert {:ok, updated, 2} = Jobs.delete_all_job_photos(job, b.id)
+      refute File.exists?(abs_a)
+      refute File.exists?(abs_b)
+      assert updated.photos == []
+      refute Repo.get(RompCrm.Jobs.JobPhoto, a.id)
+      refute Repo.get(RompCrm.Jobs.JobPhoto, b_row.id)
+    end
   end
 end

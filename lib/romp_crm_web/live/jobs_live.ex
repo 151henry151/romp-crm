@@ -6,6 +6,7 @@ defmodule RompCrmWeb.JobsLive do
   import RompCrmWeb.JobDeleteBar, only: [job_delete_bar: 1]
   import RompCrmWeb.JobPhotosSection, only: [job_photos_section: 1]
   import RompCrmWeb.JobAddPhotosModal, only: [job_add_photos_modal: 1]
+  import RompCrmWeb.JobPhotoViewerModal, only: [job_photo_viewer_modal: 1]
 
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
@@ -50,7 +51,11 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:job_expand_editing, MapSet.new())
      |> assign(:add_photos_job_id, nil)
      |> assign(:add_photos_client_name, "")
-     |> assign(:add_photos_saved_count, 0)}
+     |> assign(:add_photos_saved_count, 0)
+     |> assign(:photo_viewer_job_id, nil)
+     |> assign(:photo_viewer_photo_id, nil)
+     |> assign(:photo_delete_all_pending_job_id, nil)
+     |> assign(:photo_delete_all_confirm_step, 0)}
   end
 
   @impl true
@@ -116,6 +121,47 @@ defmodule RompCrmWeb.JobsLive do
     bid = socket.assigns.current_business_id
     assign(socket, :jobs, Jobs.list_jobs(bid))
   end
+
+  defp close_photo_viewer(socket) do
+    socket
+    |> assign(:photo_viewer_job_id, nil)
+    |> assign(:photo_viewer_photo_id, nil)
+  end
+
+  defp step_photo_viewer(socket, delta) when delta in [-1, 1] do
+    case viewer_job(socket) do
+      nil ->
+        socket
+
+      job ->
+        photos = job.photos || []
+        pos = photo_viewer_position(photos, socket.assigns.photo_viewer_photo_id)
+
+        case Enum.at(photos, pos - 1 + delta) do
+          nil -> socket
+          ph -> assign(socket, :photo_viewer_photo_id, ph.id)
+        end
+    end
+  end
+
+  defp viewer_job(%{assigns: %{photo_viewer_job_id: jid, jobs: jobs}}) when is_integer(jid) do
+    Enum.find(jobs, &(&1.id == jid))
+  end
+
+  defp viewer_job(_), do: nil
+
+  defp photo_viewer_position(photos, photo_id) when is_list(photos) do
+    case Enum.find_index(photos, &(&1.id == photo_id)) do
+      nil -> 1
+      idx -> idx + 1
+    end
+  end
+
+  defp photo_viewer_job_for_assigns(jobs, job_id) when is_integer(job_id) do
+    Enum.find(jobs, &(&1.id == job_id))
+  end
+
+  defp photo_viewer_job_for_assigns(_, _), do: nil
 
   defp close_add_photos_modal(socket) do
     socket
@@ -347,6 +393,205 @@ defmodule RompCrmWeb.JobsLive do
     {:noreply, put_flash(socket, :error, "Could not save photo. Try again.")}
   end
 
+  def handle_event("open_photo_viewer", %{"job_id" => jid, "photo_id" => pid}, socket) do
+    jid = String.to_integer(jid)
+    pid = String.to_integer(pid)
+
+    {:noreply,
+     socket
+     |> assign(:photo_viewer_job_id, jid)
+     |> assign(:photo_viewer_photo_id, pid)}
+  end
+
+  def handle_event("close_photo_viewer", _params, socket) do
+    {:noreply, close_photo_viewer(socket)}
+  end
+
+  def handle_event("photo_viewer_nav", %{"job_id" => jid, "photo_id" => pid}, socket) do
+    if pid in [nil, ""] do
+      {:noreply, socket}
+    else
+      jid = String.to_integer(jid)
+      pid = String.to_integer(pid)
+
+      if socket.assigns.photo_viewer_job_id == jid do
+        {:noreply, assign(socket, :photo_viewer_photo_id, pid)}
+      else
+        {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("photo_viewer_key", %{"key" => key}, socket) do
+    case key do
+      "left" -> {:noreply, step_photo_viewer(socket, -1)}
+      "right" -> {:noreply, step_photo_viewer(socket, 1)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("delete_job_photo", %{"job_id" => jid, "photo_id" => pid}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete photos.")}
+    else
+      jid = String.to_integer(jid)
+      pid = String.to_integer(pid)
+      bid = socket.assigns.current_business_id
+      user = socket.assigns.current_scope.user
+      job = Jobs.get_job!(jid, bid)
+      viewer_open? = socket.assigns.photo_viewer_job_id == jid
+      viewer_idx = if viewer_open?, do: photo_viewer_position(job.photos || [], pid), else: nil
+
+      case Jobs.delete_job_photo(job, bid, pid) do
+        {:ok, updated} ->
+          BusinessAuditLogs.record(%{
+            business_id: bid,
+            actor_user_id: user.id,
+            source: "web",
+            action: "jobs.photos.delete",
+            entity_type: "jobs",
+            entity_id: jid,
+            metadata: %{photo_id: pid}
+          })
+
+          socket =
+            socket
+            |> put_flash(:info, "Photo deleted.")
+            |> refresh_jobs()
+            |> then(fn sock ->
+              if viewer_open? do
+                photos = updated.photos || []
+
+                cond do
+                  photos == [] ->
+                    close_photo_viewer(sock)
+
+                  true ->
+                    new_id =
+                      case Enum.at(photos, (viewer_idx || 1) - 1) do
+                        nil -> hd(photos).id
+                        ph -> ph.id
+                      end
+
+                    assign(sock, :photo_viewer_photo_id, new_id)
+                end
+              else
+                sock
+              end
+            end)
+
+          {:noreply, socket}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Could not delete photo.")}
+      end
+    end
+  end
+
+  def handle_event("move_job_photo", %{"job_id" => jid, "photo_id" => pid, "direction" => dir}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to reorder photos.")}
+    else
+      jid = String.to_integer(jid)
+      pid = String.to_integer(pid)
+      bid = socket.assigns.current_business_id
+      job = Jobs.get_job!(jid, bid)
+
+      direction =
+        case dir do
+          "up" -> :up
+          "down" -> :down
+          _ -> nil
+        end
+
+      if is_nil(direction) do
+        {:noreply, socket}
+      else
+        case Jobs.move_job_photo(job, bid, pid, direction) do
+          {:ok, _} ->
+            {:noreply, refresh_jobs(socket)}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not reorder photo.")}
+        end
+      end
+    end
+  end
+
+  def handle_event("request_delete_all_job_photos", %{"job_id" => jid}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete photos.")}
+    else
+      {:noreply,
+       socket
+       |> assign(:photo_delete_all_pending_job_id, String.to_integer(jid))
+       |> assign(:photo_delete_all_confirm_step, 1)}
+    end
+  end
+
+  def handle_event("advance_delete_all_job_photos", %{"job_id" => jid}, socket) do
+    jid = String.to_integer(jid)
+
+    if socket.assigns.photo_delete_all_pending_job_id == jid and
+         socket.assigns.photo_delete_all_confirm_step == 1 do
+      {:noreply, assign(socket, :photo_delete_all_confirm_step, 2)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_delete_all_job_photos", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:photo_delete_all_pending_job_id, nil)
+     |> assign(:photo_delete_all_confirm_step, 0)}
+  end
+
+  def handle_event("delete_all_job_photos", %{"job_id" => jid}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete photos.")}
+    else
+      jid = String.to_integer(jid)
+
+      if socket.assigns.photo_delete_all_pending_job_id != jid or
+           socket.assigns.photo_delete_all_confirm_step != 2 do
+        {:noreply, socket}
+      else
+        bid = socket.assigns.current_business_id
+        user = socket.assigns.current_scope.user
+        job = Jobs.get_job!(jid, bid)
+        edit_key = JEK.photos_edit(jid)
+
+        case Jobs.delete_all_job_photos(job, bid) do
+          {:ok, _updated, count} ->
+            BusinessAuditLogs.record(%{
+              business_id: bid,
+              actor_user_id: user.id,
+              source: "web",
+              action: "jobs.photos.delete_all",
+              entity_type: "jobs",
+              entity_id: jid,
+              metadata: %{count: count}
+            })
+
+            socket =
+              socket
+              |> assign(:photo_delete_all_pending_job_id, nil)
+              |> assign(:photo_delete_all_confirm_step, 0)
+              |> assign(:job_expand_editing, MapSet.delete(socket.assigns.job_expand_editing, edit_key))
+              |> close_photo_viewer()
+              |> put_flash(:info, "Deleted #{count} photo(s).")
+              |> refresh_jobs()
+
+            {:noreply, socket}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not delete photos.")}
+        end
+      end
+    end
+  end
+
   def handle_event("job_time_field", params, socket) do
     started = Map.get(params, "started_at", socket.assigns.job_time_started_at)
     ended = Map.get(params, "ended_at", socket.assigns.job_time_ended_at)
@@ -442,12 +687,26 @@ defmodule RompCrmWeb.JobsLive do
         eid -> Map.take(socket.assigns.job_delete_steps, [eid])
       end
 
+    photo_delete_pending =
+      case expanded do
+        nil ->
+          {nil, 0}
+
+        eid when eid == socket.assigns.photo_delete_all_pending_job_id ->
+          {eid, socket.assigns.photo_delete_all_confirm_step}
+
+        _ ->
+          {nil, 0}
+      end
+
     {:noreply,
      socket
      |> assign(:expanded_job_id, expanded)
      |> assign(:expanded_time_entries, entries_map)
      |> assign(:job_expand_editing, MapSet.new())
      |> assign(:job_delete_steps, steps_cleared)
+     |> assign(:photo_delete_all_pending_job_id, elem(photo_delete_pending, 0))
+     |> assign(:photo_delete_all_confirm_step, elem(photo_delete_pending, 1))
      |> refresh_jobs()}
   end
 

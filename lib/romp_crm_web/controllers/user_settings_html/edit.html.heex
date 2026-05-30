@@ -167,6 +167,7 @@
     <span class="font-medium text-base-content/90">Employees</span>,
     <span class="font-medium text-base-content/90">Time log</span>,
     <span class="font-medium text-base-content/90">Audit log</span> (who changed what, web + SMS).
+    Job photos are <span class="font-medium text-base-content/90">not</span> included in CSV email exports (too large for attachments)—export them separately below.
   </p>
 
   <.form
@@ -279,6 +280,16 @@
     <p class="text-xs text-base-content/60">
       Download: one CSV or a ZIP if multiple tables. Email with 3+ tables: one ZIP.
     </p>
+
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Job photos</legend>
+      <p class="text-xs text-base-content/70">
+        Uses the workspace checkboxes above. Downloads a ZIP with one folder per job that has photos.
+      </p>
+      <button type="submit" name="action" value="export_photos_download" class="btn btn-outline btn-sm">
+        Download all photos (ZIP)
+      </button>
+    </fieldset>
   </.form>
 
   <div class="divider" />

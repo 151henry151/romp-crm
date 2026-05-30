@@ -98,7 +98,14 @@
               />
               <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
               <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
-              <.job_photos_section job={job} can_edit_jobs={@can_edit_jobs} />
+              <.job_photos_section
+                job={job}
+                can_edit_jobs={@can_edit_jobs}
+                edit_keys={@job_expand_editing}
+                delete_all_step={
+                  if @photo_delete_all_pending_job_id == job.id, do: @photo_delete_all_confirm_step, else: 0
+                }
+              />
               <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
               <% total = TimeTracking.format_total_for_job(job.id, @current_business_id) %>
               <div class="pt-2 border-t border-base-300">
@@ -283,6 +290,12 @@
                     <.job_photos_section
                       job={job}
                       can_edit_jobs={@can_edit_jobs}
+                      edit_keys={@job_expand_editing}
+                      delete_all_step={
+                        if @photo_delete_all_pending_job_id == job.id,
+                          do: @photo_delete_all_confirm_step,
+                          else: 0
+                      }
                       wrapper_class="lg:col-span-2 pt-1"
                     />
                     <% te_list = time_entries_for(@expanded_time_entries, job.id) %>
@@ -482,5 +495,17 @@
     saved_count={@add_photos_saved_count}
     upload_url={~p"/jobs/#{@add_photos_job_id}/photos"}
   />
+<% end %>
+<%= if @photo_viewer_job_id && @photo_viewer_photo_id do %>
+  <% viewer_job = photo_viewer_job_for_assigns(@jobs, @photo_viewer_job_id) %>
+  <%= if viewer_job && viewer_job.photos != [] do %>
+    <.job_photo_viewer_modal
+      job_id={viewer_job.id}
+      photo_id={@photo_viewer_photo_id}
+      photos={viewer_job.photos}
+      position={photo_viewer_position(viewer_job.photos, @photo_viewer_photo_id)}
+      total={length(viewer_job.photos)}
+    />
+  <% end %>
 <% end %>
 </Layouts.app>

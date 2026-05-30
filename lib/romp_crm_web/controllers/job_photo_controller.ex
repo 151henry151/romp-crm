@@ -4,12 +4,13 @@ defmodule RompCrmWeb.JobPhotoController do
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
   alias RompCrm.EmployeePermissions
+  alias RompCrm.JobPhotoExport
+  alias RompCrm.JobUploads
   alias RompCrm.Jobs
 
   def create(conn, %{"job_id" => job_id} = params) do
     user = conn.assigns.current_scope.user
-    businesses = Businesses.list_businesses_for_user(user)
-    bid = Businesses.resolve_active_business_id(user, businesses, conn.private[:plug_session] || %{})
+    bid = active_business_id(conn, user)
 
     caps = EmployeePermissions.for(user, bid)
 
@@ -17,6 +18,72 @@ defmodule RompCrmWeb.JobPhotoController do
       respond_error(conn, :forbidden, "You do not have permission to upload photos.")
     else
       do_upload(conn, user, bid, job_id, params)
+    end
+  end
+
+  def download(conn, %{"job_id" => job_id, "photo_id" => photo_id}) do
+    user = conn.assigns.current_scope.user
+    bid = active_business_id(conn, user)
+
+    with {:ok, _job, photo} <- fetch_job_photo(job_id, photo_id, bid) do
+      abs = JobUploads.absolute_path(photo.relative_path)
+
+      if File.regular?(abs) do
+        filename = JobPhotoExport.photo_download_filename(photo)
+
+        conn
+        |> put_resp_content_type(photo.content_type || "application/octet-stream")
+        |> put_resp_header("content-disposition", content_disposition_attachment(filename))
+        |> send_file(200, abs)
+      else
+        conn
+        |> put_flash(:error, "Photo file is missing on the server.")
+        |> redirect(to: ~p"/")
+      end
+    else
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> text("Not found")
+
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> text("Bad request")
+    end
+  end
+
+  def download_all(conn, %{"job_id" => job_id}) do
+    bid = active_business_id(conn, conn.assigns.current_scope.user)
+
+    with {:ok, job} <- fetch_job(job_id, bid),
+         {:ok, body} <- JobPhotoExport.build_job_photos_zip(job) do
+      filename = JobPhotoExport.job_zip_filename(job)
+
+      conn
+      |> put_resp_content_type("application/zip")
+      |> put_resp_header("content-disposition", content_disposition_attachment(filename))
+      |> send_resp(200, body)
+    else
+      {:error, :no_photos} ->
+        conn
+        |> put_flash(:error, "This job has no photos to download.")
+        |> redirect(to: ~p"/")
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> text("Not found")
+
+      {:error, reason} ->
+        conn
+        |> put_flash(:error, "Could not build photo download. (#{inspect(reason)})")
+        |> redirect(to: ~p"/")
+
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> text("Bad request")
     end
   end
 
@@ -53,6 +120,45 @@ defmodule RompCrmWeb.JobPhotoController do
       _ ->
         respond_error(conn, :bad_request, "Choose a photo file to upload.")
     end
+  end
+
+  defp active_business_id(conn, user) do
+    businesses = Businesses.list_businesses_for_user(user)
+    Businesses.resolve_active_business_id(user, businesses, conn.private[:plug_session] || %{})
+  end
+
+  defp fetch_job_photo(job_id, photo_id, bid) do
+    with {:ok, job} <- fetch_job(job_id, bid),
+         {:ok, pid} <- parse_id(photo_id),
+         photo when not is_nil(photo) <- Enum.find(job.photos || [], &(&1.id == pid)) do
+      {:ok, job, photo}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp fetch_job(job_id, bid) do
+    with {:ok, jid} <- parse_id(job_id),
+         job when not is_nil(job) <- Jobs.get_job(jid, bid) do
+      {:ok, job}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp parse_id(v) when is_binary(v) do
+    case Integer.parse(String.trim(v)) do
+      {n, _} -> {:ok, n}
+      :error -> :error
+    end
+  end
+
+  defp parse_id(v) when is_integer(v), do: {:ok, v}
+  defp parse_id(_), do: :error
+
+  defp content_disposition_attachment(filename) when is_binary(filename) do
+    safe = String.replace(filename, "\"", "")
+    ~s(attachment; filename="#{safe}")
   end
 
   defp respond_success(conn, message) do

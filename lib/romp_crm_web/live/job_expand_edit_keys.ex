@@ -6,4 +6,6 @@ defmodule RompCrmWeb.JobExpandEditKeys do
   def wi_edit(work_item_id) when is_integer(work_item_id), do: "wi:#{work_item_id}:edit"
 
   def mat_edit(material_id) when is_integer(material_id), do: "mat:#{material_id}:edit"
+
+  def photos_edit(job_id) when is_integer(job_id), do: "photos:#{job_id}:edit"
 end

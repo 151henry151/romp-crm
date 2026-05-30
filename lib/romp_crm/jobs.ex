@@ -29,7 +29,7 @@ defmodule RompCrm.Jobs do
   end
 
   defp photos_preload_query do
-    from p in JobPhoto, order_by: [asc: p.id]
+    from p in JobPhoto, order_by: [asc: p.sort_order, asc: p.id]
   end
 
   def list_jobs(business_id) when is_integer(business_id) do
@@ -447,7 +447,8 @@ defmodule RompCrm.Jobs do
             relative_path: rel,
             content_type: content_type,
             byte_size: byte_size(bytes),
-            source_media_url: source_media_url
+            source_media_url: source_media_url,
+            sort_order: next_job_photo_sort_order(job.id)
           })
           |> Repo.insert()
           |> case do
@@ -475,6 +476,121 @@ defmodule RompCrm.Jobs do
   end
 
   defp duplicate_source_media_url?(_job_id, _url), do: false
+
+  @doc """
+  Deletes all photos for a job (rows and files on disk).
+  """
+  def delete_all_job_photos(%Job{} = job, business_id) when is_integer(business_id) do
+    if job.business_id != business_id do
+      {:error, :wrong_business}
+    else
+      photos = Repo.all(from p in JobPhoto, where: p.job_id == ^job.id)
+
+      Enum.each(photos, &delete_job_photo_file/1)
+      {count, _} = Repo.delete_all(from p in JobPhoto, where: p.job_id == ^job.id)
+
+      updated = get_job!(job.id, business_id)
+      broadcast(business_id, {:updated, updated})
+      {:ok, updated, count}
+    end
+  end
+
+  @doc """
+  Deletes a job photo row and its file on disk.
+  """
+  def delete_job_photo(%Job{} = job, business_id, photo_id)
+      when is_integer(business_id) and is_integer(photo_id) do
+    if job.business_id != business_id do
+      {:error, :wrong_business}
+    else
+      case Repo.get_by(JobPhoto, id: photo_id, job_id: job.id) do
+        nil ->
+          {:error, :not_found}
+
+        photo ->
+          _ = delete_job_photo_file(photo)
+
+          case Repo.delete(photo) do
+            {:ok, _} ->
+              updated = get_job!(job.id, business_id)
+              broadcast(business_id, {:updated, updated})
+              {:ok, updated}
+
+            {:error, changeset} ->
+              {:error, changeset}
+          end
+      end
+    end
+  end
+
+  @doc """
+  Moves a photo one step earlier (`:up`) or later (`:down`) in the job gallery order.
+  """
+  def move_job_photo(%Job{} = job, business_id, photo_id, direction)
+      when is_integer(business_id) and is_integer(photo_id) and direction in [:up, :down] do
+    if job.business_id != business_id do
+      {:error, :wrong_business}
+    else
+      photos =
+        Repo.all(
+          from p in JobPhoto,
+            where: p.job_id == ^job.id,
+            order_by: [asc: p.sort_order, asc: p.id]
+        )
+
+      idx = Enum.find_index(photos, &(&1.id == photo_id))
+
+      cond do
+        is_nil(idx) ->
+          {:error, :not_found}
+
+        direction == :up and idx == 0 ->
+          {:ok, :noop}
+
+        direction == :down and idx == length(photos) - 1 ->
+          {:ok, :noop}
+
+        true ->
+          swap_idx = if direction == :up, do: idx - 1, else: idx + 1
+          a = Enum.at(photos, idx)
+          b = Enum.at(photos, swap_idx)
+
+          Repo.transaction(fn ->
+            {:ok, _} = Repo.update(Ecto.Changeset.change(a, sort_order: b.sort_order))
+            {:ok, _} = Repo.update(Ecto.Changeset.change(b, sort_order: a.sort_order))
+            :ok
+          end)
+          |> case do
+            {:ok, :ok} ->
+              updated = get_job!(job.id, business_id)
+              broadcast(business_id, {:updated, updated})
+              {:ok, updated}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+      end
+    end
+  end
+
+  defp next_job_photo_sort_order(job_id) when is_integer(job_id) do
+    case Repo.one(
+           from p in JobPhoto,
+             where: p.job_id == ^job_id,
+             select: max(p.sort_order)
+         ) do
+      nil -> 0
+      max when is_integer(max) -> max + 1
+    end
+  end
+
+  defp delete_job_photo_file(%JobPhoto{relative_path: rel}) when is_binary(rel) do
+    abs = RompCrm.JobUploads.absolute_path(rel)
+    if File.exists?(abs), do: File.rm!(abs)
+    :ok
+  end
+
+  defp delete_job_photo_file(_), do: :ok
 
   defp verify_work_item_belongs(job_id, wi_id) do
     case Repo.get_by(JobWorkItem, id: wi_id, job_id: job_id) do

@@ -5,6 +5,7 @@ defmodule RompCrmWeb.UserSettingsController do
   alias RompCrm.Billing
   alias RompCrm.Businesses
   alias RompCrm.DataExport
+  alias RompCrm.JobPhotoExport
   alias RompCrmWeb.UserAuth
 
   import RompCrmWeb.UserAuth, only: [require_sudo_mode: 2]
@@ -117,6 +118,52 @@ defmodule RompCrmWeb.UserSettingsController do
         |> put_flash(
           :error,
           "Nothing to download—create an owned workspace first."
+        )
+        |> redirect(to: ~p"/users/settings")
+    end
+  end
+
+  def update(conn, %{"action" => "export_photos_download"} = params) do
+    user = conn.assigns.current_scope.user
+
+    case DataExport.normalize_export_business_ids(user, params) do
+      {:ok, business_ids} ->
+        case JobPhotoExport.build_all_photos_zip(business_ids) do
+          {:ok, body} ->
+            zip_name = JobPhotoExport.bulk_zip_filename()
+
+            conn
+            |> put_resp_content_type("application/zip")
+            |> put_resp_header("content-disposition", ~s(attachment; filename="#{zip_name}"))
+            |> send_resp(200, body)
+
+          {:error, :no_photos} ->
+            conn
+            |> put_flash(
+              :info,
+              "No job photos found in the selected workspace(s)."
+            )
+            |> redirect(to: ~p"/users/settings")
+
+          {:error, reason} ->
+            conn
+            |> put_flash(:error, "Could not build photo export. (#{inspect(reason)})")
+            |> redirect(to: ~p"/users/settings")
+        end
+
+      {:error, :no_business_selected} ->
+        conn
+        |> put_flash(
+          :error,
+          "Pick a workspace (owners only)."
+        )
+        |> redirect(to: ~p"/users/settings")
+
+      {:error, :no_owned_businesses} ->
+        conn
+        |> put_flash(
+          :error,
+          "Nothing to export—create an owned workspace first."
         )
         |> redirect(to: ~p"/users/settings")
     end

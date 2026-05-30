@@ -10,6 +10,7 @@ defmodule RompCrm.Jobs.JobPhoto do
     field :content_type, :string
     field :byte_size, :integer
     field :source_media_url, :string
+    field :sort_order, :integer, default: 0
 
     timestamps(type: :utc_datetime)
   end
@@ -22,7 +23,8 @@ defmodule RompCrm.Jobs.JobPhoto do
       :relative_path,
       :content_type,
       :byte_size,
-      :source_media_url
+      :source_media_url,
+      :sort_order
     ])
     |> validate_required([:job_id, :relative_path])
     |> validate_length(:relative_path, max: 500)

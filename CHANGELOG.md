@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.9.89] - 2026-05-18
+
+### Changed
+
+- **Web job photo lightbox**: full-viewport black overlay; photo fills the screen; minimal chevron nav, top-right close, bottom-right download icon; pinch (and trackpad wheel) zoom instead of +/- controls
+
+## [0.9.88] - 2026-05-18
+
+### Changed
+
+- **Web job photos**: show **Download all (zip archive)** only in photo edit mode; rename button label
+
+## [0.9.87] - 2026-05-18
+
+### Added
+
+- **Web job photos**: two-step confirmation before delete-all (step 1 Continue, step 2 permanent delete)
+- **Web job photos**: **Download all** on each job (ZIP with a folder for that job); **Download** in the lightbox for one photo
+- **Settings → Data export**: **Download all photos (ZIP)** for selected owner workspaces (one folder per job); photos are not included in CSV email/scheduled exports
+
+## [0.9.86] - 2026-05-18
+
+### Changed
+
+- **Web job photos**: restore thumbnail grid as the default view (click opens lightbox); green pencil enters edit mode with ↑/↓ reorder and per-photo delete
+- **Web job photos**: add red × on the section header to delete all photos with a two-step confirmation banner
+- **Web job photos**: remove delete from the lightbox viewer
+
+## [0.9.85] - 2026-05-18
+
+### Added
+
+- **Web job photos**: lightbox viewer with zoom (pinch, wheel, +/- controls), prev/next within the job, and keyboard arrows
+- **Web job photos**: delete photos from the gallery row or lightbox; reorder with ↑/↓ controls
+- **DB**: add `sort_order` on `job_photos` for manual gallery ordering
+
 ## [0.9.84] - 2026-05-18
 
 ### Fixed

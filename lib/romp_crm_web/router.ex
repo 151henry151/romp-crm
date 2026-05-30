@@ -127,6 +127,8 @@ defmodule RompCrmWeb.Router do
     post "/business/switch", BusinessSwitchController, :update
 
     post "/jobs/:job_id/photos", JobPhotoController, :create
+    get "/jobs/:job_id/photos/download", JobPhotoController, :download_all
+    get "/jobs/:job_id/photos/:photo_id/download", JobPhotoController, :download
 
     live_session :authenticated_business_pages,
       on_mount: [
