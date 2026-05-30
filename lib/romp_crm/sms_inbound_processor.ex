@@ -1,169 +1,77 @@
-defmodule RompCrmWeb.TwilioWebhookController do
-  use RompCrmWeb, :controller
+defmodule RompCrm.SmsInboundProcessor do
+  @moduledoc false
 
   require Logger
 
-  alias RompCrm.Accounts
+  alias RompCrm.Accounts.User
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
-  alias RompCrm.Businesses
   alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
   alias RompCrm.Employees.TimeEntryActions
   alias RompCrm.Jobs
-  alias RompCrm.Reminders
   alias RompCrm.Jobs.Job
+  alias RompCrm.Reminders
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.SmsMms
   alias RompCrm.SmsPendingJobProposals
-  alias RompCrm.SmsInboundProcessor
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.MmsImageDownload
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
-  alias RompCrm.Twilio.Signature
   alias RompCrm.Twilio.SmsReplyBuilder
 
-  @doc """
-  Twilio `POST` webhook for inbound SMS. Configure the number's "A message comes in"
-  URL to `https://YOUR_HOST/webhooks/twilio/sms` with HTTP POST.
-  """
-  def sms(conn, _params) do
-    skip? = Application.get_env(:romp_crm, :skip_twilio_signature_validation, false)
-    token = Application.get_env(:romp_crm, :twilio_auth_token)
-    public_url = Application.get_env(:romp_crm, :twilio_webhook_public_url)
-
-    cond do
-      not skip? and (is_nil(token) or token == "") ->
-        Logger.warning(
-          "Twilio SMS webhook rejected: set TWILIO_AUTH_TOKEN or enable skip for dev"
-        )
-
-        send_resp(conn, 503, "Not configured")
-
-      not skip? and not Signature.valid?(conn, token, public_url: public_url) ->
-        send_resp(conn, 403, "Forbidden")
-
-      true ->
-        maybe_deliver_inbound_sms(conn)
-    end
-  end
+  @type delivery :: :twilio_sms | :in_app
 
   @doc """
-  Twilio **voice** webhook: returns TwiML that dials the configured support PSTN number.
-
-  Configure the Twilio number’s **“A call comes in”** URL to `https://YOUR_HOST/.../webhooks/twilio/voice`
-  (POST or GET). This does **not** change SMS handling (`/webhooks/twilio/sms`).
+  Process an inbound agent message (SMS webhook or in-app chat).
+  Returns `{:ok, reply_text}` or `{:error, reason}`.
   """
-  def voice(conn, _params) do
-    merged = Map.merge(conn.query_params || %{}, conn.body_params || %{})
-    conn_sig = %{conn | body_params: merged}
+  def process(%User{} = user, business_id, body_text, opts) when is_integer(business_id) do
+    delivery = Keyword.get(opts, :delivery, :in_app)
+    channel = Keyword.get(opts, :channel, channel_for_delivery(delivery))
+    params = Keyword.get(opts, :params, %{"Body" => body_text})
+    from_e164 = Keyword.get(opts, :from_e164, user.phone || "")
+    message_sid = Keyword.get(opts, :message_sid, "in-app-#{System.unique_integer([:positive])}")
 
-    skip? = Application.get_env(:romp_crm, :skip_twilio_signature_validation, false)
-    token = Application.get_env(:romp_crm, :twilio_auth_token)
-    public_url = voice_webhook_public_url()
+    ctx = %{
+      delivery: delivery,
+      channel: channel,
+      params: params,
+      from_e164: from_e164,
+      message_sid: message_sid
+    }
 
-    cond do
-      not skip? and (is_nil(token) or token == "") ->
-        Logger.warning(
-          "Twilio Voice webhook rejected: set TWILIO_AUTH_TOKEN or enable skip for dev"
-        )
-
-        send_resp(conn, 503, "Not configured")
-
-      not skip? and not Signature.valid?(conn_sig, token, public_url: public_url) ->
-        send_resp(conn, 403, "Forbidden")
-
-      true ->
-        forward_to =
-          Application.get_env(:romp_crm, :twilio_voice_forward_e164, "+18024587299")
-
-        conn
-        |> put_resp_content_type("text/xml")
-        |> send_resp(200, voice_twiml_dial(forward_to))
-    end
+    deliver_inbound(user, business_id, body_text, ctx)
   end
 
-  defp voice_webhook_public_url do
-    case Application.get_env(:romp_crm, :twilio_voice_webhook_public_url) do
-      url when is_binary(url) and url != "" ->
-        url
+  @doc false
+  def deliver_from_twilio(params, user, business_id) when is_map(params) and is_integer(business_id) do
+    body_text = (params["Body"] || "") |> to_string()
+    from = (params["From"] || "") |> to_string()
 
-      _ ->
-        infer_voice_url_from_sms_webhook()
-    end
+    process(user, business_id, body_text,
+      delivery: :twilio_sms,
+      channel: "sms",
+      params: params,
+      from_e164: from,
+      message_sid: (params["MessageSid"] || "") |> to_string()
+    )
   end
 
-  defp infer_voice_url_from_sms_webhook do
-    case Application.get_env(:romp_crm, :twilio_webhook_public_url) do
-      url when is_binary(url) and url != "" ->
-        cond do
-          String.ends_with?(url, "/sms") -> String.replace_suffix(url, "/sms", "/voice")
-          String.ends_with?(url, "/sms/") -> String.replace_suffix(url, "/sms/", "/voice")
-          true -> String.trim_trailing(url, "/") <> "/voice"
-        end
+  defp channel_for_delivery(:twilio_sms), do: "sms"
+  defp channel_for_delivery(:in_app), do: "in_app"
 
-      _ ->
-        nil
-    end
-  end
-
-  defp voice_twiml_dial(e164) when is_binary(e164) do
-    # PSTN forward; `answerOnBridge` avoids dead air while the callee’s phone rings.
-    ~s(<?xml version="1.0" encoding="UTF-8"?><Response><Dial answerOnBridge="true">#{e164}</Dial></Response>)
-  end
-
-  defp maybe_deliver_inbound_sms(conn) do
-    from = conn.body_params["From"] |> to_string()
+  defp resolve_phone_norm(from, user) do
     norm = Phone.normalize_us(from)
-    message_sid = conn.body_params["MessageSid"] |> to_string()
 
-    cond do
-      norm == "" ->
-        Logger.info("Twilio SMS: empty From after normalize sid=#{message_sid}")
-        twiml_ok(conn)
-
-      true ->
-        case Accounts.get_user_by_phone_normalized(norm) do
-          nil ->
-            Logger.info(
-              "Twilio SMS: no user with profile phone matching from=#{inspect(from)} sid=#{message_sid}"
-            )
-
-            twiml_ok(conn)
-
-          user ->
-            case Businesses.resolve_sms_business_id(user) do
-              {:ok, business_id} ->
-                deliver_inbound_sms(conn, user, business_id)
-
-              {:error, :no_membership} ->
-                Logger.warning(
-                  "Twilio SMS: user id=#{user.id} has no business membership sid=#{message_sid}"
-                )
-
-                twiml_ok(conn)
-
-              {:error, :ambiguous_sms_routing} ->
-                Logger.warning(
-                  "Twilio SMS: user id=#{user.id} belongs to multiple businesses; set a workspace in the Jobs picker or SMS workspace in Settings sid=#{message_sid}"
-                )
-
-                maybe_reply_routing_help(from)
-                twiml_ok(conn)
-            end
-        end
+    if norm != "" do
+      norm
+    else
+      user.phone_normalized || ""
     end
-  end
-
-  defp maybe_reply_routing_help(from) do
-    reply =
-      "Pick a workspace in Romp CRM (jobs picker), then text again—or set SMS workspace in Settings."
-
-    _ = Messages.send_sms(from, reply)
-    :ok
   end
 
   defp inbound_sms_body_for_extraction(body_text, params)
@@ -226,13 +134,111 @@ defmodule RompCrmWeb.TwilioWebhookController do
     end
   end
 
-  defp deliver_inbound_sms(conn, user, business_id) do
-    _ = SmsInboundProcessor.deliver_from_twilio(conn.body_params, user, business_id)
-    twiml_ok(conn)
+  defp deliver_inbound(user, business_id, body_text, ctx) do
+    body_stored = SmsMms.body_for_storage(body_text, ctx.params)
+    body_for_ai = inbound_sms_body_for_extraction(body_text, ctx.params)
+    from = to_string(ctx.from_e164 || "")
+    _to_num = to_string(ctx.params["To"] || "")
+    message_sid = to_string(ctx.message_sid || "")
+    phone_norm = resolve_phone_norm(from, user)
+
+    Logger.info(
+      "Agent inbound (#{ctx.channel}): sid=#{message_sid} user_id=#{user.id} business_id=#{business_id} body=#{inspect(body_text)}"
+    )
+
+    jobs_snapshot = Jobs.snapshot_for_sms_ai(business_id)
+    allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
+
+    open_time_entries = TimeTracking.snapshot_for_sms_ai(business_id)
+    employees_snapshot = Employees.snapshot_for_sms_ai(business_id)
+    allowed_employee_ids = MapSet.new(Enum.map(employees_snapshot, fn row -> row["id"] end))
+
+    prior_turns =
+      if phone_norm != "" do
+        SmsConversations.list_prior_turns_for_ai(business_id, phone_norm)
+      else
+        []
+      end
+
+    reminder_wall_tz =
+      user.sms_reminder_prefs_json
+      |> Reminders.decode_prefs_json()
+      |> Map.get("timezone", "America/New_York")
+
+    if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
+      case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
+        {:ok, results} ->
+          reply =
+            SmsReplyBuilder.compose(nil, results)
+            |> case do
+              "" -> "Confirmed—created the proposed job(s) in Romp CRM."
+              r -> r
+            end
+
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "pending_proposals_confirmed",
+            results: results
+          })
+
+        :none ->
+          :continue_extract
+
+        {:error, :wrong_user} ->
+          reply = "Couldn't apply pending jobs for this account."
+
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "pending_proposals_wrong_user",
+            results: []
+          })
+      end
+    else
+      :continue_extract
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_extract ->
+        mms_urls = SmsMms.media_urls_from_params(ctx.params)
+
+        mms_image_blocks =
+          mms_urls
+          |> MmsImageDownload.fetch_for_vision()
+          |> tap(fn blocks ->
+            if mms_urls != [] and blocks == [] do
+              Logger.warning(
+                "Twilio SMS MMS vision: sid=#{message_sid} could not download #{length(mms_urls)} image(s) for analysis"
+              )
+            end
+          end)
+
+        extract_and_deliver_sms_ops(
+          ctx,
+          user,
+          business_id,
+          from,
+          phone_norm,
+          body_text,
+          body_stored,
+          body_for_ai,
+          message_sid,
+          jobs_snapshot,
+          allowed_job_ids,
+          open_time_entries,
+          employees_snapshot,
+          allowed_employee_ids,
+          prior_turns,
+          reminder_wall_tz,
+          mms_urls,
+          mms_image_blocks
+        )
+    end
   end
 
   defp extract_and_deliver_sms_ops(
-         conn,
+         ctx,
          user,
          business_id,
          from,
@@ -289,7 +295,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
             first_nonempty([assistant]) ||
               default_proposal_reply(proposed)
 
-          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
             message_sid: message_sid,
             outcome: "proposed_job_creates",
             proposed_count: length(proposed),
@@ -298,7 +304,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
           })
         else
           deliver_extracted_sms_ops(
-            conn,
+            ctx,
             user,
             business_id,
             from,
@@ -314,7 +320,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
             time_ops_raw,
             emp_ops_raw,
             rem_ops_raw,
-            conn.body_params
+            ctx.params
           )
         end
 
@@ -325,7 +331,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
         reply = sms_extraction_failed_reply(reason)
 
-        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply, %{
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
           message_sid: message_sid,
           outcome: "extraction_error",
           planned_job_ops: [],
@@ -339,7 +345,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   end
 
   defp deliver_extracted_sms_ops(
-         conn,
+         ctx,
          user,
          business_id,
          from,
@@ -386,7 +392,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
         reply =
           "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
 
-        sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply,
           Map.merge(log_base, %{outcome: "permission_denied", results: []})
         )
 
@@ -414,7 +420,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
             sms_outbound: reply
           }, results)
 
-          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply,
             Map.merge(log_base, %{outcome: "operations_applied", results: results})
           )
         else
@@ -424,7 +430,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
             msg ||
               "No changes applied. Open Romp CRM or include clearer job/time details."
 
-          sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply,
             Map.merge(log_base, %{outcome: "no_db_operations", results: []})
           )
         end
@@ -474,11 +480,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
                 sms_outbound: reply
               }, results)
 
-              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+              sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply,
                 Map.merge(log_base, %{outcome: "operations_applied", results: results})
               )
             else
-              sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, msg,
+              sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, msg,
                 Map.merge(log_base, %{outcome: "clarify", results: []})
               )
             end
@@ -503,7 +509,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
               sms_outbound: reply
             }, all_results)
 
-            sms_reply_and_log(conn, from, user, business_id, phone_norm, body_stored, reply,
+            sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply,
               Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
             )
         end
@@ -530,7 +536,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   end
 
   defp sms_reply_and_log(
-         conn,
+         ctx,
          from,
          user,
          business_id,
@@ -539,9 +545,13 @@ defmodule RompCrmWeb.TwilioWebhookController do
          reply_text,
          _log_extra
        ) do
-    _ = Messages.send_sms(from, reply_text)
-    maybe_record_sms_exchange(business_id, user, phone_norm, inbound_stored_body, reply_text)
-    twiml_ok(conn)
+    if ctx.delivery == :twilio_sms do
+      _ = Messages.send_sms(from, reply_text)
+    end
+
+    channel = Map.get(ctx, :channel, "sms")
+    maybe_record_sms_exchange(business_id, user, phone_norm, inbound_stored_body, reply_text, channel)
+    {:ok, reply_text}
   end
 
   defp append_orphan_mms_attach(results, business_id, phone_norm, body_text, params, jobs_snapshot)
@@ -705,14 +715,15 @@ defmodule RompCrmWeb.TwilioWebhookController do
   defp format_audit_dt(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_iso8601(ndt)
   defp format_audit_dt(other), do: inspect(other)
 
-  defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body)
+  defp maybe_record_sms_exchange(business_id, user, phone_norm, inbound_body, outbound_body, channel)
        when is_binary(phone_norm) and phone_norm != "" do
     case SmsConversations.record_exchange(
            business_id,
            user.id,
            phone_norm,
            inbound_body,
-           outbound_body
+           outbound_body,
+           channel: channel
          ) do
       {:ok, _} ->
         :ok
@@ -724,7 +735,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
     end
   end
 
-  defp maybe_record_sms_exchange(_, _, "", _, _), do: :ok
+  defp maybe_record_sms_exchange(_, _, "", _, _, _), do: :ok
 
   # Runs all operation lists and collects results. Job fuzzy-match errors trigger clarification.
   defp run_all_operations(job_ops, time_ops, emp_ops, rem_ops, job_ctx, allowed_employee_ids) do
@@ -1387,13 +1398,4 @@ defmodule RompCrmWeb.TwilioWebhookController do
     Enum.find(list, fn s -> is_binary(s) and String.trim(s) != "" end)
   end
 
-  defp twiml_ok(conn) do
-    conn
-    |> put_resp_content_type("application/xml")
-    |> send_resp(200, empty_twiml())
-  end
-
-  defp empty_twiml do
-    ~s(<?xml version="1.0" encoding="UTF-8"?><Response></Response>)
-  end
 end

@@ -162,6 +162,7 @@ defmodule RompCrmWeb.Router do
       live "/time-log", TimeLogLive, :index
       live "/my-timeclock", MyTimeclockLive, :index
       live "/reminders", RemindersLive, :index
+      live "/chat", AgentChatLive, :index
     end
 
     live_session :authenticated_employees_owner,

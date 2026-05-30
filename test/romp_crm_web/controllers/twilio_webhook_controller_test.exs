@@ -54,7 +54,7 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
         assert response(conn, 200) =~ "<Response>"
       end)
 
-    assert log =~ "Twilio SMS inbound: sid=SMstubupdatebyid"
+    assert log =~ "Agent inbound (sms): sid=SMstubupdatebyid"
     assert log =~ "job_id=#{job.id}"
     assert log =~ "Twilio SMS update applied: sid=SMstubupdatebyid"
 
@@ -94,7 +94,7 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
         assert response(conn, 200) =~ "<Response>"
       end)
 
-    assert log =~ "Twilio SMS inbound: sid=SMstubupdate"
+    assert log =~ "Agent inbound (sms): sid=SMstubupdate"
     assert log =~ "from=+15555550123"
     assert log =~ "match="
     assert log =~ "Twilio SMS parsed update: sid=SMstubupdate"
@@ -200,7 +200,7 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
       end)
 
     assert log =~ "no user with profile phone matching"
-    refute log =~ "Twilio SMS inbound: sid=SMnotallowed"
+    refute log =~ "Agent inbound (sms): sid=SMnotallowed"
     assert Jobs.list_jobs(biz.id) |> length() == before
   end
 

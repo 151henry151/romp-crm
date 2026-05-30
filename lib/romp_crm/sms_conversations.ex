@@ -92,6 +92,21 @@ defmodule RompCrm.SmsConversations do
     |> Enum.join("\n")
   end
 
+  @doc """
+  All agent-thread messages for a workspace (every team member's SMS and in-app lines), oldest first.
+  """
+  def list_business_agent_messages(business_id, opts \\ []) when is_integer(business_id) do
+    limit = Keyword.get(opts, :limit, 500)
+
+    Repo.all(
+      from m in Message,
+        where: m.business_id == ^business_id,
+        order_by: [asc: m.id],
+        limit: ^limit,
+        preload: [:user]
+    )
+  end
+
   @doc "Recent inbound message bodies (newest first), for MMS job/photo inference."
   def recent_inbound_bodies(business_id, phone_normalized, opts \\ [])
       when is_integer(business_id) and is_binary(phone_normalized) do
@@ -113,15 +128,18 @@ defmodule RompCrm.SmsConversations do
 
   Bodies are truncated for safety before insert. Returns **`{:ok, :ok}`** or **`{:error, reason}`**.
   """
-  def record_exchange(business_id, user_id, phone_normalized, inbound_body, outbound_body)
+  def record_exchange(business_id, user_id, phone_normalized, inbound_body, outbound_body, opts \\ [])
       when is_integer(business_id) and is_integer(user_id) and is_binary(phone_normalized) and
              is_binary(inbound_body) and is_binary(outbound_body) do
+    channel = Keyword.get(opts, :channel, "sms")
     inbound_body = String.slice(String.trim(inbound_body), 0, 6000)
     outbound_body = String.slice(String.trim(outbound_body), 0, 6000)
 
     Repo.transaction(fn ->
-      with {:ok, _} <- insert_message(business_id, user_id, phone_normalized, "inbound", inbound_body),
-           {:ok, _} <- insert_message(business_id, user_id, phone_normalized, "outbound", outbound_body) do
+      with {:ok, _} <-
+             insert_message(business_id, user_id, phone_normalized, "inbound", inbound_body, channel),
+           {:ok, _} <-
+             insert_message(business_id, user_id, phone_normalized, "outbound", outbound_body, channel) do
         :ok
       else
         {:error, changeset} -> Repo.rollback(changeset)
@@ -129,14 +147,15 @@ defmodule RompCrm.SmsConversations do
     end)
   end
 
-  defp insert_message(business_id, user_id, phone_normalized, direction, body) do
+  defp insert_message(business_id, user_id, phone_normalized, direction, body, channel) do
     %Message{}
     |> Message.changeset(%{
       business_id: business_id,
       user_id: user_id,
       phone_normalized: phone_normalized,
       direction: direction,
-      body: body
+      body: body,
+      channel: channel
     })
     |> Repo.insert()
   end

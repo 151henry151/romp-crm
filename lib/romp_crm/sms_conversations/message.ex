@@ -10,6 +10,7 @@ defmodule RompCrm.SmsConversations.Message do
 
     field :phone_normalized, :string
     field :direction, :string
+    field :channel, :string, default: "sms"
     field :body, :string
 
     timestamps(type: :utc_datetime)
@@ -17,9 +18,10 @@ defmodule RompCrm.SmsConversations.Message do
 
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:business_id, :user_id, :phone_normalized, :direction, :body])
+    |> cast(attrs, [:business_id, :user_id, :phone_normalized, :direction, :channel, :body])
     |> validate_required([:business_id, :user_id, :phone_normalized, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
+    |> validate_inclusion(:channel, ["sms", "in_app"])
     |> validate_length(:body, max: 6000)
   end
 end

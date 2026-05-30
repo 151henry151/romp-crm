@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.9.96] - 2026-05-18
+
+### Changed
+
+- **Chat**: restore comfortable bubble padding (`px-3 py-1.5`, `leading-snug`) now that empty-bubble whitespace no longer inflates vertical space
+
+## [0.9.95] - 2026-05-18
+
+### Fixed
+
+- **Chat**: fix 500 on `/chat` when a message has no display text (photo-only or empty SMS) by using boolean-safe content checks instead of `&&`/`or`
+
+## [0.9.94] - 2026-05-18
+
+### Fixed
+
+- **Chat**: remove extra blank space in bubbles caused by `whitespace-pre-wrap` on the bubble container preserving template newlines; skip empty bubbles
+
+## [0.9.93] - 2026-05-18
+
+### Changed
+
+- **Chat**: reduce vertical padding inside message bubbles
+
+## [0.9.92] - 2026-05-18
+
+### Changed
+
+- **Chat**: label your own messages **You** (in-app) or **You (sms)** instead of **You (name)**
+
+## [0.9.91] - 2026-05-18
+
+### Changed
+
+- **Chat**: tighten bubble padding, increase corner radius, and use solid outgoing colors for readable dark-mode text
+
+## [0.9.90] - 2026-05-18
+
+### Added
+
+- **Chat** page (`/chat`): messenger-style agent thread combining SMS and in-app messages for the workspace
+- **`RompCrm.Conversations`**, **`RompCrmWeb.ChatComponents`**, and **`RompCrm.SmsInboundProcessor`** for modular future client chat threads
+- **`sms_conversation_messages.channel`**: distinguish `sms` vs `in_app` delivery
+
 ## [0.9.89] - 2026-05-18
 
 ### Changed
