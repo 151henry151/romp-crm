@@ -88,6 +88,7 @@ defmodule RompCrmWeb do
       # Core UI components
       import RompCrmWeb.CoreComponents
       import RompCrmWeb.AddressFieldsComponent, only: [address_fields: 1]
+      import RompCrmWeb.PhoneFieldComponent, only: [phone_field: 1]
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

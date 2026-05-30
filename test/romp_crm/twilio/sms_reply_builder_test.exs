@@ -39,5 +39,42 @@ defmodule RompCrm.Twilio.SmsReplyBuilderTest do
 
       assert SmsReplyBuilder.compose("Ignored.", results) == "Ignored. (1 skipped.)"
     end
+
+    test "replaces partial address assistant text with full saved service address" do
+      job = %Job{
+        id: 12,
+        client_name: "Dave Miles",
+        address_line1: "34 Exchange St",
+        city: "Middlebury",
+        state: "VT",
+        postal_code: "05753"
+      }
+
+      results = [{:updated, job, ["address_line1", "city", "state", "postal_code"], []}]
+
+      assistant = "Updated Dave Miles' address to 34 Exchange St"
+
+      assert SmsReplyBuilder.compose(assistant, results) ==
+               "Updated Dave Miles's address to 34 Exchange St, Middlebury, VT 05753."
+    end
+
+    test "replaces partial billing address assistant text with full saved billing address" do
+      job = %Job{
+        id: 12,
+        client_name: "Dave Miles",
+        billing_address_different: true,
+        billing_address_line1: "45 Exchange St",
+        billing_city: "Middlebury",
+        billing_state: "VT",
+        billing_postal_code: "05753"
+      }
+
+      results = [{:updated, job, ["billing_address_line1"], []}]
+
+      assistant = "Updated Dave Miles' billing address to 45 Exchange St"
+
+      assert SmsReplyBuilder.compose(assistant, results) ==
+               "Updated Dave Miles's billing address to 45 Exchange St, Middlebury, VT 05753."
+    end
   end
 end

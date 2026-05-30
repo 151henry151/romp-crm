@@ -53,6 +53,7 @@ defmodule RompCrmWeb.JobPhotosSection do
                 type="button"
                 phx-click="job_expand_edit_start"
                 phx-value-key={@edit_key}
+                data-job-expand-edit-start={@edit_key}
                 class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
                 aria-label="Edit photos"
                 title="Edit order or delete photos"
@@ -139,7 +140,12 @@ defmodule RompCrmWeb.JobPhotosSection do
 
       <%= if @photos != [] do %>
         <%= if @editing? && @can_edit_jobs do %>
-          <div class="flex flex-col gap-2">
+          <div
+            data-job-expand-edit-surface
+            data-job-expand-edit-key={@edit_key}
+            data-job-expand-no-dirty="true"
+            class="flex flex-col gap-2"
+          >
             <%= for {ph, idx} <- Enum.with_index(@photos, 1) do %>
               <div class="flex items-center gap-2">
                 <div class="flex shrink-0 flex-col gap-0.5">

@@ -71,9 +71,34 @@ defmodule RompCrmWeb.ChatComponents do
   attr :placeholder, :string, default: "Message the RompCRM agent…"
   attr :disabled, :boolean, default: false
 
+  attr :id, :string, default: "chat-typing-indicator"
+
+  def chat_typing_indicator(assigns) do
+    ~H"""
+    <div id={@id} class="mt-2 flex w-full flex-col items-start" aria-live="polite" aria-label="RompCRM agent is typing">
+      <div class="mb-0.5 px-1 text-[10px] font-medium tracking-wide text-base-content/55">
+        RompCRM agent
+      </div>
+      <div class={[
+        "max-w-[min(85%,20rem)] px-3 py-2 text-sm leading-snug text-base-content/70",
+        "rounded-[1.125rem] rounded-bl-[0.35rem] shadow-sm",
+        bubble_tone(:agent)
+      ]}>
+        <span class="chat-typing-dots">RompCRM is typing</span>
+      </div>
+    </div>
+    """
+  end
+
   def chat_compose(assigns) do
     ~H"""
-    <form id={@form_id} phx-submit="chat_send" class="flex items-end gap-2 border-t border-base-300 pt-3">
+    <form
+      id={@form_id}
+      phx-submit="chat_send"
+      phx-reset
+      phx-hook="ChatCompose"
+      class="flex items-end gap-2 border-t border-base-300 pt-3"
+    >
       <label class="sr-only" for={"#{@form_id}-input"}>Message</label>
       <textarea
         id={"#{@form_id}-input"}
@@ -83,7 +108,7 @@ defmodule RompCrmWeb.ChatComponents do
         disabled={@disabled}
         class="textarea textarea-bordered min-h-[2.75rem] flex-1 resize-y text-sm"
       ></textarea>
-      <button type="submit" class="btn btn-brand btn-sm shrink-0" disabled={@disabled}>
+      <button type="submit" class="btn btn-primary btn-sm shrink-0" disabled={@disabled}>
         Send
       </button>
     </form>

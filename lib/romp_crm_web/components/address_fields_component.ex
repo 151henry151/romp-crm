@@ -1,6 +1,6 @@
 defmodule RompCrmWeb.AddressFieldsComponent do
   @moduledoc """
-  Structured service + optional billing address fields with Google Places hook.
+  Structured service + optional billing address fields with Google Places autocomplete.
   """
   use Phoenix.Component
 
@@ -33,55 +33,56 @@ defmodule RompCrmWeb.AddressFieldsComponent do
       >
         <div class="space-y-3 rounded-lg border border-base-300 bg-base-200/20 p-3">
           <p class="text-sm font-medium text-base-content">Service address</p>
-          <.address_lines prefix={@name_prefix} part="service" values={@values} />
-          <%= if @maps_configured? do %>
-            <button type="button" data-address-validate="service" class="btn btn-brand btn-xs">
-              Check address
-            </button>
-          <% end %>
+          <.address_lines
+            prefix={@name_prefix}
+            part="service"
+            values={@values}
+            maps_configured?={@maps_configured?}
+          />
         </div>
       </div>
 
       <%= if @show_billing? do %>
-        <label class="flex cursor-pointer items-start gap-2 text-sm">
-          <input type="hidden" name={"#{@name_prefix}[billing_address_different]"} value="false" />
-          <input
-            type="checkbox"
-            name={"#{@name_prefix}[billing_address_different]"}
-            value="true"
-            checked={@billing_different?}
-            class="checkbox checkbox-sm mt-0.5"
-          />
-          <span class="text-base-content">Billing address is different from service address</span>
-        </label>
+        <div
+          id={"#{@id}-billing-toggle"}
+          phx-update="ignore"
+          phx-hook="BillingAddressToggle"
+          data-billing-toggle-root
+        >
+          <label class="flex cursor-pointer items-start gap-2 text-sm">
+            <input type="hidden" name={"#{@name_prefix}[billing_address_different]"} value="false" />
+            <input
+              type="checkbox"
+              name={"#{@name_prefix}[billing_address_different]"}
+              value="true"
+              checked={@billing_different?}
+              data-billing-toggle
+              onchange="this.closest('[data-billing-toggle-root]')?.querySelector('[data-billing-panel]')?.classList.toggle('hidden', !this.checked)"
+              class="checkbox checkbox-sm mt-0.5"
+            />
+            <span class="text-base-content">Billing address is different from service address</span>
+          </label>
 
-        <%= if @billing_different? do %>
-          <div
-            id={"#{@id}-billing"}
-            phx-hook="GoogleAddress"
-            phx-update="ignore"
-            phx-target={@target}
-            data-prefix={@name_prefix}
-          >
-            <div class="space-y-3 rounded-lg border border-base-300 bg-base-200/20 p-3">
-              <p class="text-sm font-medium text-base-content">Billing address</p>
-              <.address_lines prefix={@name_prefix} part="billing" values={@values} />
-              <%= if @maps_configured? do %>
-                <button type="button" data-address-validate="billing" class="btn btn-brand btn-xs">
-                  Check billing address
-                </button>
-              <% end %>
+          <div data-billing-panel class={unless @billing_different?, do: "hidden"}>
+            <div
+              id={"#{@id}-billing"}
+              phx-hook="GoogleAddress"
+              phx-update="ignore"
+              phx-target={@target}
+              data-prefix={@name_prefix}
+            >
+              <div class="space-y-3 rounded-lg border border-base-300 bg-base-200/20 p-3 mt-3">
+                <p class="text-sm font-medium text-base-content">Billing address</p>
+                <.address_lines
+                  prefix={@name_prefix}
+                  part="billing"
+                  values={@values}
+                  maps_configured?={@maps_configured?}
+                />
+              </div>
             </div>
           </div>
-        <% end %>
-      <% end %>
-
-      <%= if @suggestion && @suggestion["part"] == "service" do %>
-        <.address_suggestion_panel suggestion={@suggestion} target={@target} />
-      <% end %>
-
-      <%= if @suggestion && @suggestion["part"] == "billing" do %>
-        <.address_suggestion_panel suggestion={@suggestion} target={@target} />
+        </div>
       <% end %>
     </div>
     """
@@ -90,6 +91,7 @@ defmodule RompCrmWeb.AddressFieldsComponent do
   attr :prefix, :string, required: true
   attr :part, :string, required: true
   attr :values, :map, required: true
+  attr :maps_configured?, :boolean, required: true
 
   defp address_lines(assigns) do
     {line1, line2, city, state, postal, line1_id} =
@@ -121,17 +123,19 @@ defmodule RompCrmWeb.AddressFieldsComponent do
         <label for={@line1_id} class="block text-xs font-medium text-base-content/70 mb-0.5">
           Address line 1
         </label>
-        <input
-          id={@line1_id}
-          type="text"
-          name={@line1_name}
-          value={@line1_val}
-          data-address-part={@part}
-          data-address-field="line1"
-          data-address-autocomplete
-          autocomplete="address-line1"
-          class="input input-bordered input-sm w-full"
-        />
+        <div data-address-autocomplete-wrap class="relative">
+          <input
+            id={@line1_id}
+            type="text"
+            name={@line1_name}
+            value={@line1_val}
+            data-address-part={@part}
+            data-address-field="line1"
+            data-address-autocomplete={if @maps_configured?, do: "true"}
+            autocomplete="off"
+            class="input input-bordered input-sm w-full"
+          />
+        </div>
       </div>
       <div>
         <label class="block text-xs font-medium text-base-content/70 mb-0.5">Address line 2</label>
@@ -183,45 +187,6 @@ defmodule RompCrmWeb.AddressFieldsComponent do
             class="input input-bordered input-sm w-full"
           />
         </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr :suggestion, :map, required: true
-  attr :target, :any, default: nil
-
-  defp address_suggestion_panel(assigns) do
-    ~H"""
-    <div class="rounded-md border border-base-300 bg-base-100 p-3 text-sm space-y-2">
-      <p class="font-medium text-base-content">We found a standardized address. Which should we use?</p>
-      <p class="text-base-content/80">
-        <span class="font-medium">What you entered:</span> {@suggestion["typed_formatted"]}
-      </p>
-      <p class="text-base-content/80">
-        <span class="font-medium">Suggested:</span> {@suggestion["suggested_formatted"]}
-      </p>
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button
-          type="button"
-          phx-click="address_apply_choice"
-          phx-target={@target}
-          phx-value-part={@suggestion["part"]}
-          phx-value-choice="typed"
-          class="btn btn-brand btn-xs"
-        >
-          Use what I entered
-        </button>
-        <button
-          type="button"
-          phx-click="address_apply_choice"
-          phx-target={@target}
-          phx-value-part={@suggestion["part"]}
-          phx-value-choice="suggested"
-          class="btn btn-brand-soft btn-xs"
-        >
-          Use suggested address
-        </button>
       </div>
     </div>
     """

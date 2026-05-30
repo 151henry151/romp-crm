@@ -20,6 +20,7 @@ defmodule RompCrmWeb.JobsLive do
   alias RompCrmWeb.JobExpandEditKeys, as: JEK
   alias RompCrmWeb.JobsList
   alias RompCrmWeb.AddressFormHandlers
+  alias RompCrm.ContactInfo
 
   @impl true
   def mount(_params, _session, socket) do
@@ -729,8 +730,18 @@ defmodule RompCrmWeb.JobsLive do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
     else
-      keys = MapSet.put(socket.assigns.job_expand_editing, key)
-      {:noreply, assign(socket, :job_expand_editing, keys)}
+      {:noreply, assign(socket, :job_expand_editing, MapSet.new([key]))}
+    end
+  end
+
+  def handle_event("job_expand_edit_switch", %{"to_key" => key}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      {:noreply,
+       socket
+       |> assign(:job_expand_editing, MapSet.new([key]))
+       |> assign(:address_suggestion, nil)}
     end
   end
 
@@ -762,6 +773,10 @@ defmodule RompCrmWeb.JobsLive do
         job_id == nil ->
           {:noreply, put_flash(socket, :error, "Invalid request.")}
 
+        match?({:invalid, _}, attrs) ->
+          {:invalid, msg} = attrs
+          {:noreply, put_flash(socket, :error, msg)}
+
         not inline_job_field_allowed?(field) ->
           {:noreply, put_flash(socket, :error, "Invalid field.")}
 
@@ -781,8 +796,9 @@ defmodule RompCrmWeb.JobsLive do
                   {:ok, _} ->
                     {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
 
-                  {:error, _} ->
-                    {:noreply, put_flash(socket, :error, "Could not save that change.")}
+                  {:error, changeset} ->
+                    msg = inline_field_error(changeset, field) || "Could not save that change."
+                    {:noreply, put_flash(socket, :error, msg)}
                 end
             end
           end
@@ -967,7 +983,7 @@ defmodule RompCrmWeb.JobsLive do
                socket
                |> refresh_jobs()
                |> assign(:expanded_job_id, job_id)
-               |> assign(:job_expand_editing, MapSet.put(socket.assigns.job_expand_editing, edit_key))}
+               |> assign(:job_expand_editing, MapSet.new([edit_key]))}
 
             {:error, _} ->
               {:noreply, put_flash(socket, :error, "Could not add work item.")}
@@ -1344,12 +1360,51 @@ defmodule RompCrmWeb.JobsLive do
 
   defp build_inline_job_update_attrs("status", _), do: %{}
 
+  defp build_inline_job_update_attrs("phone", raw) do
+    case ContactInfo.normalize_phone(to_string(raw || "")) do
+      {:ok, nil} -> %{"phone" => nil}
+      {:ok, phone} -> %{"phone" => phone}
+      {:error, msg} -> {:invalid, msg}
+    end
+  end
+
+  defp build_inline_job_update_attrs("client_email", raw) do
+    case ContactInfo.normalize_email(to_string(raw || "")) do
+      {:ok, nil} -> %{"client_email" => nil}
+      {:ok, email} -> %{"client_email" => email}
+      {:error, msg} -> {:invalid, msg}
+    end
+  end
+
   defp build_inline_job_update_attrs(field, raw)
-       when field in ~w(client_name address phone client_email work_description notes referred_by next_action) do
+       when field in ~w(client_name address work_description notes referred_by next_action) do
     %{field => raw |> to_string()}
   end
 
   defp build_inline_job_update_attrs(_, _), do: %{}
+
+  defp inline_field_error(changeset, "phone"), do: first_changeset_error(changeset, :phone)
+  defp inline_field_error(changeset, "client_email"), do: first_changeset_error(changeset, :client_email)
+
+  defp inline_field_error(changeset, field)
+       when field in ~w(client_name work_description notes referred_by next_action priority status) do
+    first_changeset_error(changeset, String.to_existing_atom(field))
+  end
+
+  defp inline_field_error(_, _), do: nil
+
+  defp first_changeset_error(changeset, field) do
+    case Keyword.get(changeset.errors, field) do
+      {msg, opts} -> format_inline_error_msg(msg, opts)
+      _ -> nil
+    end
+  end
+
+  defp format_inline_error_msg(msg, opts) do
+    Enum.reduce(opts, msg, fn {key, value}, acc ->
+      String.replace(acc, "%{#{key}}", to_string(value))
+    end)
+  end
 
   defp expanded?(expanded_job_id, job_id), do: expanded_job_id == job_id
 

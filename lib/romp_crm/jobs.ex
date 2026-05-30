@@ -226,6 +226,7 @@ defmodule RompCrm.Jobs do
   def update_job(%Job{} = job, attrs) do
     job = Repo.preload(job, [:work_items, :materials])
     attrs = normalize_job_nested_attrs(attrs)
+    attrs = RompCrm.Addresses.enrich_ai_address_update(job, attrs)
     attrs = merge_append_only_work_items(job, attrs)
     {mat_action, attrs} = pop_material_specs_attr(attrs)
 

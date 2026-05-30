@@ -158,4 +158,87 @@ img.brand-logo-dark {
   .text-brand {
     @apply text-primary;
   }
+
+  @keyframes job-expand-edit-flash {
+    0%,
+    100% {
+      background-color: transparent;
+      box-shadow: none;
+    }
+    50% {
+      background-color: color-mix(in oklch, var(--color-warning) 22%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-warning) 45%, transparent);
+    }
+  }
+
+  .job-expand-edit-flash {
+    animation: job-expand-edit-flash 0.45s ease-in-out 2;
+    border-radius: 0.375rem;
+  }
+
+  @keyframes job-expand-edit-save-blink {
+    0%,
+    100% {
+      background-color: transparent;
+      color: oklch(52% 0.15 155);
+      box-shadow: none;
+      transform: scale(1);
+    }
+    50% {
+      background-color: oklch(72% 0.19 155);
+      color: white;
+      box-shadow: 0 0 0 2px oklch(62% 0.2 155), 0 0 10px oklch(62% 0.2 155 / 0.55);
+      transform: scale(1.12);
+    }
+  }
+
+  @keyframes job-expand-edit-cancel-blink {
+    0%,
+    100% {
+      background-color: transparent;
+      color: oklch(55% 0.02 260);
+      box-shadow: none;
+      transform: scale(1);
+    }
+    50% {
+      background-color: oklch(82% 0.16 85);
+      color: oklch(35% 0.06 85);
+      box-shadow: 0 0 0 2px oklch(75% 0.17 85), 0 0 10px oklch(75% 0.17 85 / 0.5);
+      transform: scale(1.12);
+    }
+  }
+
+  [data-job-expand-edit-actions].job-expand-edit-flash button[type="submit"] {
+    animation: job-expand-edit-save-blink 0.32s ease-in-out 4;
+  }
+
+  [data-job-expand-edit-actions].job-expand-edit-flash button[type="button"] {
+    animation: job-expand-edit-cancel-blink 0.32s ease-in-out 4;
+  }
+
+  .chat-typing-dots::after {
+    display: inline-block;
+    width: 1.25rem;
+    text-align: left;
+    content: "";
+    animation: chat-typing-ellipsis 1.2s steps(4, end) infinite;
+  }
+
+  @keyframes chat-typing-ellipsis {
+    0% {
+      content: "";
+    }
+
+    25% {
+      content: ".";
+    }
+
+    50% {
+      content: "..";
+    }
+
+    75% {
+      content: "...";
+    }
+  }
 }

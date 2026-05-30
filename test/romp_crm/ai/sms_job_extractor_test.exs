@@ -1,7 +1,9 @@
 defmodule RompCrm.Ai.SmsJobExtractorTest do
   use ExUnit.Case, async: true
 
+  alias RompCrm.Addresses
   alias RompCrm.Ai.SmsJobExtractor
+  alias RompCrm.Jobs.Job
 
   describe "normalize_update_patch/1" do
     test "preserves material quantity from AI JSON for update patches" do
@@ -23,6 +25,25 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
         })
 
       assert patch.client_email == "pat@example.com"
+    end
+
+    test "normalizes partial address updates with existing job context" do
+      job = %Job{
+        address: "South St, Middlebury VT",
+        address_line1: nil,
+        city: nil,
+        state: nil
+      }
+
+      patch =
+        SmsJobExtractor.normalize_update_patch(%{"address" => "5 south st"})
+        |> Map.new(fn {k, v} -> {to_string(k), v} end)
+
+      enriched = Addresses.enrich_ai_address_update(job, patch)
+
+      assert enriched["address_line1"] == "5 South St"
+      assert enriched["city"] == "Middlebury"
+      assert enriched["state"] == "VT"
     end
 
     test "preserves string material quantity" do
@@ -49,7 +70,7 @@ defmodule RompCrm.Ai.SmsJobExtractorTest do
       assert {:ok,
               %{
                 assistant_sms: "Stub: applied.",
-                operations: [{:update_by_id, 44, %{address: "99 Oak"}}]
+                operations: [{:update_by_id, 44, %{address_line1: "99 Oak"}}]
               }} =
                SmsJobExtractor.extract(raw, [])
     end

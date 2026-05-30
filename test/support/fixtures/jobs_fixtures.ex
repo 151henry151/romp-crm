@@ -37,7 +37,7 @@ defmodule RompCrm.JobsFixtures do
         client_name: "some client_name",
         next_action: "some next_action",
         notes: "some notes",
-        phone: "some phone",
+        phone: "+18025550100",
         priority: :normal,
         referred_by: "some referred_by",
         status: :lead,

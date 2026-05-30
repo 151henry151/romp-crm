@@ -84,14 +84,19 @@ defmodule RompCrm.Jobs.Job do
       drop_param: :work_items_drop
     )
     |> validate_required([:business_id, :client_name, :priority, :status])
+    |> RompCrm.ContactInfo.validate_job_changeset()
   end
 
   defp normalize_billing_address_different(changeset) do
     case get_change(changeset, :billing_address_different) do
+      values when is_list(values) ->
+        truthy = Enum.any?(values, fn v -> v in [true, "true", "1", 1, "on"] end)
+        put_change(changeset, :billing_address_different, truthy)
+
       v when v in [true, "true", "1", 1, "on"] ->
         put_change(changeset, :billing_address_different, true)
 
-      v when v in [false, "false", "0", 0] ->
+      v when v in [false, "false", "0", 0, nil, ""] ->
         put_change(changeset, :billing_address_different, false)
 
       _ ->

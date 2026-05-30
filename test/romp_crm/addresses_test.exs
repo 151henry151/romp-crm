@@ -20,6 +20,48 @@ defmodule RompCrm.AddressesTest do
     assert Addresses.format_service(job) == "99 Oak Ave"
   end
 
+  test "parse_us_address/1 splits comma-separated legacy addresses" do
+    assert Addresses.parse_us_address("South St, Middlebury VT") == %{
+             "address_line1" => "South St",
+             "address_line2" => nil,
+             "city" => "Middlebury",
+             "state" => "VT",
+             "postal_code" => nil
+           }
+  end
+
+  test "enrich_ai_address_update/2 merges partial street with existing legacy address" do
+    job = %Job{
+      address: "South St, Middlebury VT",
+      address_line1: nil,
+      city: nil,
+      state: nil
+    }
+
+    attrs = Addresses.enrich_ai_address_update(job, %{"address" => "5 south st"})
+
+    assert attrs["address_line1"] == "5 South St"
+    assert attrs["city"] == "Middlebury"
+    assert attrs["state"] == "VT"
+    assert attrs["address"] == "5 South St, Middlebury, VT"
+  end
+
+  test "enrich_ai_address_update/2 keeps structured snapshot city when AI sends street only" do
+    job = %Job{
+      address_line1: "South St",
+      city: "Middlebury",
+      state: "VT",
+      postal_code: "05753"
+    }
+
+    attrs = Addresses.enrich_ai_address_update(job, %{"address_line1" => "5 south st"})
+
+    assert attrs["address_line1"] == "5 South St"
+    assert attrs["city"] == "Middlebury"
+    assert attrs["state"] == "VT"
+    assert attrs["postal_code"] == "05753"
+  end
+
   test "merge_ai_address_attrs/1 splits flat address into line1" do
     assert Addresses.merge_ai_address_attrs(%{"address" => "123 Main St"})["address_line1"] ==
              "123 Main St"

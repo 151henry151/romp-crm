@@ -8,6 +8,7 @@ defmodule RompCrmWeb.JobFormComponent do
   alias RompCrm.Jobs.JobWorkItem
   alias RompCrmWeb.AddressFormHandlers
   alias RompCrmWeb.AddressValues
+  alias RompCrm.ContactInfo
 
   @impl true
   def update(%{job: incoming_job} = assigns, socket) do
@@ -333,8 +334,21 @@ defmodule RompCrmWeb.JobFormComponent do
         />
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <.input field={@form[:phone]} type="text" label="Phone" />
-          <.input field={@form[:client_email]} type="email" label="Email" />
+        <.phone_field
+          id="job-form-phone"
+          name={@form[:phone].name}
+          value={@form[:phone].value}
+          label="Phone"
+          errors={@form[:phone].errors}
+        />
+
+        <.input
+          field={@form[:client_email]}
+          type="email"
+          label="Email"
+          pattern={ContactInfo.email_html_pattern()}
+          title={ContactInfo.email_hint()}
+        />
         </div>
 
         <.input field={@form[:scheduled_on]} type="date" label="Job scheduled date (optional)" />

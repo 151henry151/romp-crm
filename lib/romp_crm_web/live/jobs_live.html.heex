@@ -163,6 +163,7 @@
           <%= if mob_expanded? do %>
             <div
               id={"job-expand-sm-#{job.id}"}
+              phx-hook="JobExpandEditGuard"
               class="border-t border-base-300 px-4 py-3 text-sm text-base-content space-y-2"
             >
               <.job_expanded_inline_fields
@@ -351,7 +352,11 @@
             <%= if job_expanded? do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
                 <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
-                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
+                  <div
+                    id={"job-expand-md-panel-#{job.id}"}
+                    phx-hook="JobExpandEditGuard"
+                    class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2"
+                  >
                     <.job_expanded_inline_fields
                       job={job}
                       can_edit_jobs={@can_edit_jobs}

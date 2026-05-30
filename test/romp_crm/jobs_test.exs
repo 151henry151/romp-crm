@@ -44,7 +44,7 @@ defmodule RompCrm.JobsTest do
         status: :pending,
         address: "some address",
         client_name: "some client_name",
-        phone: "some phone",
+        phone: "+18025550101",
         client_email: "client@example.com",
         work_description: "some work_description",
         referred_by: "some referred_by",
@@ -57,7 +57,7 @@ defmodule RompCrm.JobsTest do
       assert job.status == :pending
       assert job.address == "some address"
       assert job.client_name == "some client_name"
-      assert job.phone == "some phone"
+      assert job.phone == "+18025550101"
       assert job.client_email == "client@example.com"
       assert job.work_description == "some work_description"
       assert job.referred_by == "some referred_by"
@@ -77,7 +77,7 @@ defmodule RompCrm.JobsTest do
         status: :in_progress,
         address: "some updated address",
         client_name: "some updated client_name",
-        phone: "some updated phone",
+        phone: "+18025550202",
         client_email: "updated@example.com",
         work_description: "some updated work_description",
         referred_by: "some updated referred_by",
@@ -90,7 +90,7 @@ defmodule RompCrm.JobsTest do
       assert job.status == :in_progress
       assert job.address == "some updated address"
       assert job.client_name == "some updated client_name"
-      assert job.phone == "some updated phone"
+      assert job.phone == "+18025550202"
       assert job.client_email == "updated@example.com"
       assert job.work_description == "some updated work_description"
       assert job.referred_by == "some updated referred_by"
@@ -234,6 +234,27 @@ defmodule RompCrm.JobsTest do
     test "change_job/2 returns a job changeset" do
       job = job_fixture()
       assert %Ecto.Changeset{} = Jobs.change_job(job)
+    end
+
+    test "change_job/2 treats duplicate billing checkbox params as checked" do
+      job = job_fixture()
+
+      changeset =
+        Jobs.change_job(job, %{
+          "billing_address_different" => ["false", "true"]
+        })
+
+      assert Ecto.Changeset.get_change(changeset, :billing_address_different) == true
+    end
+
+    test "change_job/2 validates phone and email formats" do
+      job = job_fixture()
+
+      phone_changeset = Jobs.change_job(job, %{"phone" => "not-a-phone"})
+      assert {"Enter a valid phone number for the selected country", _} = Keyword.fetch!(phone_changeset.errors, :phone)
+
+      email_changeset = Jobs.change_job(job, %{"client_email" => "bad-email"})
+      assert {"Enter a valid email address (name@domain.tld)", _} = Keyword.fetch!(email_changeset.errors, :client_email)
     end
 
     test "find_job_for_sms_update/2 returns job when match hints uniquely" do

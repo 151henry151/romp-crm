@@ -5,10 +5,21 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
   Keeps copy under ~300 characters when possible.
   """
 
+  alias RompCrm.Addresses
   alias RompCrm.Jobs.Job
   alias RompCrm.Reminders.Reminder
 
   @max_len 320
+
+  @service_address_fields ~w(address address_line1 address_line2 city state postal_code)
+  @billing_address_fields ~w(
+    billing_address_different
+    billing_address_line1
+    billing_address_line2
+    billing_city
+    billing_state
+    billing_postal_code
+  )
 
   @doc """
   `results` is a list of `{:created, %Job{}}`, `{:updated, %Job{}, [field]}`,
@@ -17,11 +28,14 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
   def compose(assistant_sms \\ nil, results) when is_list(results) do
     summary = summarize_results(results)
     assistant = assistant_sms |> to_string() |> String.trim()
+    address_confirmation = build_address_confirmations(results)
 
     failure_ct =
       Enum.count(results, fn r ->
         match?({:skipped, _}, r) or match?({:error, _}, r)
       end)
+
+    assistant = apply_address_confirmations(assistant, address_confirmation)
 
     base =
       cond do
@@ -33,6 +47,9 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
 
         assistant != "" ->
           assistant
+
+        address_confirmation != "" ->
+          address_confirmation
 
         summary != "" ->
           summary
@@ -115,4 +132,101 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
   defp truncate(s) do
     if String.length(s) <= @max_len, do: s, else: String.slice(s, 0, @max_len - 1) <> "…"
   end
+
+  defp build_address_confirmations(results) do
+    results
+    |> Enum.flat_map(&address_confirmation_lines/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> case do
+      [] -> ""
+      lines -> Enum.join(lines, " ")
+    end
+  end
+
+  defp address_confirmation_lines({:updated, %Job{} = job, fields, _extra}) do
+    address_confirmation_lines(job, fields)
+  end
+
+  defp address_confirmation_lines({:updated, %Job{} = job, fields}) do
+    address_confirmation_lines(job, fields)
+  end
+
+  defp address_confirmation_lines(_), do: []
+
+  defp address_confirmation_lines(%Job{} = job, fields) do
+    fields = normalize_field_names(fields)
+
+    service_line =
+      if service_address_updated?(fields) do
+        service_address = Addresses.format_service(job)
+
+        if blank_address?(service_address) do
+          nil
+        else
+          "Updated #{short_client(job)}'s address to #{service_address}."
+        end
+      end
+
+    billing_line =
+      if billing_address_updated?(fields) do
+        case Addresses.format_billing(job) do
+          nil -> nil
+          billing when billing in ["", "—"] -> nil
+          billing -> "Updated #{short_client(job)}'s billing address to #{billing}."
+        end
+      end
+
+    [service_line, billing_line]
+  end
+
+  defp apply_address_confirmations(assistant, ""), do: assistant
+
+  defp apply_address_confirmations(assistant, address_confirmation) do
+    assistant = String.trim(assistant)
+
+    cond do
+      assistant == "" ->
+        address_confirmation
+
+      address_focused_reply?(assistant) ->
+        address_confirmation
+
+      true ->
+        String.trim("#{assistant} #{address_confirmation}")
+    end
+  end
+
+  defp address_focused_reply?(text) when is_binary(text) do
+    t = String.downcase(text)
+
+    mentions_address? =
+      String.contains?(t, "address") or String.contains?(t, "billing")
+
+    mentions_other_fields? =
+      Enum.any?(~w(phone email work description note material photo reminder), fn word ->
+        String.contains?(t, word)
+      end)
+
+    mentions_address? and not mentions_other_fields?
+  end
+
+  defp address_focused_reply?(_), do: false
+
+  defp normalize_field_names(fields) when is_list(fields) do
+    Enum.map(fields, fn field -> field |> to_string() |> String.downcase() end)
+  end
+
+  defp normalize_field_names(_), do: []
+
+  defp service_address_updated?(fields) do
+    Enum.any?(@service_address_fields, &(&1 in fields))
+  end
+
+  defp billing_address_updated?(fields) do
+    Enum.any?(@billing_address_fields, &(&1 in fields))
+  end
+
+  defp blank_address?(value) when is_binary(value), do: value in ["", "—"]
+  defp blank_address?(_), do: true
 end

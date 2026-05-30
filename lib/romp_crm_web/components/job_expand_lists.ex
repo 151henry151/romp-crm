@@ -63,10 +63,13 @@ defmodule RompCrmWeb.JobExpandLists do
                 </div>
                 <div class="min-w-0 flex flex-col gap-1">
                   <%= if @can_edit_jobs && editing?(@edit_keys, EK.wi_edit(wi.id)) do %>
-                    <form
-                      phx-submit="job_expand_commit_wi_row"
-                      class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
-                    >
+                    <div data-job-expand-edit-flash>
+                      <form
+                        phx-submit="job_expand_commit_wi_row"
+                        data-job-expand-edit-form
+                        data-job-expand-edit-key={EK.wi_edit(wi.id)}
+                        class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
+                      >
                       <input type="hidden" name="job_id" value={@job.id} />
                       <input type="hidden" name="work_item_id" value={wi.id} />
                       <div class="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-md">
@@ -102,7 +105,7 @@ defmodule RompCrmWeb.JobExpandLists do
                           />
                         </div>
                       </div>
-                      <div class="flex shrink-0 items-center gap-0.5">
+                      <div data-job-expand-edit-actions class="flex shrink-0 items-center gap-0.5">
                         <button
                           type="submit"
                           class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
@@ -121,6 +124,7 @@ defmodule RompCrmWeb.JobExpandLists do
                         </button>
                       </div>
                     </form>
+                    </div>
                   <% else %>
                     <div class="min-w-0">
                       <p class="text-sm text-base-content break-words">{wi.title}</p>
@@ -140,6 +144,7 @@ defmodule RompCrmWeb.JobExpandLists do
                       type="button"
                       phx-click="job_expand_edit_start"
                       phx-value-key={EK.wi_edit(wi.id)}
+                      data-job-expand-edit-start={EK.wi_edit(wi.id)}
                       class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
                       aria-label="Edit work item"
                     >
@@ -204,10 +209,13 @@ defmodule RompCrmWeb.JobExpandLists do
                 <% end %>
               </div>
               <%= if @can_edit_jobs && editing?(@edit_keys, EK.mat_edit(m.id)) do %>
-                <form
-                  phx-submit="job_expand_commit_material_row"
-                  class="flex min-w-0 flex-1 flex-wrap items-end gap-2"
-                >
+                <div data-job-expand-edit-flash class="flex min-w-0 flex-1 flex-wrap items-end gap-2">
+                  <form
+                    phx-submit="job_expand_commit_material_row"
+                    data-job-expand-edit-form
+                    data-job-expand-edit-key={EK.mat_edit(m.id)}
+                    class="flex min-w-0 flex-1 flex-wrap items-end gap-2"
+                  >
                   <input type="hidden" name="job_id" value={@job.id} />
                   <input type="hidden" name="material_id" value={m.id} />
                   <div class="flex shrink-0 flex-col gap-0.5">
@@ -233,7 +241,7 @@ defmodule RompCrmWeb.JobExpandLists do
                       title={material_line_title(m)}
                     />
                   </div>
-                  <div class="flex shrink-0 items-center gap-0.5 self-end pb-px">
+                  <div data-job-expand-edit-actions class="flex shrink-0 items-center gap-0.5 self-end pb-px">
                     <button
                       type="submit"
                       class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
@@ -252,6 +260,7 @@ defmodule RompCrmWeb.JobExpandLists do
                     </button>
                   </div>
                 </form>
+                </div>
               <% else %>
                 <span class="shrink-0 text-xs font-medium text-base-content/70">Qty:</span>
                 <span class="shrink-0 text-[11px] tabular-nums text-base-content">{format_qty_value(m.quantity)}</span>
@@ -267,6 +276,7 @@ defmodule RompCrmWeb.JobExpandLists do
                       type="button"
                       phx-click="job_expand_edit_start"
                       phx-value-key={EK.mat_edit(m.id)}
+                      data-job-expand-edit-start={EK.mat_edit(m.id)}
                       class="btn btn-square btn-ghost btn-xs h-7 w-7 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
                       aria-label="Edit material"
                     >

@@ -1,6 +1,8 @@
 defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
   @moduledoc false
 
+  alias RompCrm.Ai.WorkItemsPrompt
+
   @api "https://api.anthropic.com/v1/messages"
   @finch RompCrm.Finch
 
@@ -266,9 +268,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     **Update job:** `"intent": "update"`, `"job_id": <int from jobs snapshot>`, `"updates": { only changed fields }`.
 
-    **Adding scope to an existing job (judgment, not keyword rules):** Read the SMS and the snapshot for that job (`work_description`, `notes`, existing `work_items` titles). When the contractor is clearly **adding another distinct task** on the same visit or same job (e.g. "also change her kitchen sink faucet when we're there for the water heater", "add to Celeste's job …", "while we're there can we …"), use **`updates.work_items`**: add a **new line item** with a concise **`title`** for that added task (and optional per-line **`scheduled_on`** if they give a date). **Also** update **`work_description`** when a refreshed one-line summary helps the office read the job at a glance — do **both** when that fits the message. For **net-new line items only**, you may send rows **without** `"id"`; the server appends them after existing snapshot line items. If you are **replacing, deleting, or reordering** line items, send the **complete** `work_items` array including every existing **`id`** from the snapshot plus your edits.
-
-    **Work items on creates / multi-task messages:** Same idea: prefer **`work_items`** rows for separate tasks instead of one long `work_description` alone when the message clearly enumerates distinct work.
+    #{WorkItemsPrompt.guidance()}
 
     **Job-level date:** `"scheduled_on": "YYYY-MM-DD"` on create/update for the overall job start or primary visit date when stated.
 
@@ -355,6 +355,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     - One SMS may produce actions in more than one array.
     - **`assistant_sms`** should summarize everything you applied or ask one focused question if ambiguous.
+    - After **service or billing address** updates, **`assistant_sms`** must state the **full formatted address** (street, city, state, ZIP when known), not only what the user typed — e.g. "Updated Dave Miles' billing address to 45 Exchange St, Middlebury, VT 05753."
     - **`reminder_actions`** are independent of job permissions; still require valid `fire_at` and `body` when used.
     """
   end

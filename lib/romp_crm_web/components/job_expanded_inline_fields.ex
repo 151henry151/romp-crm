@@ -4,11 +4,13 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
 
   import RompCrmWeb.CoreComponents, only: [icon: 1]
   import RompCrmWeb.AddressFieldsComponent, only: [address_fields: 1]
+  import RompCrmWeb.PhoneFieldComponent, only: [phone_field: 1]
 
   alias RompCrm.Jobs
   alias RompCrmWeb.JobExpandEditKeys, as: EK
   alias RompCrmWeb.AddressValues
   alias RompCrm.Addresses
+  alias RompCrm.ContactInfo
 
   attr :job, :any, required: true
   attr :can_edit_jobs, :boolean, default: false
@@ -18,24 +20,19 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
 
   def job_expanded_inline_fields(assigns) do
     wrap =
-      cond do
-        assigns.variant == :desktop -> "contents"
-        true -> "space-y-2"
+      if assigns.variant == :desktop do
+        "space-y-2 min-w-0 lg:col-span-2"
+      else
+        "space-y-2"
       end
 
-    wide = if assigns.variant == :desktop, do: "lg:col-span-2", else: ""
-
-    assigns =
-      assigns
-      |> assign(:wrap, wrap)
-      |> assign(:wide, wide)
+    assigns = assign(assigns, :wrap, wrap)
 
     ~H"""
     <div class={@wrap}>
       <%= if @can_edit_jobs do %>
         <.job_field
           variant={@variant}
-          col=""
           label="Client"
           editing?={editing?(@edit_keys, EK.job(@job.id, "client_name"))}
           edit_key={EK.job(@job.id, "client_name")}
@@ -49,7 +46,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col={@wide}
           label="Address"
           editing?={editing?(@edit_keys, EK.job(@job.id, "address"))}
           edit_key={EK.job(@job.id, "address")}
@@ -78,21 +74,25 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Phone"
           editing?={editing?(@edit_keys, EK.job(@job.id, "phone"))}
           edit_key={EK.job(@job.id, "phone")}
           job_id={@job.id}
           field="phone"
         >
-          <:readonly>{display(@job.phone)}</:readonly>
+          <:readonly>{display_phone(@job.phone)}</:readonly>
           <:editor>
-            <input type="text" name="value" value={@job.phone || ""} class="input input-bordered input-sm w-full min-w-0" />
+            <.phone_field
+              id={"job-#{@job.id}-phone"}
+              name="value"
+              value={@job.phone}
+              class="input input-bordered input-sm"
+              select_class="select select-bordered select-sm"
+            />
           </:editor>
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Email"
           editing?={editing?(@edit_keys, EK.job(@job.id, "client_email"))}
           edit_key={EK.job(@job.id, "client_email")}
@@ -101,12 +101,19 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         >
           <:readonly>{display(@job.client_email)}</:readonly>
           <:editor>
-            <input type="email" name="value" value={@job.client_email || ""} class="input input-bordered input-sm w-full min-w-0" />
+            <input
+              type="email"
+              name="value"
+              value={@job.client_email || ""}
+              pattern={ContactInfo.email_html_pattern()}
+              title={ContactInfo.email_hint()}
+              autocomplete="email"
+              class="input input-bordered input-sm w-full min-w-0"
+            />
           </:editor>
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Priority"
           editing?={editing?(@edit_keys, EK.job(@job.id, "priority"))}
           edit_key={EK.job(@job.id, "priority")}
@@ -125,7 +132,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Status"
           editing?={editing?(@edit_keys, EK.job(@job.id, "status"))}
           edit_key={EK.job(@job.id, "status")}
@@ -143,7 +149,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Referred by"
           editing?={editing?(@edit_keys, EK.job(@job.id, "referred_by"))}
           edit_key={EK.job(@job.id, "referred_by")}
@@ -157,7 +162,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
           label="Next action"
           editing?={editing?(@edit_keys, EK.job(@job.id, "next_action"))}
           edit_key={EK.job(@job.id, "next_action")}
@@ -171,7 +175,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col={@wide}
           label="Work description"
           editing?={editing?(@edit_keys, EK.job(@job.id, "work_description"))}
           edit_key={EK.job(@job.id, "work_description")}
@@ -187,7 +190,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col={@wide}
           label="Job scheduled (optional)"
           editing?={editing?(@edit_keys, EK.job(@job.id, "scheduled_on"))}
           edit_key={EK.job(@job.id, "scheduled_on")}
@@ -217,7 +219,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col={@wide}
           label="Notes"
           editing?={editing?(@edit_keys, EK.job(@job.id, "notes"))}
           edit_key={EK.job(@job.id, "notes")}
@@ -239,7 +240,7 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
             <span class="font-medium text-base-content/90">Billing:</span> {Addresses.format_billing(@job)}
           </p>
         <% end %>
-        <p><span class="font-medium text-base-content/90">Phone:</span> {display(@job.phone)}</p>
+        <p><span class="font-medium text-base-content/90">Phone:</span> {display_phone(@job.phone)}</p>
         <p><span class="font-medium text-base-content/90">Email:</span> {display(@job.client_email)}</p>
         <p>
           <span class="font-medium text-base-content/90">Priority:</span>
@@ -248,17 +249,17 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         <p><span class="font-medium text-base-content/90">Status:</span> {status_label(@job.status)}</p>
         <p><span class="font-medium text-base-content/90">Referred by:</span> {display(@job.referred_by)}</p>
         <p><span class="font-medium text-base-content/90">Next action:</span> {display(@job.next_action)}</p>
-        <p class={@wide}>
+        <p>
           <span class="font-medium text-base-content/90">Work description:</span>
           <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">{display(@job.work_description)}</span>
         </p>
         <%= if @job.scheduled_on do %>
-          <p class={@wide}>
+          <p>
             <span class="font-medium text-base-content/90">Scheduled:</span>
             <span class="text-base-content">{Jobs.format_schedule_date_time(@job.scheduled_on, @job.scheduled_time)}</span>
           </p>
         <% end %>
-        <p class={@wide}>
+        <p>
           <span class="font-medium text-base-content/90">Notes:</span> {display(@job.notes)}
         </p>
       <% end %>
@@ -267,7 +268,6 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
   end
 
   attr :variant, :atom, required: true
-  attr :col, :string, default: ""
   attr :label, :string, required: true
   attr :editing?, :boolean, required: true
   attr :edit_key, :string, required: true
@@ -279,12 +279,17 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
 
   def job_field(assigns) do
     ~H"""
-    <div class={["min-w-0", @col]}>
+    <div class="min-w-0" data-job-expand-edit-flash={if @editing?, do: ""}>
       <div class="flex items-center justify-between gap-1 mb-0.5">
         <span class="block text-xs font-medium text-base-content/70">{@label}</span>
       </div>
       <%= if @editing? do %>
-        <form phx-submit={@submit_event} class="flex flex-wrap items-end gap-1.5 min-w-0">
+        <form
+          phx-submit={@submit_event}
+          data-job-expand-edit-form
+          data-job-expand-edit-key={@edit_key}
+          class="flex flex-wrap items-end gap-1.5 min-w-0"
+        >
           <input type="hidden" name="job_id" value={@job_id} />
           <%= if @submit_event == "job_expand_commit_job" do %>
             <input type="hidden" name="field" value={@field} />
@@ -292,22 +297,24 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
           <div class="min-w-0 flex-1 basis-[min(100%,18rem)]">
             {render_slot(@editor)}
           </div>
-          <button
-            type="submit"
-            class="btn btn-square btn-ghost btn-xs h-8 w-8 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
-            aria-label={"Save #{@label}"}
-          >
-            <.icon name="hero-check" class="size-4" />
-          </button>
-          <button
-            type="button"
-            phx-click="job_expand_edit_cancel"
-            phx-value-key={@edit_key}
-            class="btn btn-square btn-ghost btn-xs h-8 w-8 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
-            aria-label={"Cancel editing #{@label}"}
-          >
-            <.icon name="hero-x-mark" class="size-4" />
-          </button>
+          <div data-job-expand-edit-actions class="flex shrink-0 items-center gap-0.5 self-end">
+            <button
+              type="submit"
+              class="btn btn-square btn-ghost btn-xs h-8 w-8 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
+              aria-label={"Save #{@label}"}
+            >
+              <.icon name="hero-check" class="size-4" />
+            </button>
+            <button
+              type="button"
+              phx-click="job_expand_edit_cancel"
+              phx-value-key={@edit_key}
+              class="btn btn-square btn-ghost btn-xs h-8 w-8 min-h-0 shrink-0 text-base-content/50 hover:bg-base-300/40"
+              aria-label={"Cancel editing #{@label}"}
+            >
+              <.icon name="hero-x-mark" class="size-4" />
+            </button>
+          </div>
         </form>
       <% else %>
         <div class="flex items-start gap-1 min-w-0">
@@ -316,6 +323,7 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
             type="button"
             phx-click="job_expand_edit_start"
             phx-value-key={@edit_key}
+            data-job-expand-edit-start={@edit_key}
             class="btn btn-square btn-ghost btn-xs h-8 w-8 min-h-0 shrink-0 text-green-600 hover:bg-green-500/15"
             aria-label={"Edit #{@label}"}
           >
@@ -333,6 +341,10 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
   defp display(nil), do: "—"
   defp display(""), do: "—"
   defp display(v), do: v
+
+  defp display_phone(nil), do: "—"
+  defp display_phone(""), do: "—"
+  defp display_phone(phone), do: ContactInfo.format_display(phone)
 
   defp status_label(:lead), do: "Lead"
   defp status_label(:pending), do: "Pending"

@@ -9,7 +9,7 @@
   is_business_owner={@is_business_owner}
   content_width={:wide}
 >
-  <div class="mx-auto flex h-[min(78vh,42rem)] w-full max-w-3xl flex-col">
+  <div class="mx-auto flex h-[min(78vh,42rem)] max-w-3xl flex-col">
     <.header>
       Chat
       <:subtitle>
@@ -25,12 +25,15 @@
         phx-hook="AgentChatScroll"
         class="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-base-300 bg-base-100/80 p-3 shadow-sm"
       >
-        <%= if @chat_rows == [] do %>
+        <%= if @chat_rows == [] and not @chat_agent_typing? do %>
           <p class="text-sm text-base-content/60">
             No messages yet. Text your agent from here or send an SMS from your profile phone.
           </p>
         <% else %>
           <.chat_thread rows={@chat_rows} id="agent-chat-thread" />
+          <%= if @chat_agent_typing? do %>
+            <.chat_typing_indicator id="agent-chat-typing" />
+          <% end %>
         <% end %>
       </div>
 

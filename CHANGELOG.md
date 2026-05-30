@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.9.103] - 2026-05-30
+
+### Added
+
+- **Agent / SMS AI**: enrich partial address updates with existing job context, US address parsing, and geocoding to fill structured fields and ZIP
+- **Agent / SMS AI**: shared work-description ↔ work-item guidance for creates, add-on scope, and description-only edits (`WorkItemsPrompt`)
+- **SMS replies**: confirm service and billing address updates with the full formatted address saved on the job
+- **Chat**: show the user’s message immediately on send and a “RompCRM is typing…” indicator while the agent responds
+- **Chat compose**: Enter sends, Shift+Enter inserts a newline (`ChatCompose` hook)
+- **Jobs**: phone and email validation (E.164 / pattern) on forms and inline edit; `ContactInfo` module and `PhoneField` component
+- **Jobs**: inline expanded edit guard (one field at a time; flash save/cancel when switching with unsaved edits)
+- **Jobs**: billing-address toggle hook and programmatic Google Places autocomplete (`AutocompleteSuggestion` dropdown)
+
+### Changed
+
+- **Google address autocomplete**: parse `addressComponents` / `postalAddress`; fix selection via `pointerdown`; improve billing toggle wiring
+- **Agent prompts**: require structured address fields, snapshot merge examples, and full-address confirmation copy
+- **Jobs expanded card**: single-column layout on desktop so edit pencils align; photo section tweaks
+
+### Fixed
+
+- **Chat**: avoid blocking the LiveView until the agent finishes by processing sends asynchronously
+
 ## [0.9.102] - 2026-05-18
 
 ### Added
