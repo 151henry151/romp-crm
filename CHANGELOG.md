@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.100] - 2026-05-18
+
+### Changed
+
+- **Chat**: restore centered **`max-w-3xl`** conversation column so left/right bubbles stay closer together on wide screens
+
 ## [0.9.99] - 2026-05-18
 
 ### Changed

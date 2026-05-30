@@ -63,25 +63,25 @@
             phx-value-id={job.id}
             class="w-full text-left px-4 py-3"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0 flex-1 space-y-1">
-                <p class="font-semibold text-base-content break-words">{job.client_name}</p>
-                <%= if not mob_expanded? do %>
-                  <p class="text-sm text-base-content/80 break-words line-clamp-2">
-                    <span class="font-medium text-base-content/90">Work description:</span>
-                    {display(job.work_description)}
-                  </p>
-                <% end %>
-                <%= if is_binary(job.notes) && String.trim(job.notes) != "" do %>
-                  <p class="text-sm text-base-content/80 break-words">
-                    <span class="font-medium text-base-content/90">Notes:</span>
-                    {job.notes}
-                  </p>
-                <% end %>
+            <div class="space-y-1">
+              <div class="flex items-start justify-between gap-3">
+                <p class="min-w-0 font-semibold text-base-content break-words">{job.client_name}</p>
+                <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center self-start rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
+                  {status_label(job.status)}
+                </span>
               </div>
-              <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center self-start rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
-                {status_label(job.status)}
-              </span>
+              <%= if not mob_expanded? do %>
+                <p class="text-sm text-base-content/80 break-words line-clamp-2">
+                  <span class="font-medium text-base-content/90">Work description:</span>
+                  {display(job.work_description)}
+                </p>
+              <% end %>
+              <%= if is_binary(job.notes) && String.trim(job.notes) != "" do %>
+                <p class="text-sm text-base-content/80 break-words">
+                  <span class="font-medium text-base-content/90">Notes:</span>
+                  {job.notes}
+                </p>
+              <% end %>
             </div>
           </button>
 
