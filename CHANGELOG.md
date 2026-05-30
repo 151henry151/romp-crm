@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.97] - 2026-05-18
+
+### Fixed
+
+- **Navigation**: improve dark-mode pill contrast (white text on deeper emerald fill) and apply Tailwind `dark:` styles when the theme toggle is set to **system** and the OS prefers dark
+
 ## [0.9.96] - 2026-05-18
 
 ### Changed
