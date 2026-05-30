@@ -75,42 +75,100 @@ See **`deploy/README.md`** for systemd, PayPal provisioning, Twilio voice, and G
 
 SMS-driven job updates, workspaces, job list with expandable rows (hours, materials, reminders), **Reminders** (`/reminders`), optional **data export** scheduling, **gifts** and **invitations**, **Support** (`/support`), **Admin** (`/admin`) for configured admin emails, multipart HTML + plain transactional email, and more. See **[CHANGELOG.md](CHANGELOG.md)** for versioned detail.
 
-## Screenshots & screen recordings
+## Screenshots
 
-Captured from the live app. All assets live under **[`docs/screencaps/`](docs/screencaps/)**.
-
-### Screenshots
+Same shots as the **[rompcrm.com](https://rompcrm.com/)** landing page carousel. Assets live under **[`docs/screencaps/`](docs/screencaps/)**.
 
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/screencaps/1000001496.png" alt="Romp CRM screenshot 1" width="100%" />
+      <img src="docs/screencaps/app-screenshot-01.png" alt="Jobs at a glance" width="100%" /><br /><em>Jobs at a glance</em>
     </td>
     <td align="center" width="50%">
-      <img src="docs/screencaps/1000001497.png" alt="Romp CRM screenshot 2" width="100%" />
+      <img src="docs/screencaps/app-screenshot-07.png" alt="Detailed job view" width="100%" /><br /><em>Detailed job view</em>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screencaps/1000001498.png" alt="Romp CRM screenshot 3" width="100%" />
+      <img src="docs/screencaps/app-screenshot-08.png" alt="Tasks and materials" width="100%" /><br /><em>Tasks and materials</em>
     </td>
     <td align="center">
-      <img src="docs/screencaps/1000001499.png" alt="Romp CRM screenshot 4" width="100%" />
+      <img src="docs/screencaps/app-screenshot-02.png" alt="Create leads by text" width="100%" /><br /><em>Create leads by text</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-03.png" alt="Scan handwritten notes" width="100%" /><br /><em>Scan handwritten notes</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-04.png" alt="In-app AI chat" width="100%" /><br /><em>In-app AI chat</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-05.png" alt="Update jobs by text" width="100%" /><br /><em>Update jobs by text</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-06.png" alt="SMS assistant replies" width="100%" /><br /><em>SMS assistant replies</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-09.png" alt="Completed job record" width="100%" /><br /><em>Completed job record</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-10.png" alt="Job site photos" width="100%" /><br /><em>Job site photos</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-11.png" alt="Add job photos" width="100%" /><br /><em>Add job photos</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-12.png" alt="Assign photos via SMS" width="100%" /><br /><em>Assign photos via SMS</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-13.png" alt="Log job hours" width="100%" /><br /><em>Log job hours</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-14.png" alt="Client job time log" width="100%" /><br /><em>Client job time log</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-15.png" alt="Workday timeclock punch" width="100%" /><br /><em>Workday timeclock punch</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-16.png" alt="Log past shifts" width="100%" /><br /><em>Log past shifts</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-17.png" alt="Upcoming SMS reminders" width="100%" /><br /><em>Upcoming SMS reminders</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-18.png" alt="Daily task reminders" width="100%" /><br /><em>Daily task reminders</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-19.png" alt="Schedule SMS reminders" width="100%" /><br /><em>Schedule SMS reminders</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-20.png" alt="Full app navigation" width="100%" /><br /><em>Full app navigation</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-21.png" alt="Manage your team" width="100%" /><br /><em>Manage your team</em>
+    </td>
+    <td align="center">
+      <img src="docs/screencaps/app-screenshot-22.png" alt="Multiple businesses support" width="100%" /><br /><em>Multiple businesses support</em>
     </td>
   </tr>
 </table>
-
-### Screen recording
-
-Full capture at **2× speed** (~32s playback for ~65s of screen time). **[Original real-time MP4](docs/screencaps/1000001495.mp4)** is linked if you prefer normal speed.
-
-<p align="center">
-  <img src="docs/screencaps/1000001495-preview.gif" alt="Romp CRM screencast (2× speed)" width="480" />
-</p>
-
-<p align="center">
-  <video src="docs/screencaps/1000001495-fast.mp4" controls playsinline width="480"></video>
-</p>
 
 ## License
 

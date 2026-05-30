@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.108] - 2026-05-30
+
+### Changed
+
+- **README**: replace outdated screencaps with the 22 landing-page screenshots; remove the screencast video section and retire old `docs/screencaps/1000001495*` assets
+
 ## [0.9.107] - 2026-05-30
 
 ### Changed
