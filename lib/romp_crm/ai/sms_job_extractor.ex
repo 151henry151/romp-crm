@@ -466,7 +466,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
 
     client_name =
       if blank?(m["client_name"]) do
-        "Lead from SMS"
+        ""
       else
         String.trim(m["client_name"])
       end

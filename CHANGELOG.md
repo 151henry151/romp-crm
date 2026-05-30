@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.106] - 2026-05-30
+
+### Added
+
+- **Agent / SMS AI**: include recently deleted jobs (from audit log) in extraction context so the model knows when a job from chat history was removed
+- **Demo scripts**: `seed_demo_workspace.exs`, `seed_demo_reminders.exs`, and helpers to dedupe/fix demo job names
+
+### Fixed
+
+- **Jobs (web form)**: drop blank default work-item rows from indexed form params so save no longer crashes with `NOT NULL` on `job_work_items.title`
+- **Jobs**: allow creating a lead with only address, work summary, phone, or notes (client name optional); reject saves with no identifying details
+- **Agent / SMS AI**: instruct model to use **create** for new jobs when no snapshot row matches, including reusing a client name after delete (duplicate names allowed)
+
 ## [0.9.104] - 2026-05-30
 
 ### Fixed

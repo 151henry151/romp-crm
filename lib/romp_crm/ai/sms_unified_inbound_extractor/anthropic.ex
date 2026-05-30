@@ -22,6 +22,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       {:error, :missing_api_key}
     else
       mms_image_blocks = Keyword.get(opts, :mms_image_blocks, [])
+      recent_deleted_jobs = Keyword.get(opts, :recent_deleted_jobs, [])
 
       call_claude(
         api_key,
@@ -31,7 +32,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         open_te_snapshot,
         employees_snapshot,
         prior_turns,
-        mms_image_blocks
+        mms_image_blocks,
+        recent_deleted_jobs
       )
     end
   end
@@ -44,7 +46,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          open_te_snapshot,
          employees_snapshot,
          prior_turns,
-         mms_image_blocks
+         mms_image_blocks,
+         recent_deleted_jobs
        ) do
     user_blocks =
       build_user_content_blocks(
@@ -53,7 +56,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         open_te_snapshot,
         employees_snapshot,
         prior_turns,
-        mms_image_blocks
+        mms_image_blocks,
+        recent_deleted_jobs
       )
 
     body = %{
@@ -130,9 +134,18 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          open_te_snapshot,
          employees_snapshot,
          prior_turns,
-         mms_image_blocks
+         mms_image_blocks,
+         recent_deleted_jobs
        ) do
-    text = user_content_text(raw_message, jobs_snapshot, open_te_snapshot, employees_snapshot, prior_turns)
+    text =
+      user_content_text(
+        raw_message,
+        jobs_snapshot,
+        open_te_snapshot,
+        employees_snapshot,
+        prior_turns,
+        recent_deleted_jobs
+      )
 
     image_blocks =
       Enum.map(mms_image_blocks, fn %{media_type: mt, data: b64} ->
@@ -154,13 +167,28 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          jobs_snapshot,
          open_te_snapshot,
          employees_snapshot,
-         prior_turns
+         prior_turns,
+         recent_deleted_jobs
        ) do
     jobs_json = encode_json(jobs_snapshot)
     open_json = encode_json(open_te_snapshot)
     emp_json = encode_json(employees_snapshot)
+    deleted_json = encode_json(recent_deleted_jobs)
 
     thread_block = format_prior_turns(prior_turns)
+
+    deleted_block =
+      if recent_deleted_jobs == [] do
+        ""
+      else
+        """
+
+        Recently deleted jobs (removed from CRM — **not** in the jobs snapshot below; do **not** update these **`job_id`** values; use **create** if the contractor asks for that customer again):
+        ---
+        #{deleted_json}
+        ---
+        """
+      end
 
     """
     Parse the **latest** inbound SMS for Romp CRM: job creates/updates, per-job time clock-in/out, and employee clock-in/out/lunch.
@@ -173,11 +201,11 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     #{raw_message}
     ---
 
-    Existing CRM jobs (JSON array). Each object has integer `"id"` — authoritative; never invent ids.
+    Existing CRM jobs (JSON array). Each object has integer `"id"` — authoritative for **current** rows; never invent ids.
     Jobs snapshot:
     ---
     #{jobs_json}
-    ---
+    ---#{deleted_block}
 
     Open job time entries (clocked in, not ended). Use for clock-out alignment.
     Open time entries snapshot:
@@ -236,7 +264,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     You extract structured operations for a plumbing/mechanical contractor from the **latest** inbound SMS.
 
     The user message may include a **prior SMS thread** (Contractor / Assistant lines) for the same phone number, then JSON snapshots: **jobs**, **open job time entries**, and **employees**, then the latest SMS.
-    **Always** use the prior thread to resolve follow-ups: e.g. attributing hours to the correct **employee** or **job** when the latest message only says "That was Bob" or "same as before" or corrects a name. The thread is authoritative for "what we already established" in this chat.
+    **Always** use the prior thread to resolve follow-ups: e.g. attributing hours to the correct **employee** or **job** when the latest message only says "That was Bob" or "same as before" or corrects a name. The thread is authoritative for "what we already established" in this chat — **except** when a job id or name appears in **Recently deleted jobs**, treat that row as gone and prefer **create** or a still-present snapshot id.
+
+    **Deleted jobs:** When **Recently deleted jobs** lists a **`job_id`**, that row no longer exists. Prior chat may still mention it; do **not** refuse a new **create** for the same client name or assume the old job is still open.
     Use semantic judgment (typos, informal references, nicknames) to decide which snapshot **`id`** values apply — the same way you match jobs for updates. **Never** invent database ids; every `job_id` and `employee_id` must appear in the provided snapshots.
 
     Respond with **one JSON object only** (no markdown fences, no commentary).
@@ -265,6 +295,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Each element is one action object:
 
     **Create lead:** `"intent": "create"` plus `"job": { "client_name", "address", "phone", "client_email", ... }`.
+    **New job rows:** When the user asks to create a new lead/job, always emit **create** — even if the same **client_name** was used before or appears in prior chat for a deleted job. Trust the **jobs snapshot** only; if no snapshot **`job_id`** fits, create a fresh row (duplicate client names across jobs are allowed).
 
     **Update job:** `"intent": "update"`, `"job_id": <int from jobs snapshot>`, `"updates": { only changed fields }`.
 

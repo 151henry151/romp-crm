@@ -27,6 +27,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
 
   **`opts`** — keyword list; supports **`reminder_wall_tz`** (IANA) so naive **`fire_at`** values in **`reminder_actions`**
   are interpreted as that zone’s wall clock (same as SMS reminder settings). Defaults to Eastern when omitted.
+  Supports **`recent_deleted_jobs`** — list of recently deleted job rows from audit logs (see **`BusinessAuditLogs.recent_deleted_jobs_snapshot/2`**).
   """
   def extract(
         raw_message,

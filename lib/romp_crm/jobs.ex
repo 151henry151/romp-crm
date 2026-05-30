@@ -719,10 +719,49 @@ defmodule RompCrm.Jobs do
     attrs
     |> stringify_keys_shallow()
     |> RompCrm.Addresses.merge_ai_address_attrs()
+    |> normalize_work_items_param()
+    |> drop_blank_work_items_from_attrs()
     |> maybe_add_work_item_sort_orders()
     |> maybe_parse_job_date("scheduled_on")
     |> maybe_parse_job_time()
   end
+
+  defp normalize_work_items_param(%{"work_items" => wis} = attrs) when is_map(wis) do
+    list =
+      wis
+      |> Enum.sort_by(fn {key, _} -> work_items_param_sort_key(key) end)
+      |> Enum.map(fn {_, row} -> row end)
+
+    Map.put(attrs, "work_items", list)
+  end
+
+  defp normalize_work_items_param(attrs), do: attrs
+
+  defp work_items_param_sort_key(key) when is_binary(key) do
+    case Integer.parse(key) do
+      {n, _} -> n
+      :error -> 0
+    end
+  end
+
+  defp work_items_param_sort_key(key) when is_integer(key), do: key
+  defp work_items_param_sort_key(_), do: 0
+
+  defp drop_blank_work_items_from_attrs(%{"work_items" => wis} = attrs) when is_list(wis) do
+    kept =
+      Enum.filter(wis, fn row ->
+        row
+        |> stringify_keys_shallow()
+        |> Map.get("title", "")
+        |> to_string()
+        |> String.trim()
+        |> Kernel.!=("")
+      end)
+
+    Map.put(attrs, "work_items", kept)
+  end
+
+  defp drop_blank_work_items_from_attrs(attrs), do: attrs
 
   defp maybe_add_work_item_sort_orders(%{"work_items" => wis} = attrs) when is_list(wis) do
     wis =

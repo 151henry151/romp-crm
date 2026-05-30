@@ -137,8 +137,9 @@ defmodule RompCrm.Ai.SmsJobExtractor.Anthropic do
     ## Action type: create
     Use keys on an action object:
     - "intent": "create"
+    - **Always create a new job row** when the contractor asks for a new lead/job — even if the same **client_name** appeared in prior chat or existed on a job that was later deleted. The **jobs snapshot** is the only source of truth for existing rows; if no snapshot **`id`** matches, use **create**, never refuse because chat history mentions the name.
     - "job": object with:
-      - "client_name" (required): person or business name for the customer (never null for creates).
+      - "client_name" (optional): person or business name; omit or use `""` when unknown if address, **`work_description`**, phone, or notes identify the lead.
       - "address" (optional): single-line service/site address when structured fields are not used.
       - optional structured service address: "address_line1", "address_line2", "city", "state", "postal_code".
         Prefer structured fields when you can split the address. Put only the street number and name in **address_line1** (not city/state).

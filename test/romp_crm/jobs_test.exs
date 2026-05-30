@@ -69,6 +69,98 @@ defmodule RompCrm.JobsTest do
       assert {:error, %Ecto.Changeset{}} = Jobs.create_job(@invalid_attrs)
     end
 
+    test "create_job/1 allows blank client_name when address is present" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "",
+                 "priority" => "normal",
+                 "status" => "lead",
+                 "address_line1" => "42 Maple St",
+                 "city" => "Burlington",
+                 "state" => "VT",
+                 "postal_code" => "05401"
+               })
+
+      assert job.client_name == ""
+      assert job.address_line1 == "42 Maple St"
+    end
+
+    test "create_job/1 allows blank client_name when work_description is present" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "priority" => "normal",
+                 "status" => "lead",
+                 "work_description" => "Replace kitchen faucet"
+               })
+
+      assert job.client_name == ""
+      assert job.work_description == "Replace kitchen faucet"
+    end
+
+    test "create_job/1 rejects job with no identifying details" do
+      b = business_fixture()
+
+      assert {:error, cs} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "",
+                 "priority" => "normal",
+                 "status" => "lead"
+               })
+
+      assert {"Enter a client name or at least one other detail (address, work summary, phone, notes)",
+              _} = Keyword.fetch!(cs.errors, :client_name)
+    end
+
+    test "create_job/1 ignores blank work_items rows from indexed form params" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Website photos",
+                 "priority" => "normal",
+                 "status" => "lead",
+                 "work_items" => %{
+                   "0" => %{"title" => "", "sort_order" => "0", "completed" => "false"}
+                 }
+               })
+
+      assert job.work_items == []
+    end
+
+    test "create_job/1 after delete allows same client_name again" do
+      b = business_fixture()
+
+      assert {:ok, job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Website photos",
+                 "priority" => "normal",
+                 "status" => "lead"
+               })
+
+      assert {:ok, _} = Jobs.delete_job(job)
+
+      assert {:ok, job2} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Website photos",
+                 "priority" => "normal",
+                 "status" => "lead",
+                 "work_description" => "Second lead"
+               })
+
+      assert job2.id != job.id
+      assert job2.client_name == "Website photos"
+    end
+
     test "update_job/2 with valid data updates the job" do
       job = job_fixture()
 

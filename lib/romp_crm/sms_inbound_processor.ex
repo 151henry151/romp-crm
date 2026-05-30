@@ -165,6 +165,8 @@ defmodule RompCrm.SmsInboundProcessor do
       |> Reminders.decode_prefs_json()
       |> Map.get("timezone", "America/New_York")
 
+    recent_deleted_jobs = BusinessAuditLogs.recent_deleted_jobs_snapshot(business_id)
+
     if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
       case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
         {:ok, results} ->
@@ -232,7 +234,8 @@ defmodule RompCrm.SmsInboundProcessor do
           prior_turns,
           reminder_wall_tz,
           mms_urls,
-          mms_image_blocks
+          mms_image_blocks,
+          recent_deleted_jobs
         )
     end
   end
@@ -255,7 +258,8 @@ defmodule RompCrm.SmsInboundProcessor do
          prior_turns,
          reminder_wall_tz,
          mms_urls,
-         mms_image_blocks
+         mms_image_blocks,
+         recent_deleted_jobs
        ) do
     case SmsUnifiedInboundExtractor.extract(
            body_for_ai,
@@ -264,7 +268,8 @@ defmodule RompCrm.SmsInboundProcessor do
            employees_snapshot,
            prior_turns,
            reminder_wall_tz: reminder_wall_tz,
-           mms_image_blocks: mms_image_blocks
+           mms_image_blocks: mms_image_blocks,
+           recent_deleted_jobs: recent_deleted_jobs
          ) do
       {:ok,
        %{

@@ -152,24 +152,49 @@ defmodule RompCrmWeb.JobFormComponent do
   end
 
   defp normalize_job_params(params) when is_map(params) do
-    case Map.get(params, "work_items") do
-      wis when is_list(wis) ->
-        kept =
-          wis
-          |> Enum.map(fn row ->
-            row
-            |> Enum.map(fn {k, v} -> {to_string(k), v} end)
-            |> Map.new()
-          end)
-          |> Enum.with_index()
-          |> Enum.map(fn {row, i} -> Map.put(row, "sort_order", i) end)
+    params
+    |> normalize_work_items_param()
+    |> then(fn p ->
+      case Map.get(p, "work_items") do
+        wis when is_list(wis) ->
+          kept =
+            wis
+            |> Enum.map(fn row ->
+              row
+              |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+              |> Map.new()
+            end)
+            |> Enum.with_index()
+            |> Enum.map(fn {row, i} -> Map.put(row, "sort_order", i) end)
 
-        Map.put(params, "work_items", kept)
+          Map.put(p, "work_items", kept)
 
-      _ ->
-        params
+        _ ->
+          p
+      end
+    end)
+  end
+
+  defp normalize_work_items_param(%{"work_items" => wis} = params) when is_map(wis) do
+    list =
+      wis
+      |> Enum.sort_by(fn {key, _} -> work_items_param_sort_key(key) end)
+      |> Enum.map(fn {_, row} -> row end)
+
+    Map.put(params, "work_items", list)
+  end
+
+  defp normalize_work_items_param(params), do: params
+
+  defp work_items_param_sort_key(key) when is_binary(key) do
+    case Integer.parse(key) do
+      {n, _} -> n
+      :error -> 0
     end
   end
+
+  defp work_items_param_sort_key(key) when is_integer(key), do: key
+  defp work_items_param_sort_key(_), do: 0
 
   defp drop_blank_work_items(%{"work_items" => wis} = params) when is_list(wis) do
     kept =
@@ -323,7 +348,10 @@ defmodule RompCrmWeb.JobFormComponent do
         phx-submit="save"
         class="mt-4 space-y-4"
       >
-        <.input field={@form[:client_name]} type="text" label="Client Name" required />
+        <.input field={@form[:client_name]} type="text" label="Client Name" />
+        <p class="text-xs text-base-content/60 -mt-2">
+          Client name, address, work summary, phone, or notes — at least one is required.
+        </p>
 
         <.address_fields
           id="job-form-address"
