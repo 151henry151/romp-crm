@@ -19,6 +19,7 @@ defmodule RompCrmWeb.JobsLive do
   alias RompCrmWeb.JobTimeLogDefaults
   alias RompCrmWeb.JobExpandEditKeys, as: JEK
   alias RompCrmWeb.JobsList
+  alias RompCrmWeb.AddressFormHandlers
 
   @impl true
   def mount(_params, _session, socket) do
@@ -37,6 +38,7 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:filter, :all)
      |> assign(:sort_by, :name)
      |> assign(:show_address_primary, false)
+     |> assign(:color_code_statuses, false)
      |> assign(:expanded_job_id, nil)
      |> assign(:expanded_time_entries, %{})
      |> assign(:jobs, Jobs.list_jobs(bid))
@@ -52,6 +54,7 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:log_time_entry_id, nil)
      |> assign(:job_delete_steps, %{})
      |> assign(:job_expand_editing, MapSet.new())
+     |> assign(:address_suggestion, nil)
      |> assign(:add_photos_job_id, nil)
      |> assign(:add_photos_client_name, "")
      |> assign(:add_photos_saved_count, 0)
@@ -201,6 +204,10 @@ defmodule RompCrmWeb.JobsLive do
 
   def handle_event("toggle_address_primary", _params, socket) do
     {:noreply, assign(socket, :show_address_primary, !socket.assigns.show_address_primary)}
+  end
+
+  def handle_event("toggle_color_code", _params, socket) do
+    {:noreply, assign(socket, :color_code_statuses, !socket.assigns.color_code_statuses)}
   end
 
   def handle_event("job_delete_advance", %{"id" => id}, socket) do
@@ -729,7 +736,11 @@ defmodule RompCrmWeb.JobsLive do
 
   def handle_event("job_expand_edit_cancel", %{"key" => key}, socket) do
     keys = MapSet.delete(socket.assigns.job_expand_editing, key)
-    {:noreply, assign(socket, :job_expand_editing, keys)}
+
+    {:noreply,
+     socket
+     |> assign(:job_expand_editing, keys)
+     |> assign(:address_suggestion, nil)}
   end
 
   def handle_event("job_expand_commit_job", params, socket) do
@@ -776,6 +787,69 @@ defmodule RompCrmWeb.JobsLive do
             end
           end
       end
+    end
+  end
+
+  def handle_event("job_expand_commit_address", params, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      job_id = parse_id_param(params["job_id"])
+      attrs = AddressFormHandlers.job_address_attrs_from_params(params)
+      edit_key = JEK.job(job_id, "address")
+      bid = socket.assigns.current_business_id
+
+      cond do
+        job_id == nil ->
+          {:noreply, put_flash(socket, :error, "Invalid request.")}
+
+        attrs == %{} ->
+          {:noreply, drop_expand_edit(socket, edit_key) |> assign(:address_suggestion, nil)}
+
+        true ->
+          case Jobs.get_job(job_id, bid) do
+            nil ->
+              {:noreply, put_flash(socket, :error, "Job not found.")}
+
+            job ->
+              case Jobs.update_job(job, attrs) do
+                {:ok, _} ->
+                  {:noreply,
+                   socket
+                   |> refresh_jobs()
+                   |> drop_expand_edit(edit_key)
+                   |> assign(:address_suggestion, nil)}
+
+                {:error, _} ->
+                  {:noreply, put_flash(socket, :error, "Could not save that address.")}
+              end
+          end
+      end
+    end
+  end
+
+  def handle_event("address_validate", params, socket) do
+    suggestion = AddressFormHandlers.build_suggestion(params)
+    {:noreply, assign(socket, :address_suggestion, suggestion)}
+  end
+
+  def handle_event("address_apply_choice", %{"choice" => choice, "part" => part}, socket) do
+    suggestion = socket.assigns[:address_suggestion]
+
+    if suggestion && suggestion["part"] == part do
+      fill =
+        if choice == "suggested" do
+          suggestion["suggested"]
+        else
+          suggestion["typed"]
+        end
+
+      {:noreply,
+       socket
+       |> assign(:address_suggestion, nil)
+       |> push_event("address_fill", %{part: part, fields: fill})}
+    else
+      {:noreply, socket}
     end
   end
 
@@ -868,6 +942,35 @@ defmodule RompCrmWeb.JobsLive do
                 {:error, _} ->
                   {:noreply, put_flash(socket, :error, "Could not update material.")}
               end
+          end
+      end
+    end
+  end
+
+  def handle_event("add_work_item", %{"job_id" => jid}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to edit jobs.")}
+    else
+      job_id = parse_id_param(jid)
+      bid = socket.assigns.current_business_id
+
+      case Jobs.get_job(job_id, bid) do
+        nil ->
+          {:noreply, put_flash(socket, :error, "Job not found.")}
+
+        job ->
+          case Jobs.add_job_work_item(job, %{title: ""}) do
+            {:ok, {_job, wi}} ->
+              edit_key = JEK.wi_edit(wi.id)
+
+              {:noreply,
+               socket
+               |> refresh_jobs()
+               |> assign(:expanded_job_id, job_id)
+               |> assign(:job_expand_editing, MapSet.put(socket.assigns.job_expand_editing, edit_key))}
+
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Could not add work item.")}
           end
       end
     end
@@ -1247,14 +1350,6 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   defp build_inline_job_update_attrs(_, _), do: %{}
-
-  defp status_class(:lead), do: "bg-blue-100 text-blue-800 dark:bg-blue-900/45 dark:text-blue-200"
-  defp status_class(:pending), do: "bg-amber-100 text-amber-800 dark:bg-amber-900/45 dark:text-amber-200"
-  defp status_class(:in_progress), do: "bg-green-100 text-green-800 dark:bg-green-900/45 dark:text-green-200"
-  defp status_class(:done), do: "bg-base-200 text-base-content/70 dark:bg-base-300/40 dark:text-base-content/80"
-
-  defp priority_class(:high), do: "bg-red-100 text-red-800"
-  defp priority_class(:normal), do: ""
 
   defp expanded?(expanded_job_id, job_id), do: expanded_job_id == job_id
 

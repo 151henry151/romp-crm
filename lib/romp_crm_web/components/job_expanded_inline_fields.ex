@@ -3,14 +3,18 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
   use Phoenix.Component
 
   import RompCrmWeb.CoreComponents, only: [icon: 1]
+  import RompCrmWeb.AddressFieldsComponent, only: [address_fields: 1]
 
   alias RompCrm.Jobs
   alias RompCrmWeb.JobExpandEditKeys, as: EK
+  alias RompCrmWeb.AddressValues
+  alias RompCrm.Addresses
 
   attr :job, :any, required: true
   attr :can_edit_jobs, :boolean, default: false
   attr :variant, :atom, required: true
   attr :edit_keys, :any, required: true
+  attr :address_suggestion, :map, default: nil
 
   def job_expanded_inline_fields(assigns) do
     wrap =
@@ -45,16 +49,31 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
-          col=""
+          col={@wide}
           label="Address"
           editing?={editing?(@edit_keys, EK.job(@job.id, "address"))}
           edit_key={EK.job(@job.id, "address")}
           job_id={@job.id}
           field="address"
+          submit_event="job_expand_commit_address"
         >
-          <:readonly>{display(@job.address)}</:readonly>
+          <:readonly>
+            <div class="space-y-1">
+              <p>{Addresses.format_service(@job)}</p>
+              <%= if @job.billing_address_different do %>
+                <p class="text-xs text-base-content/70">
+                  Billing: {Addresses.format_billing(@job)}
+                </p>
+              <% end %>
+            </div>
+          </:readonly>
           <:editor>
-            <input type="text" name="value" value={@job.address || ""} class="input input-bordered input-sm w-full min-w-0" />
+            <.address_fields
+              id={"job-#{@job.id}-address"}
+              name_prefix="job"
+              values={AddressValues.from_job(@job)}
+              suggestion={@address_suggestion}
+            />
           </:editor>
         </.job_field>
         <.job_field
@@ -214,7 +233,12 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
       <% else %>
         <p><span class="font-medium text-base-content/90">Client:</span> {@job.client_name}</p>
-        <p><span class="font-medium text-base-content/90">Address:</span> {display(@job.address)}</p>
+        <p><span class="font-medium text-base-content/90">Address:</span> {Addresses.format_service(@job)}</p>
+        <%= if @job.billing_address_different do %>
+          <p class="text-xs text-base-content/70">
+            <span class="font-medium text-base-content/90">Billing:</span> {Addresses.format_billing(@job)}
+          </p>
+        <% end %>
         <p><span class="font-medium text-base-content/90">Phone:</span> {display(@job.phone)}</p>
         <p><span class="font-medium text-base-content/90">Email:</span> {display(@job.client_email)}</p>
         <p>
@@ -249,6 +273,7 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
   attr :edit_key, :string, required: true
   attr :job_id, :integer, required: true
   attr :field, :string, required: true
+  attr :submit_event, :string, default: "job_expand_commit_job"
   slot :readonly, required: true
   slot :editor, required: true
 
@@ -259,9 +284,11 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         <span class="block text-xs font-medium text-base-content/70">{@label}</span>
       </div>
       <%= if @editing? do %>
-        <form phx-submit="job_expand_commit_job" class="flex flex-wrap items-end gap-1.5 min-w-0">
+        <form phx-submit={@submit_event} class="flex flex-wrap items-end gap-1.5 min-w-0">
           <input type="hidden" name="job_id" value={@job_id} />
-          <input type="hidden" name="field" value={@field} />
+          <%= if @submit_event == "job_expand_commit_job" do %>
+            <input type="hidden" name="field" value={@field} />
+          <% end %>
           <div class="min-w-0 flex-1 basis-[min(100%,18rem)]">
             {render_slot(@editor)}
           </div>

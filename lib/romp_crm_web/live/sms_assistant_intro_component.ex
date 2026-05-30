@@ -56,7 +56,7 @@ defmodule RompCrmWeb.SmsAssistantIntroComponent do
             <.button type="button" class="btn btn-ghost" phx-click="sms_intro_skip" phx-target={@myself}>
               Skip for now
             </.button>
-            <.button type="submit" class="btn btn-primary">
+            <.button type="submit" class="btn btn-brand">
               Save and text me
             </.button>
           </div>

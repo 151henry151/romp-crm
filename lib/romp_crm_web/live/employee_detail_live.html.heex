@@ -15,7 +15,7 @@
       <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <.link
           navigate={~p"/employees"}
-          class="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800"
+          class="shrink-0 text-sm link-brand"
         >
           ← Employees
         </.link>
@@ -28,7 +28,7 @@
       </div>
       <.link
         navigate={~p"/employees/#{@employee.id}/edit"}
-        class="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800 sm:self-center"
+        class="shrink-0 text-sm link-brand sm:self-center"
       >
         Edit
       </.link>
@@ -68,7 +68,7 @@
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 class="text-base font-semibold text-base-content/80">Time Entries</h2>
         <%= if @can_manage_time do %>
-          <button type="button" phx-click="add_manual_shift" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+          <button type="button" phx-click="add_manual_shift" class="text-sm link-brand">
             + Log shift
           </button>
         <% end %>
@@ -134,7 +134,7 @@
                 <td class="px-4 py-3 text-xs text-base-content/70">{entry_kind_label(entry.clock_in_kind)}</td>
                 <%= if @can_manage_time do %>
                   <td class="px-4 py-3 text-right whitespace-nowrap space-x-2">
-                    <button type="button" phx-click="open_edit_entry" phx-value-id={entry.id} class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+                    <button type="button" phx-click="open_edit_entry" phx-value-id={entry.id} class="link-brand text-xs">Edit</button>
                     <button type="button" phx-click="delete_entry" phx-value-id={entry.id} data-confirm="Delete this time entry?" class="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>
                   </td>
                 <% end %>
@@ -176,7 +176,7 @@
               <p class="text-xs text-base-content/60">Saved changes appear in the audit log as manual adjustments.</p>
               <div class="flex justify-end gap-2 pt-2">
                 <button type="button" phx-click="close_edit_entry" class="btn btn-ghost btn-sm">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <button type="submit" class="btn btn-brand btn-sm">Save</button>
               </div>
             </form>
           </div>

@@ -15,7 +15,7 @@
       <p class="mt-1 text-sm text-base-content/70">
         Upcoming SMS reminders for your account. Times use your
         <span class="font-medium text-base-content/90">{@tz}</span> profile from
-        <.link href={~p"/users/settings"} class="text-blue-600 hover:text-blue-800 font-medium">Settings</.link>
+        <.link href={~p"/users/settings"} class="link-brand">Settings</.link>
         (default hour when you leave time blank: {to_string(@default_hour)}:00).
       </p>
       <p class="mt-2 text-xs text-base-content/60">
@@ -74,7 +74,7 @@
               title="Optional — defaults to profile hour"
             />
           </div>
-          <button type="submit" class="btn btn-primary btn-sm shrink-0">Add</button>
+          <button type="submit" class="btn btn-brand btn-sm shrink-0">Add</button>
         </div>
       </form>
     </section>
@@ -106,7 +106,7 @@
                       value={fire_at_time_part(r.fire_at, @tz)}
                       class="input input-bordered input-sm w-[6.25rem] px-1 text-[11px] tabular-nums"
                     />
-                    <button type="submit" class="btn btn-primary btn-xs">Save</button>
+                    <button type="submit" class="btn btn-brand btn-xs">Save</button>
                     <button type="button" phx-click="edit_cancel" class="btn btn-ghost btn-xs">
                       Cancel
                     </button>

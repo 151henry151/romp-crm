@@ -142,10 +142,10 @@ defmodule RompCrmWeb.AppWorkspaceNav do
   defp pill_nav_classes(true) do
     Enum.join(
       [
-        "block w-full text-center no-underline rounded-lg border border-emerald-700/35",
-        "bg-emerald-600/10 px-3 py-2 text-sm font-semibold text-emerald-950",
-        "hover:bg-emerald-600/15",
-        "dark:border-emerald-400/50 dark:bg-emerald-800/60 dark:text-white dark:hover:bg-emerald-700/70"
+        "block w-full text-center no-underline rounded-lg border border-base-content/20",
+        "bg-base-200/60 px-3 py-2 text-sm font-semibold text-base-content/90",
+        "hover:bg-base-300/60",
+        "dark:border-base-content/25 dark:bg-base-300/35 dark:text-base-content dark:hover:bg-base-300/50"
       ],
       " "
     )
@@ -154,10 +154,10 @@ defmodule RompCrmWeb.AppWorkspaceNav do
   defp pill_nav_classes(false) do
     Enum.join(
       [
-        "inline-flex shrink-0 items-center justify-center no-underline rounded-lg border border-emerald-700/35",
-        "bg-emerald-600/10 px-3 py-1.5 text-sm font-semibold text-emerald-950",
-        "hover:bg-emerald-600/15",
-        "dark:border-emerald-400/50 dark:bg-emerald-800/60 dark:text-white dark:hover:bg-emerald-700/70"
+        "inline-flex shrink-0 items-center justify-center no-underline rounded-lg border border-base-content/20",
+        "bg-base-200/60 px-3 py-1.5 text-sm font-semibold text-base-content/90",
+        "hover:bg-base-300/60",
+        "dark:border-base-content/25 dark:bg-base-300/35 dark:text-base-content dark:hover:bg-base-300/50"
       ],
       " "
     )

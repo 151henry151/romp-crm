@@ -87,6 +87,7 @@ defmodule RompCrmWeb do
       import Phoenix.Controller, only: [get_csrf_token: 0]
       # Core UI components
       import RompCrmWeb.CoreComponents
+      import RompCrmWeb.AddressFieldsComponent, only: [address_fields: 1]
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

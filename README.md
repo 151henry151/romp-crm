@@ -63,8 +63,9 @@ Use your real hostname, for example **`https://rompcrm.com/romp-crm/webhooks/twi
 | `TWILIO_VOICE_WEBHOOK_PUBLIC_URL` / `TWILIO_VOICE_FORWARD_TO` | Optional; voice webhook (**`/webhooks/twilio/voice`**) |
 | `ANTHROPIC_API_KEY` | SMS → job parsing |
 | `ANTHROPIC_MODEL` | Defaults in **`config/runtime.exs`** if unset |
+| `GOOGLE_MAPS_API_KEY` | Optional; Places Autocomplete + Geocoding for structured job addresses (see self-hosting guide §4) |
 
-See **`deploy/README.md`** for systemd, PayPal provisioning, and Twilio voice.
+See **`deploy/README.md`** for systemd, PayPal provisioning, Twilio voice, and Google Maps setup.
 
 **Sign-ups:** By default **any** email can register (`ENFORCE_REGISTRATION_ALLOWLIST` is off). Set **`ENFORCE_REGISTRATION_ALLOWLIST=true`** and **`ALLOWED_REGISTRATION_EMAILS`** in production only if you need a private allowlist.
 

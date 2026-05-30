@@ -206,6 +206,7 @@ ENFORCE_REGISTRATION_ALLOWLIST=false</code></pre>
           <li><strong>Twilio voice</strong> — <code>TWILIO_VOICE_WEBHOOK_PUBLIC_URL</code> and <code>TWILIO_VOICE_FORWARD_TO</code> if you use the voice webhook.</li>
           <li><strong>Transactional email branding</strong> — <code>EMAIL_LOGO_URL</code> and <code>EMAIL_BRAND_BASE_URL</code>.</li>
           <li><strong>CSRF / LiveView origins</strong> — <code>PHX_CHECK_ORIGINS</code> if you expose multiple public hostnames.</li>
+          <li><strong>Job address autocomplete</strong> — <code>GOOGLE_MAPS_API_KEY</code> (see section 4). Structured address fields work without it; autocomplete and “Check address” do not.</li>
         </ul>
 
         <div class="callout">
@@ -216,7 +217,47 @@ ENFORCE_REGISTRATION_ALLOWLIST=false</code></pre>
 
     <section class="section">
       <div class="card">
-        <h2>4) Set up Anthropic and get your API key</h2>
+        <h2>4) Google Maps Platform (job address autocomplete)</h2>
+        <p>Romp CRM job forms use structured addresses (line 1, line 2, city, state, ZIP) with optional billing address. When configured, <strong>Address line 1</strong> offers Google Places suggestions as you type, and <strong>Check address</strong> compares what you entered to Google’s geocoded result — you always choose whether to keep your text or accept the suggestion.</p>
+        <p>This is optional but recommended. Without an API key, the fields still save; autocomplete and geocode checks are simply hidden.</p>
+
+        <h3>4.1 Create a Google Cloud project and enable billing</h3>
+        <ol>
+          <li>Sign in at <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>.</li>
+          <li>Create a project (or pick an existing one) for Romp CRM.</li>
+          <li>Attach a billing account — <a href="https://developers.google.com/maps/billing-and-pricing/pricing" target="_blank" rel="noopener noreferrer">Maps Platform</a> requires billing, but Google applies monthly free usage credits for Geocoding and Places.</li>
+        </ol>
+
+        <h3>4.2 Enable the APIs Romp CRM uses</h3>
+        <p>Open <strong>APIs &amp; Services → Library</strong> and enable:</p>
+        <ul>
+          <li><strong>Maps JavaScript API</strong> — loads the browser script (<code>libraries=places</code>).</li>
+          <li><strong>Places API</strong> — powers the address autocomplete dropdown on line 1.</li>
+          <li><strong>Geocoding API</strong> — server-side validation when users click <strong>Check address</strong>.</li>
+        </ul>
+        <p>Romp CRM uses the classic <a href="https://developers.google.com/maps/documentation/javascript/place-autocomplete" target="_blank" rel="noopener noreferrer">Maps JavaScript Places Autocomplete</a> widget. You do <em>not</em> need the separate “Place Autocomplete (New)” widget unless you migrate the app yourself — the same key and Places API enablement cover our integration.</p>
+
+        <h3>4.3 Create and restrict an API key</h3>
+        <ol>
+          <li><strong>APIs &amp; Services → Credentials → Create credentials → API key</strong>.</li>
+          <li>Edit the key → <strong>Application restrictions</strong>: choose <strong>HTTP referrers (web sites)</strong> and add your public CRM origins, for example:
+            <pre><code>https://yourdomain.com/*
+https://www.yourdomain.com/*</code></pre>
+            Include every hostname where users edit jobs (e.g. <code>https://rompcrm.com/*</code> if you use that host).</li>
+          <li><strong>API restrictions</strong>: restrict to <strong>Maps JavaScript API</strong>, <strong>Places API</strong>, and <strong>Geocoding API</strong> only.</li>
+          <li>Copy the key into <code>GOOGLE_MAPS_API_KEY</code> in <code>.env.production</code>.</li>
+          <li>Restart Romp CRM: <code>sudo systemctl restart romp-crm</code>.</li>
+        </ol>
+
+        <div class="callout">
+          Never commit the real key to git. If autocomplete works but “Check address” never suggests corrections, confirm <strong>Geocoding API</strong> is enabled and allowed on the same key.
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="card">
+        <h2>5) Set up Anthropic and get your API key</h2>
         <ol>
           <li>Create/login at <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.</li>
           <li>Set up billing for production use.</li>
@@ -230,7 +271,7 @@ ENFORCE_REGISTRATION_ALLOWLIST=false</code></pre>
 
     <section class="section">
       <div class="card">
-        <h2>5) Set up Twilio (including A2P 10DLC for outbound)</h2>
+        <h2>6) Set up Twilio (including A2P 10DLC for outbound)</h2>
 
         <h3>5.1 Create Twilio project and buy an SMS-capable US number</h3>
         <ol>
@@ -270,7 +311,7 @@ TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx MIX_ENV=prod mix
 
     <section class="section">
       <div class="card">
-        <h2>6) Nginx and HTTPS (Let’s Encrypt)</h2>
+        <h2>7) Nginx and HTTPS (Let’s Encrypt)</h2>
         <ol>
           <li>Proxy <code>/romp-crm/</code> to your release port (default <code>40175</code>) and strip prefix with trailing slash in <code>proxy_pass</code>.</li>
           <li>Expose <code>/.well-known/acme-challenge/</code> for webroot cert issuance.</li>
@@ -287,13 +328,14 @@ TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx MIX_ENV=prod mix
 
     <section class="section">
       <div class="card">
-        <h2>7) Verification checklist</h2>
+        <h2>8) Verification checklist</h2>
         <div class="grid">
           <div>
             <h3>App</h3>
             <ul>
               <li><code>https://yourdomain.com/romp-crm/</code> loads</li>
               <li>User registration and magic-link login work</li>
+              <li>New/edit job: structured address fields save; with <code>GOOGLE_MAPS_API_KEY</code>, line 1 autocomplete and “Check address” work</li>
               <li>Optional: <code>/reminders</code>, <code>/support</code>, and (for admin emails) <code>/admin</code></li>
             </ul>
           </div>

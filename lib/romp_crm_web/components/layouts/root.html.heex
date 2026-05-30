@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="live-socket-path" content={RompCrmWeb.PathPrefix.live_socket_path()} />
+    <%= if key = RompCrm.GoogleMaps.api_key() do %>
+      <meta name="google-maps-api-key" content={key} />
+    <% end %>
     <.live_title default="Romp CRM" suffix=" · Romp CRM" phx-no-format>{assigns[:page_title]}</.live_title>
     <link
       rel="icon"

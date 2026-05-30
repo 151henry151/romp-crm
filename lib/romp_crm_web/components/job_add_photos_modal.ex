@@ -36,7 +36,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
           class="mt-5 rounded-lg border-2 border-dashed border-base-300 bg-base-200/40 p-4"
         >
           <div class="flex flex-col sm:flex-row gap-2">
-            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content hover:opacity-90">
+            <label class="relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-base-content/25 bg-base-100 px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:border-base-content/35 hover:bg-base-200">
               <input
                 data-role="gallery-input"
                 type="file"
@@ -84,7 +84,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
             <button
               type="button"
               data-role="webcam-capture"
-              class="hidden btn btn-primary btn-xs"
+              class="hidden btn btn-brand btn-xs"
             >
               Capture photo
             </button>
@@ -102,7 +102,7 @@ defmodule RompCrmWeb.JobAddPhotosModal do
         <% end %>
 
         <div class="mt-5 flex flex-wrap gap-2">
-          <button type="button" phx-click="close_add_photos" class="btn btn-primary btn-sm">
+          <button type="button" phx-click="close_add_photos" class="btn btn-brand btn-sm">
             Done
           </button>
         </div>

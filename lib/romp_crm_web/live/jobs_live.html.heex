@@ -12,19 +12,33 @@
   <div class="text-base-content">
     <%!-- Filter / sort controls + new job --%>
     <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300 pb-3">
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <details class="relative">
-          <summary class="btn btn-sm btn-outline h-9 min-h-0 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-            Filter · {JobsList.filter_label(@filter)}
+      <div class="relative min-w-0 flex-1">
+        <div class="relative flex flex-wrap items-center gap-2">
+        <details class="group">
+          <summary
+            class={[
+              "indicator btn btn-square btn-sm h-9 w-9 min-h-0 shrink-0 list-none cursor-pointer border bg-base-100 p-0 text-base-content shadow-sm hover:bg-base-200 [&::-webkit-details-marker]:hidden",
+              if(JobsList.filter_active?(@filter),
+                do: "border-base-content/35 bg-base-300/40 hover:border-base-content/45 hover:bg-base-300/55 dark:bg-base-300/30 dark:hover:bg-base-300/45",
+                else: "border-base-content/20 hover:border-base-content/30"
+              )
+            ]}
+            aria-label={JobsList.filter_button_label(@filter, @color_code_statuses)}
+            title={JobsList.filter_button_label(@filter, @color_code_statuses)}
+          >
+            <%= if JobsList.filter_active?(@filter) do %>
+              <span class="indicator-item status status-neutral status-xs" aria-hidden="true"></span>
+            <% end %>
+            <.icon name="hero-funnel" class="size-4 shrink-0 text-base-content" />
           </summary>
-          <div class="absolute left-0 z-30 mt-1 min-w-[11rem] rounded-lg border border-base-300 bg-base-100 p-1.5 shadow-lg">
+          <div class="absolute left-0 right-0 top-full z-30 mt-1 w-full rounded-lg border border-base-300 bg-base-100 p-1.5 shadow-lg">
             <%= for {label, status} <- JobsList.filter_options() do %>
               <button
                 type="button"
                 phx-click="filter"
                 phx-value-status={status}
                 class={[
-                  "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm",
+                  "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm whitespace-nowrap",
                   if(@filter == status,
                     do: "bg-base-200 font-semibold text-base-content",
                     else: "hover:bg-base-200/60 text-base-content/80"
@@ -35,27 +49,30 @@
                 <span class="text-xs tabular-nums text-base-content/60">{JobsList.count_for(@jobs, status)}</span>
               </button>
             <% end %>
+            <div class="mt-1.5 border-t border-base-300 pt-1.5">
+              <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-base-200/60 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={@color_code_statuses}
+                  phx-click="toggle_color_code"
+                  class="checkbox checkbox-sm mt-0.5"
+                />
+                <span class="font-medium text-base-content">Color-code</span>
+              </label>
+            </div>
           </div>
         </details>
 
-        <details class="relative">
-          <summary class="btn btn-sm btn-outline h-9 min-h-0 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-            Sort · {JobsList.sort_label(@sort_by)}<%= if @show_address_primary, do: " · Address" %>
+        <details class="group">
+          <summary
+            class="btn btn-square btn-sm h-9 w-9 min-h-0 shrink-0 list-none cursor-pointer border border-base-content/20 bg-base-100 p-0 text-base-content shadow-sm hover:border-base-content/30 hover:bg-base-200 [&::-webkit-details-marker]:hidden"
+            aria-label={JobsList.sort_summary(@sort_by, @show_address_primary)}
+            title={JobsList.sort_summary(@sort_by, @show_address_primary)}
+          >
+            <.icon name="hero-bars-3-bottom-left" class="size-4 shrink-0 text-base-content" />
           </summary>
-          <div class="absolute left-0 z-30 mt-1 min-w-[14rem] rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg space-y-2">
-            <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-base-200/60">
-              <input
-                type="checkbox"
-                checked={@show_address_primary}
-                phx-click="toggle_address_primary"
-                class="checkbox checkbox-sm mt-0.5"
-              />
-              <span>
-                <span class="font-medium text-base-content">Show address as primary</span>
-                <span class="block text-xs text-base-content/60">Address above client name on each job</span>
-              </span>
-            </label>
-            <div class="border-t border-base-300 pt-2 space-y-0.5">
+          <div class="absolute left-0 right-0 top-full z-30 mt-1 w-full rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+            <div class="space-y-0.5">
               <p class="px-2 text-xs font-medium uppercase tracking-wide text-base-content/50">Sort by</p>
               <%= for {label, key} <- JobsList.sort_options() do %>
                 <button
@@ -63,7 +80,7 @@
                   phx-click="set_sort"
                   phx-value-sort={key}
                   class={[
-                    "block w-full rounded-md px-3 py-2 text-left text-sm",
+                    "block w-full rounded-md px-3 py-2 text-left text-sm whitespace-nowrap",
                     if(@sort_by == key,
                       do: "bg-base-200 font-semibold text-base-content",
                       else: "hover:bg-base-200/60 text-base-content/80"
@@ -74,13 +91,25 @@
                 </button>
               <% end %>
             </div>
+            <div class="mt-2 border-t border-base-300 pt-2">
+              <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-base-200/60 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={@show_address_primary}
+                  phx-click="toggle_address_primary"
+                  class="checkbox checkbox-sm mt-0.5"
+                />
+                <span class="font-medium text-base-content">List by address</span>
+              </label>
+            </div>
           </div>
         </details>
+        </div>
       </div>
       <%= if @can_edit_jobs do %>
         <.link
           patch={~p"/jobs/new"}
-          class="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center self-center rounded-lg bg-blue-600 px-6 text-lg font-semibold leading-none text-white no-underline shadow-sm hover:bg-blue-500 hover:no-underline"
+          class="btn-icon-neutral"
           title="New Job"
           aria-label="New Job"
         >
@@ -93,8 +122,8 @@
       <%= for job <- JobsList.prepare_jobs(@jobs, @filter, @sort_by) do %>
         <% mob_expanded? = expanded?(@expanded_job_id, job.id) %>
         <div class={[
-          "rounded-lg border border-base-300 overflow-hidden",
-          if(mob_expanded?, do: "bg-base-200/40", else: "bg-base-100")
+          "rounded-lg border overflow-hidden",
+          JobsList.mobile_card_classes(job, mob_expanded?)
         ]}>
           <button
             type="button"
@@ -112,20 +141,20 @@
                     <p class="text-sm text-base-content/70 break-words">{name}</p>
                   <% end %>
                 </div>
-                <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center self-start rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
-                  {JobsList.status_label(job.status)}
-                </span>
+                <div class="flex shrink-0 flex-col items-end gap-1 self-start">
+                  <%= if job.priority == :high do %>
+                    <span class={"inline-flex h-5 min-w-[3.25rem] items-center justify-center rounded px-1.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap box-border #{JobsList.priority_badge_class(job.priority, @color_code_statuses)}"}>
+                      HIGH
+                    </span>
+                  <% end %>
+                  <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{JobsList.status_badge_class(job.status, @color_code_statuses)}"}>
+                    {JobsList.status_label(job.status)}
+                  </span>
+                </div>
               </div>
               <%= if not mob_expanded? do %>
                 <p class="text-sm text-base-content/80 break-words line-clamp-2">
-                  <span class="font-medium text-base-content/90">Work description:</span>
                   {display(job.work_description)}
-                </p>
-              <% end %>
-              <%= if is_binary(job.notes) && String.trim(job.notes) != "" do %>
-                <p class="text-sm text-base-content/80 break-words">
-                  <span class="font-medium text-base-content/90">Notes:</span>
-                  {job.notes}
                 </p>
               <% end %>
             </div>
@@ -141,6 +170,7 @@
                 can_edit_jobs={@can_edit_jobs}
                 variant={:mobile}
                 edit_keys={@job_expand_editing}
+                address_suggestion={@address_suggestion}
               />
               <.job_work_items_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
               <.job_materials_section job={job} can_edit_jobs={@can_edit_jobs} edit_keys={@job_expand_editing} />
@@ -287,7 +317,7 @@
                 <% end %>
               </td>
               <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
-                <%= if @show_address_primary, do: "—", else: job.address %>
+                <%= if @show_address_primary, do: "—", else: RompCrm.Addresses.format_service(job) %>
               </td>
               <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">{job.phone}</td>
               <td class="px-4 py-3 text-base-content/90 max-w-[220px] align-top">
@@ -299,13 +329,13 @@
               </td>
               <td class="px-4 py-3">
                 <%= if job.priority == :high do %>
-                  <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-semibold whitespace-nowrap box-border #{priority_class(job.priority)}"}>
+                  <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-semibold whitespace-nowrap box-border #{JobsList.priority_badge_class(job.priority, @color_code_statuses)}"}>
                     HIGH
                   </span>
                 <% end %>
               </td>
               <td class="px-4 py-3">
-                <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
+                <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{JobsList.status_badge_class(job.status, @color_code_statuses)}"}>
                   {JobsList.status_label(job.status)}
                 </span>
               </td>
@@ -327,6 +357,7 @@
                       can_edit_jobs={@can_edit_jobs}
                       variant={:desktop}
                       edit_keys={@job_expand_editing}
+                      address_suggestion={@address_suggestion}
                     />
                     <.job_work_items_section
                       job={job}

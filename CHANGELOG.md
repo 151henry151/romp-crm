@@ -1,38 +1,16 @@
 # Changelog
 
-## [0.9.101] - 2026-05-18
+## [0.9.102] - 2026-05-18
+
+### Added
+
+- **Jobs**: structured service and optional billing addresses (line 1/2, city, state, ZIP) with Google Places Autocomplete and geocode confirmation (“Use what I entered” vs “Use suggested address”)
+- **SMS AI**: accept structured address fields, flat `address`, and separate billing address on create/update
+- **Docs**: Google Maps Platform API key setup in self-hosting guide, `deploy/README.md`, env examples, and VPS migration checklist
 
 ### Changed
 
-- **Jobs list**: replace status filter tabs with **Filter** and **Sort** menus; sort by alphabetical, scheduled date (soonest job or work-item date), or creation date
-- **Jobs list**: add optional **Show address as primary** display mode (address above client name) independent of sort choice
-
-## [0.9.100] - 2026-05-18
-
-### Changed
-
-- **Chat**: restore centered **`max-w-3xl`** conversation column so left/right bubbles stay closer together on wide screens
-
-## [0.9.99] - 2026-05-18
-
-### Changed
-
-- **Layout**: unify CRM workspace page width at **`max-w-[min(100%,100rem)]`** (~1600px) for header and main content; remove per-page **`max-w-lg` / `max-w-3xl` / `max-w-5xl`** caps on Businesses, Support, Chat, Reminders, Admin, Settings, and Subscribe
-- **Businesses**, **Reminders**, **Workday timeclock**, **Support**: use responsive multi-column layouts on large screens to use horizontal space
-
-## [0.9.98] - 2026-05-18
-
-### Fixed
-
-- **Modals**: remove forced light theme from shared `<.modal>`; use daisyUI `base-*` tokens so New Job, Add photos, Add job hours, employee, and SMS intro modals follow dark/light mode
-- **Modals**: replace hardcoded gray/white form styling in job-hours and add-photos modals with theme-aware inputs and buttons
-- **Jobs**: add dark-mode styling for status badges on the job list
-
-## [0.9.97] - 2026-05-18
-
-### Fixed
-
-- **Navigation**: improve dark-mode pill contrast (white text on deeper emerald fill) and apply Tailwind `dark:` styles when the theme toggle is set to **system** and the OS prefers dark
+- **Jobs list / form**: replace single address text field with structured address UI; legacy `address` column kept in sync for sorting
 
 ## [0.9.96] - 2026-05-18
 

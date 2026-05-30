@@ -26,6 +26,7 @@ import {hooks as colocatedHooks} from "phoenix-colocated/romp_crm"
 import JobPhotoUpload from "./hooks/job_photo_upload"
 import JobPhotoViewer from "./hooks/job_photo_viewer"
 import AgentChatScroll from "./hooks/agent_chat_scroll"
+import GoogleAddress from "./hooks/google_address"
 import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
@@ -38,7 +39,7 @@ const liveSocketPath =
 // toast even though the page still works after reconnect.
 const liveSocket = new LiveSocket(liveSocketPath, Socket, {
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, JobPhotoUpload, JobPhotoViewer, AgentChatScroll},
+  hooks: {...colocatedHooks, JobPhotoUpload, JobPhotoViewer, AgentChatScroll, GoogleAddress},
   // Default is 500ms — brief transport blips on mobile then flash the error toast; wait a bit longer.
   disconnectedTimeout: 2_500,
 })

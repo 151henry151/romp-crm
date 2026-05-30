@@ -141,6 +141,19 @@ defmodule RompCrm.Jobs do
         "id" => j.id,
         "client_name" => j.client_name,
         "address" => j.address,
+        "address_line1" => j.address_line1,
+        "address_line2" => j.address_line2,
+        "city" => j.city,
+        "state" => j.state,
+        "postal_code" => j.postal_code,
+        "billing_address_different" => j.billing_address_different,
+        "billing_address" =>
+          if(j.billing_address_different, do: RompCrm.Addresses.format_billing(j), else: nil),
+        "billing_address_line1" => j.billing_address_line1,
+        "billing_address_line2" => j.billing_address_line2,
+        "billing_city" => j.billing_city,
+        "billing_state" => j.billing_state,
+        "billing_postal_code" => j.billing_postal_code,
         "phone" => j.phone,
         "client_email" => j.client_email,
         "work_description" => j.work_description,
@@ -289,6 +302,43 @@ defmodule RompCrm.Jobs do
           {:error, %Ecto.Changeset{} = cs} ->
             {:error, cs}
         end
+    end
+  end
+
+  @doc """
+  Inserts a new work item on **`job`**, reloads the job, and broadcasts **`{:updated, job}`**.
+  """
+  def add_job_work_item(%Job{} = job, attrs \\ %{}) when is_map(attrs) do
+    bid = job.business_id
+    job = Repo.preload(job, :work_items)
+
+    next_order =
+      (job.work_items || [])
+      |> Enum.map(& &1.sort_order)
+      |> Enum.max(fn -> -1 end)
+      |> Kernel.+(1)
+
+    sort_order =
+      case attrs[:sort_order] || attrs["sort_order"] do
+        n when is_integer(n) -> n
+        _ -> next_order
+      end
+
+    attrs =
+      attrs
+      |> stringify_keys_shallow()
+      |> Map.put("title", Map.get(attrs, "title") || Map.get(attrs, :title) || "")
+      |> Map.put("sort_order", sort_order)
+      |> Map.put("job_id", job.id)
+
+    case %JobWorkItem{} |> JobWorkItem.changeset(attrs) |> Repo.insert() do
+      {:ok, wi} ->
+        job = get_job!(job.id, bid)
+        broadcast(bid, {:updated, job})
+        {:ok, {job, wi}}
+
+      {:error, %Ecto.Changeset{} = cs} ->
+        {:error, cs}
     end
   end
 
@@ -665,11 +715,12 @@ defmodule RompCrm.Jobs do
   defp header_value_to_string(_), do: ""
 
   defp normalize_job_nested_attrs(attrs) when is_map(attrs) do
-    attrs = stringify_keys_shallow(attrs)
-    attrs = maybe_add_work_item_sort_orders(attrs)
-    attrs = maybe_parse_job_date(attrs, "scheduled_on")
-    attrs = maybe_parse_job_time(attrs)
     attrs
+    |> stringify_keys_shallow()
+    |> RompCrm.Addresses.merge_ai_address_attrs()
+    |> maybe_add_work_item_sort_orders()
+    |> maybe_parse_job_date("scheduled_on")
+    |> maybe_parse_job_time()
   end
 
   defp maybe_add_work_item_sort_orders(%{"work_items" => wis} = attrs) when is_list(wis) do

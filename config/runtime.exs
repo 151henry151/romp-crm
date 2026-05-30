@@ -306,7 +306,8 @@ if config_env() == :prod do
     paypal_trial_days: paypal_trial_days,
     signup_trial_days: signup_trial_days,
     email_logo_url: email_logo_url,
-    email_brand_base_url: email_brand_base_url
+    email_brand_base_url: email_brand_base_url,
+    google_maps_api_key: System.get_env("GOOGLE_MAPS_API_KEY")
 
   case System.get_env("SMTP_HOST") |> to_string() |> String.trim() do
     "" ->

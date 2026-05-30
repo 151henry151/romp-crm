@@ -249,13 +249,13 @@ defmodule RompCrm.Ai.SmsJobExtractor do
 
     %{}
     |> maybe_put_string(:client_name, m["client_name"])
-    |> maybe_put_string(:address, m["address"])
     |> maybe_put_string(:phone, m["phone"])
     |> maybe_put_string(:client_email, m["client_email"])
     |> maybe_put_string(:work_description, m["work_description"])
     |> maybe_put_string(:referred_by, m["referred_by"])
     |> maybe_put_string(:notes, m["notes"])
     |> maybe_put_string(:next_action, m["next_action"])
+    |> Map.merge(RompCrm.Addresses.atom_job_address_attrs_if_present(m))
     |> maybe_put_date(:scheduled_on, m["scheduled_on"])
     |> maybe_put_work_items(:work_items, m["work_items"])
     |> maybe_put_materials(:materials, m["materials"])
@@ -473,7 +473,6 @@ defmodule RompCrm.Ai.SmsJobExtractor do
 
     base = %{
       client_name: client_name,
-      address: nilify_blank(m["address"]),
       phone: nilify_blank(m["phone"]),
       client_email: nilify_blank(m["client_email"]),
       work_description: nilify_blank(m["work_description"]),
@@ -483,6 +482,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
       notes: nilify_blank(m["notes"]),
       next_action: nilify_blank(m["next_action"])
     }
+    |> Map.merge(RompCrm.Addresses.atom_job_address_attrs(m))
 
     extras =
       %{}

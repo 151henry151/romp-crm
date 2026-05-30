@@ -27,7 +27,7 @@
         <p class="font-semibold text-base-content mb-2">You are not on the employee roster (or your account is not linked).</p>
         <%= if @is_business_owner do %>
           <p class="mb-3">
-            Add yourself under <.link navigate={~p"/employees"} class="text-blue-600 hover:text-blue-800 font-medium">Employees</.link>
+            Add yourself under <.link navigate={~p"/employees"} class="link-brand">Employees</.link>
             with the same email as this login, or ask your admin to link your user to your roster row.
           </p>
         <% else %>
@@ -80,7 +80,7 @@
           <button
             type="button"
             phx-click="add_manual_shift"
-            class="text-sm font-medium text-blue-600 hover:text-blue-800"
+            class="text-sm link-brand"
           >
             + Log past shift
           </button>
@@ -125,7 +125,7 @@
                         type="button"
                         phx-click="open_edit_entry"
                         phx-value-id={e.id}
-                        class="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                        class="link-brand text-xs"
                       >
                         Edit
                       </button>
@@ -203,7 +203,7 @@
                 </p>
                 <div class="flex justify-end gap-2 pt-2">
                   <button type="button" phx-click="close_edit_entry" class="btn btn-ghost btn-sm">Cancel</button>
-                  <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                  <button type="submit" class="btn btn-brand btn-sm">Save</button>
                 </div>
               </form>
             </div>

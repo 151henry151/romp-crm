@@ -6,19 +6,43 @@ defmodule RompCrmWeb.JobFormComponent do
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.Jobs.JobWorkItem
+  alias RompCrmWeb.AddressFormHandlers
+  alias RompCrmWeb.AddressValues
 
   @impl true
-  def update(%{job: job} = assigns, socket) do
+  def update(%{job: incoming_job} = assigns, socket) do
     action = Map.get(assigns, :action)
-    job = ensure_default_work_items(job, action)
+    incoming_job = ensure_default_work_items(incoming_job, action)
+    job = preserve_local_work_items(socket, incoming_job)
+
+    form = to_form(Jobs.change_job(job))
 
     {:ok,
      socket
      |> assign(assigns)
+     |> assign(:job, job)
      |> assign_new(:current_business_id, fn -> nil end)
      |> assign_new(:actor_user_id, fn -> nil end)
      |> assign_new(:can_edit_jobs, fn -> true end)
-     |> assign_new(:form, fn -> to_form(Jobs.change_job(job)) end)}
+     |> assign_new(:address_suggestion, fn -> nil end)
+     |> assign(:form, form)}
+  end
+
+  defp preserve_local_work_items(socket, incoming_job) do
+    case socket.assigns[:job] do
+      %Job{id: id} = current when id == incoming_job.id or is_nil(id) and is_nil(incoming_job.id) ->
+        current_items = current.work_items || []
+        incoming_items = incoming_job.work_items || []
+
+        if length(current_items) > length(incoming_items) do
+          %{incoming_job | work_items: current_items}
+        else
+          incoming_job
+        end
+
+      _ ->
+        incoming_job
+    end
   end
 
   defp ensure_default_work_items(%Job{id: nil} = job, :new) do
@@ -40,7 +64,7 @@ defmodule RompCrmWeb.JobFormComponent do
   @impl true
   def handle_event("validate", %{"job" => params} = outer, socket) do
     if socket.assigns.can_edit_jobs do
-      params = filter_job_params(params)
+      params = normalize_job_params(params)
       changeset = Jobs.change_job(socket.assigns.job, params)
       {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
     else
@@ -64,6 +88,43 @@ defmodule RompCrmWeb.JobFormComponent do
     end
   end
 
+  def handle_event("address_validate", params, socket) do
+    suggestion = AddressFormHandlers.build_suggestion(params)
+    {:noreply, assign(socket, :address_suggestion, suggestion)}
+  end
+
+  def handle_event("address_apply_choice", %{"choice" => choice, "part" => part}, socket) do
+    suggestion = socket.assigns[:address_suggestion]
+
+    if suggestion && suggestion["part"] == part do
+      fill =
+        if choice == "suggested" do
+          suggestion["suggested"]
+        else
+          suggestion["typed"]
+        end
+
+      params =
+        socket.assigns.form.params
+        |> case do
+          p when is_map(p) -> %{"job" => p}
+          _ -> %{"job" => %{}}
+        end
+        |> AddressFormHandlers.merge_fill_into_job_params(fill, part)
+
+      job_params = Map.get(params, "job", %{})
+      changeset = Jobs.change_job(socket.assigns.job, job_params)
+
+      {:noreply,
+       socket
+       |> assign(:address_suggestion, nil)
+       |> assign(:form, to_form(changeset, action: :validate))
+       |> push_event("address_fill", %{part: part, fields: fill})}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_event("add_work_item", _, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, socket}
@@ -84,6 +145,12 @@ defmodule RompCrmWeb.JobFormComponent do
   end
 
   defp filter_job_params(params) when is_map(params) do
+    params
+    |> normalize_job_params()
+    |> drop_blank_work_items()
+  end
+
+  defp normalize_job_params(params) when is_map(params) do
     case Map.get(params, "work_items") do
       wis when is_list(wis) ->
         kept =
@@ -93,7 +160,6 @@ defmodule RompCrmWeb.JobFormComponent do
             |> Enum.map(fn {k, v} -> {to_string(k), v} end)
             |> Map.new()
           end)
-          |> Enum.filter(fn row -> (row["title"] || "") |> to_string() |> String.trim() != "" end)
           |> Enum.with_index()
           |> Enum.map(fn {row, i} -> Map.put(row, "sort_order", i) end)
 
@@ -103,6 +169,18 @@ defmodule RompCrmWeb.JobFormComponent do
         params
     end
   end
+
+  defp drop_blank_work_items(%{"work_items" => wis} = params) when is_list(wis) do
+    kept =
+      wis
+      |> Enum.filter(fn row -> (row["title"] || "") |> to_string() |> String.trim() != "" end)
+      |> Enum.with_index()
+      |> Enum.map(fn {row, i} -> Map.put(row, "sort_order", i) end)
+
+    Map.put(params, "work_items", kept)
+  end
+
+  defp drop_blank_work_items(params), do: params
 
   defp material_lines_to_list(text) do
     text
@@ -246,8 +324,15 @@ defmodule RompCrmWeb.JobFormComponent do
       >
         <.input field={@form[:client_name]} type="text" label="Client Name" required />
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <.input field={@form[:address]} type="text" label="Address" />
+        <.address_fields
+          id="job-form-address"
+          name_prefix="job"
+          target={@myself}
+          values={AddressValues.from_form(@form, @job)}
+          suggestion={@address_suggestion}
+        />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <.input field={@form[:phone]} type="text" label="Phone" />
           <.input field={@form[:client_email]} type="email" label="Email" />
         </div>

@@ -77,7 +77,7 @@ defmodule RompCrmWeb.JobPhotosSection do
             type="button"
             phx-click="open_add_photos"
             phx-value-job_id={@job.id}
-            class="shrink-0 rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+            class="shrink-0 btn btn-brand btn-xs px-3 py-1.5 text-xs font-semibold"
           >
             Add photos…
           </button>
@@ -185,7 +185,7 @@ defmodule RompCrmWeb.JobPhotosSection do
                   phx-click="open_photo_viewer"
                   phx-value-job_id={@job.id}
                   phx-value-photo_id={ph.id}
-                  class="group relative shrink-0 overflow-hidden rounded border border-base-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="group relative shrink-0 overflow-hidden rounded border border-base-300 focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <img
                     src={RompCrmWeb.PathPrefix.static_upload_path(ph.relative_path)}

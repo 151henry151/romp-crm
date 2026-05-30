@@ -28,7 +28,7 @@ cp deploy/romp-crm.env.example /home/henry/romp-crm/.env.production
 chmod 600 /home/henry/romp-crm/.env.production
 ```
 
-Fill in **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, SMTP, Twilio, Anthropic, etc.
+Fill in **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, SMTP, Twilio, Anthropic, optional **`GOOGLE_MAPS_API_KEY`** (address autocomplete), etc.
 
 **Open registration:** leave **`ENFORCE_REGISTRATION_ALLOWLIST`** unset or **`false`** (default). Set **`ENFORCE_REGISTRATION_ALLOWLIST=true`** and **`ALLOWED_REGISTRATION_EMAILS`** only if you want to lock sign-ups to a fixed email list.
 
@@ -82,3 +82,25 @@ TWILIO_MESSAGING_SERVICE_SID='MG…' mix twilio.messaging_service_inbound
 ```
 
 (or enable **Defer to sender’s webhook** in Console → Messaging → your Service → Integration).
+
+## Google Maps Platform (job addresses)
+
+Structured job addresses use **Google Places Autocomplete** in the browser (Address line 1) and **Geocoding API** on the server when a user clicks **Check address**. Set **`GOOGLE_MAPS_API_KEY`** in **`.env.production`** and restart the app.
+
+1. Create or open a project at [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable billing on the project (Maps Platform requires it; Google provides a monthly free credit).
+3. **APIs & Services → Library** — enable:
+   - **Maps JavaScript API** (loads the Places library in the browser)
+   - **Places API** (address autocomplete dropdown)
+   - **Geocoding API** (server-side address validation / suggestions)
+4. **APIs & Services → Credentials → Create credentials → API key**.
+5. **Restrict the key** (recommended):
+   - **Application restrictions:** HTTP referrers — add your public CRM origins, e.g. `https://yourdomain.com/*`, `https://www.yourdomain.com/*` (and `https://hromp.com/*` / `https://rompcrm.com/*` if you use those hosts).
+   - **API restrictions:** restrict to the three APIs above only.
+6. Copy the key into **`GOOGLE_MAPS_API_KEY`** in **`.env.production`**, then `sudo systemctl restart romp-crm`.
+
+The app uses the [Maps JavaScript Places Autocomplete](https://developers.google.com/maps/documentation/javascript/place-autocomplete) widget (classic `google.maps.places.Autocomplete`), not the newer Place Autocomplete Element — the same API key and Places API enablement apply.
+
+Without a key, line-by-line address fields and optional billing address still save; autocomplete and geocode confirmation prompts are omitted.
+
+Step-by-step for self-hosters: **[docs/self-hosting-rompcrm.com.html](../docs/self-hosting-rompcrm.com.html)** §4.

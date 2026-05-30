@@ -132,6 +132,25 @@ defmodule RompCrm.JobsTest do
       assert job2.work_description == "Water heater; kitchen faucet on same visit"
     end
 
+    test "add_job_work_item/2 appends a new line item" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Pat",
+                 "priority" => "normal",
+                 "status" => "pending",
+                 "work_items" => [%{"title" => "First task"}]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+
+      assert {:ok, {job2, wi}} = Jobs.add_job_work_item(job, %{title: "Second task"})
+      assert wi.title == "Second task"
+      assert length(job2.work_items) == 2
+    end
+
     test "update_job/2 appends materials from partial list onto existing materials" do
       b = business_fixture()
 

@@ -44,4 +44,24 @@ defmodule RompCrmWeb.JobsLiveTest do
     refute has_element?(view, "#job-expand-md-#{job.id}")
     refute has_element?(view, "#job-expand-sm-#{job.id}")
   end
+
+  test "add work item from expanded row", %{conn: conn, user: user} do
+    [business] = Businesses.list_businesses_for_user(user)
+
+    job =
+      job_fixture(%{
+        business_id: business.id,
+        client_name: "Work Item Co",
+        work_description: "Initial scope"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view |> element("#job-row-#{job.id}") |> render_click()
+
+    view |> element("button[aria-label=\"Add work item\"]") |> render_click()
+
+    assert render(view) =~ "wi-title-"
+    assert has_element?(view, "input[name=\"title\"]")
+  end
 end

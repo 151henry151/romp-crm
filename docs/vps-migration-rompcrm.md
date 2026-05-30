@@ -16,7 +16,7 @@ This checklist is for operators (or an agent with **root SSH** on **both** the o
 
 | Location (typical) | Purpose |
 |--------------------|---------|
-| **`/home/henry/romp-crm/.env.production`** | **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, **`PHX_HOST`**, **`PORT`**, SMTP, Twilio, Anthropic, PayPal (if paywall on), admin emails, optional `EMAIL_*`, `PHX_CHECK_ORIGINS`, etc. |
+| **`/home/henry/romp-crm/.env.production`** | **`SECRET_KEY_BASE`**, **`DATABASE_PATH`**, **`PHX_HOST`**, **`PORT`**, SMTP, Twilio, Anthropic, optional **`GOOGLE_MAPS_API_KEY`**, PayPal (if paywall on), admin emails, optional `EMAIL_*`, `PHX_CHECK_ORIGINS`, etc. |
 
 **Critical:** reuse the **same** **`SECRET_KEY_BASE`** from production when cut over, or all existing sessions and signed tokens become invalid immediately.
 

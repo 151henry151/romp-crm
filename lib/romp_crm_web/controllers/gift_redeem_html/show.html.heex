@@ -19,7 +19,7 @@
         </p>
         <form action={~p"/gift/redeem/#{@token}"} method="post" class="pt-2">
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-          <button type="submit" class="btn btn-primary">Redeem gift</button>
+          <button type="submit" class="btn btn-brand">Redeem gift</button>
         </form>
       <% else %>
         <p class="text-sm text-error">
@@ -34,7 +34,7 @@
         Use the gift link from your email in this browser, or sign in below with <span class="font-medium">{@gift.recipient_email}</span> if you already have an account.
       </p>
       <div class="flex flex-wrap gap-2 pt-1">
-        <.link navigate={~p"/users/log-in?#{[email: @gift.recipient_email, after_gift: "1"]}"} class="btn btn-primary btn-sm">Log in</.link>
+        <.link navigate={~p"/users/log-in?#{[email: @gift.recipient_email, after_gift: "1"]}"} class="btn btn-brand btn-sm">Log in</.link>
       </div>
     <% end %>
   </div>

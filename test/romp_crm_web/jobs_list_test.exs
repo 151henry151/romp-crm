@@ -58,6 +58,72 @@ defmodule RompCrmWeb.JobsListTest do
     end
   end
 
+  describe "filter_active?/1" do
+    test "is false for all jobs" do
+      refute JobsList.filter_active?(:all)
+    end
+
+    test "is true for a status filter" do
+      assert JobsList.filter_active?(:lead)
+      assert JobsList.filter_active?(:in_progress)
+    end
+  end
+
+  describe "filter_button_label/1" do
+    test "notes when a filter is active" do
+      assert JobsList.filter_button_label(:all) == "Filter: All jobs"
+      assert JobsList.filter_button_label(:lead) =~ "Filter active: Lead"
+      assert JobsList.filter_button_label(:lead) =~ "not all jobs"
+    end
+
+    test "notes when color-code is enabled" do
+      assert JobsList.filter_button_label(:all, true) =~ "Color-code on"
+    end
+  end
+
+  describe "status_badge_class/2" do
+    test "returns distinct greyscale shades when color-code is off" do
+      lead = JobsList.status_badge_class(:lead, false)
+      pending = JobsList.status_badge_class(:pending, false)
+      in_progress = JobsList.status_badge_class(:in_progress, false)
+      done = JobsList.status_badge_class(:done, false)
+
+      assert lead != pending
+      assert pending != in_progress
+      assert in_progress != done
+      assert lead =~ "base-"
+      assert done =~ "base-300"
+    end
+
+    test "returns status colors when color-code is on" do
+      assert JobsList.status_badge_class(:lead, true) =~ "blue"
+      assert JobsList.status_badge_class(:pending, true) =~ "amber"
+      assert JobsList.status_badge_class(:in_progress, true) =~ "green"
+    end
+  end
+
+  describe "priority_badge_class/2" do
+    test "returns distinct greyscale for high priority when color-code is off" do
+      assert JobsList.priority_badge_class(:high, false) =~ "border-base-content"
+    end
+
+    test "returns red for high priority when color-code is on" do
+      assert JobsList.priority_badge_class(:high, true) =~ "red"
+    end
+  end
+
+  describe "mobile_card_classes/2" do
+    test "uses a lighter surface for high-priority collapsed cards" do
+      job = %Job{priority: :high}
+      normal = %Job{priority: :normal}
+
+      assert JobsList.mobile_card_classes(job, false) =~ "bg-base-200"
+      assert JobsList.mobile_card_classes(normal, false) =~ "bg-base-100"
+      refute JobsList.mobile_card_classes(normal, false) =~ "shadow-sm"
+      assert JobsList.mobile_card_classes(job, false) =~ "shadow-sm"
+    end
+  end
+
   describe "primary_heading/2" do
     test "shows address when address-primary mode is on" do
       job = %Job{client_name: "Amy", address: "42 Maple St"}

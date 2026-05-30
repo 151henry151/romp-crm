@@ -182,7 +182,7 @@ defmodule RompCrmWeb.CoreComponents do
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    variants = %{"primary" => "btn-brand", nil => "btn-brand-soft"}
 
     assigns =
       assign_new(assigns, :class, fn ->
