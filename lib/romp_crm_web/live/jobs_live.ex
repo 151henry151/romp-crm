@@ -18,6 +18,7 @@ defmodule RompCrmWeb.JobsLive do
   alias RompCrmWeb.DatetimeLocal
   alias RompCrmWeb.JobTimeLogDefaults
   alias RompCrmWeb.JobExpandEditKeys, as: JEK
+  alias RompCrmWeb.JobsList
 
   @impl true
   def mount(_params, _session, socket) do
@@ -34,6 +35,8 @@ defmodule RompCrmWeb.JobsLive do
     {:ok,
      socket
      |> assign(:filter, :all)
+     |> assign(:sort_by, :name)
+     |> assign(:show_address_primary, false)
      |> assign(:expanded_job_id, nil)
      |> assign(:expanded_time_entries, %{})
      |> assign(:jobs, Jobs.list_jobs(bid))
@@ -189,10 +192,15 @@ defmodule RompCrmWeb.JobsLive do
 
   @impl true
   def handle_event("filter", %{"status" => status}, socket) do
-    {:noreply,
-     socket
-     |> assign(:filter, String.to_existing_atom(status))
-     |> refresh_jobs()}
+    {:noreply, assign(socket, :filter, String.to_existing_atom(status))}
+  end
+
+  def handle_event("set_sort", %{"sort" => sort}, socket) do
+    {:noreply, assign(socket, :sort_by, String.to_existing_atom(sort))}
+  end
+
+  def handle_event("toggle_address_primary", _params, socket) do
+    {:noreply, assign(socket, :show_address_primary, !socket.assigns.show_address_primary)}
   end
 
   def handle_event("job_delete_advance", %{"id" => id}, socket) do
@@ -1240,14 +1248,6 @@ defmodule RompCrmWeb.JobsLive do
 
   defp build_inline_job_update_attrs(_, _), do: %{}
 
-  defp visible_jobs(jobs, :all), do: jobs
-  defp visible_jobs(jobs, status), do: Enum.filter(jobs, &(&1.status == status))
-
-  defp status_label(:lead), do: "Lead"
-  defp status_label(:pending), do: "Pending"
-  defp status_label(:in_progress), do: "In Progress"
-  defp status_label(:done), do: "Done"
-
   defp status_class(:lead), do: "bg-blue-100 text-blue-800 dark:bg-blue-900/45 dark:text-blue-200"
   defp status_class(:pending), do: "bg-amber-100 text-amber-800 dark:bg-amber-900/45 dark:text-amber-200"
   defp status_class(:in_progress), do: "bg-green-100 text-green-800 dark:bg-green-900/45 dark:text-green-200"
@@ -1255,9 +1255,6 @@ defmodule RompCrmWeb.JobsLive do
 
   defp priority_class(:high), do: "bg-red-100 text-red-800"
   defp priority_class(:normal), do: ""
-
-  defp count_for(jobs, :all), do: length(jobs)
-  defp count_for(jobs, status), do: Enum.count(jobs, &(&1.status == status))
 
   defp expanded?(expanded_job_id, job_id), do: expanded_job_id == job_id
 

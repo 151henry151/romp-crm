@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.101] - 2026-05-18
+
+### Changed
+
+- **Jobs list**: replace status filter tabs with **Filter** and **Sort** menus; sort by alphabetical, scheduled date (soonest job or work-item date), or creation date
+- **Jobs list**: add optional **Show address as primary** display mode (address above client name) independent of sort choice
+
 ## [0.9.100] - 2026-05-18
 
 ### Changed

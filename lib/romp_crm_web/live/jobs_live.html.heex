@@ -10,33 +10,72 @@
   content_width={:wide}
 >
   <div class="text-base-content">
-    <%!-- Status filter tabs + new job --%>
-    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300">
-      <div class="flex min-w-0 flex-1 flex-wrap gap-1">
-        <%= for {label, status} <- [{"All", :all} | Enum.map([:lead, :pending, :in_progress, :done], &{status_label(&1), &1})] do %>
-          <button
-            phx-click="filter"
-            phx-value-status={status}
-            class={[
-              "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors",
-              if(@filter == status,
-                do: "border-blue-600 text-blue-600",
-                else: "border-transparent text-base-content/70 hover:text-base-content"
-              )
-            ]}
-          >
-            {label}
-            <span class={[
-              "ml-1.5 rounded-full px-1.5 py-0.5 text-xs",
-              if(@filter == status,
-                do: "bg-blue-100 text-blue-700",
-                else: "bg-base-200 text-base-content/70"
-              )
-            ]}>
-              {count_for(@jobs, status)}
-            </span>
-          </button>
-        <% end %>
+    <%!-- Filter / sort controls + new job --%>
+    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300 pb-3">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <details class="relative">
+          <summary class="btn btn-sm btn-outline h-9 min-h-0 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+            Filter · {JobsList.filter_label(@filter)}
+          </summary>
+          <div class="absolute left-0 z-30 mt-1 min-w-[11rem] rounded-lg border border-base-300 bg-base-100 p-1.5 shadow-lg">
+            <%= for {label, status} <- JobsList.filter_options() do %>
+              <button
+                type="button"
+                phx-click="filter"
+                phx-value-status={status}
+                class={[
+                  "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm",
+                  if(@filter == status,
+                    do: "bg-base-200 font-semibold text-base-content",
+                    else: "hover:bg-base-200/60 text-base-content/80"
+                  )
+                ]}
+              >
+                <span>{label}</span>
+                <span class="text-xs tabular-nums text-base-content/60">{JobsList.count_for(@jobs, status)}</span>
+              </button>
+            <% end %>
+          </div>
+        </details>
+
+        <details class="relative">
+          <summary class="btn btn-sm btn-outline h-9 min-h-0 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+            Sort · {JobsList.sort_label(@sort_by)}<%= if @show_address_primary, do: " · Address" %>
+          </summary>
+          <div class="absolute left-0 z-30 mt-1 min-w-[14rem] rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg space-y-2">
+            <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-base-200/60">
+              <input
+                type="checkbox"
+                checked={@show_address_primary}
+                phx-click="toggle_address_primary"
+                class="checkbox checkbox-sm mt-0.5"
+              />
+              <span>
+                <span class="font-medium text-base-content">Show address as primary</span>
+                <span class="block text-xs text-base-content/60">Address above client name on each job</span>
+              </span>
+            </label>
+            <div class="border-t border-base-300 pt-2 space-y-0.5">
+              <p class="px-2 text-xs font-medium uppercase tracking-wide text-base-content/50">Sort by</p>
+              <%= for {label, key} <- JobsList.sort_options() do %>
+                <button
+                  type="button"
+                  phx-click="set_sort"
+                  phx-value-sort={key}
+                  class={[
+                    "block w-full rounded-md px-3 py-2 text-left text-sm",
+                    if(@sort_by == key,
+                      do: "bg-base-200 font-semibold text-base-content",
+                      else: "hover:bg-base-200/60 text-base-content/80"
+                    )
+                  ]}
+                >
+                  {label}
+                </button>
+              <% end %>
+            </div>
+          </div>
+        </details>
       </div>
       <%= if @can_edit_jobs do %>
         <.link
@@ -51,7 +90,7 @@
     </div>
 
     <div class="md:hidden space-y-3">
-      <%= for job <- visible_jobs(@jobs, @filter) do %>
+      <%= for job <- JobsList.prepare_jobs(@jobs, @filter, @sort_by) do %>
         <% mob_expanded? = expanded?(@expanded_job_id, job.id) %>
         <div class={[
           "rounded-lg border border-base-300 overflow-hidden",
@@ -65,9 +104,16 @@
           >
             <div class="space-y-1">
               <div class="flex items-start justify-between gap-3">
-                <p class="min-w-0 font-semibold text-base-content break-words">{job.client_name}</p>
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold text-base-content break-words">
+                    {JobsList.primary_heading(job, @show_address_primary)}
+                  </p>
+                  <%= if name = JobsList.secondary_heading(job, @show_address_primary) do %>
+                    <p class="text-sm text-base-content/70 break-words">{name}</p>
+                  <% end %>
+                </div>
                 <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center self-start rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
-                  {status_label(job.status)}
+                  {JobsList.status_label(job.status)}
                 </span>
               </div>
               <%= if not mob_expanded? do %>
@@ -195,7 +241,7 @@
         </div>
       <% end %>
 
-      <%= if visible_jobs(@jobs, @filter) == [] do %>
+      <%= if JobsList.prepare_jobs(@jobs, @filter, @sort_by) == [] do %>
         <div class="bg-base-100 rounded-lg border border-base-300 px-4 py-12 text-center text-base-content/60">
           No jobs found.
         </div>
@@ -221,7 +267,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-base-300">
-          <%= for job <- visible_jobs(@jobs, @filter) do %>
+          <%= for job <- JobsList.prepare_jobs(@jobs, @filter, @sort_by) do %>
             <% job_expanded? = expanded?(@expanded_job_id, job.id) %>
             <tr
               id={"job-row-#{job.id}"}
@@ -232,10 +278,17 @@
                 if(job_expanded?, do: "bg-base-200/40", else: "hover:bg-base-200/40")
               ]}
             >
-              <td class="px-4 py-3 font-medium text-base-content whitespace-nowrap">
-                {job.client_name}
+              <td class="px-4 py-3 align-top">
+                <div class="font-medium text-base-content whitespace-nowrap">
+                  {JobsList.primary_heading(job, @show_address_primary)}
+                </div>
+                <%= if @show_address_primary do %>
+                  <div class="text-sm text-base-content/70">{job.client_name}</div>
+                <% end %>
               </td>
-              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">{job.address}</td>
+              <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
+                <%= if @show_address_primary, do: "—", else: job.address %>
+              </td>
               <td class="px-4 py-3 text-base-content/80 whitespace-nowrap">{job.phone}</td>
               <td class="px-4 py-3 text-base-content/90 max-w-[220px] align-top">
                 <%= if job_expanded? do %>
@@ -253,7 +306,7 @@
               </td>
               <td class="px-4 py-3">
                 <span class={"inline-flex h-6 w-28 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium whitespace-nowrap box-border #{status_class(job.status)}"}>
-                  {status_label(job.status)}
+                  {JobsList.status_label(job.status)}
                 </span>
               </td>
               <td class="px-4 py-3 text-base-content/80">{job.referred_by}</td>
@@ -395,7 +448,7 @@
               </tr>
             <% end %>
           <% end %>
-          <%= if visible_jobs(@jobs, @filter) == [] do %>
+          <%= if JobsList.prepare_jobs(@jobs, @filter, @sort_by) == [] do %>
             <tr>
               <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-12 text-center text-base-content/60">
                 No jobs found.
