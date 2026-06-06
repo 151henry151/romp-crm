@@ -487,6 +487,7 @@ defmodule RompCrm.Ai.SmsJobExtractor do
     extras =
       %{}
       |> put_optional(:scheduled_on, parse_iso_date(m["scheduled_on"]))
+      |> put_optional(:client_id, parse_optional_int(m["client_id"]))
       |> put_optional_list(:work_items, normalize_work_items_for_patch(m["work_items"]))
       |> put_optional_list(:materials, normalize_materials_for_patch(m["materials"]))
 

@@ -10,6 +10,9 @@ defmodule RompCrmWeb.JobsLive do
 
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Businesses
+  alias RompCrm.Clients
+  alias RompCrm.Clients.ClientContact
+  alias RompCrm.Clients.MatchSuggest
   alias RompCrm.EmployeePermissions
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
@@ -62,7 +65,10 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:photo_viewer_job_id, nil)
      |> assign(:photo_viewer_photo_id, nil)
      |> assign(:photo_delete_all_pending_job_id, nil)
-     |> assign(:photo_delete_all_confirm_step, 0)}
+     |> assign(:photo_delete_all_confirm_step, 0)
+     |> assign(:pending_client_update, nil)
+     |> assign(:client_match, nil)
+     |> assign(:clients_for_picker, Clients.list_clients(bid))}
   end
 
   @impl true
@@ -78,12 +84,38 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   defp apply_action(socket, :index, _params) do
-    assign(socket, :job, nil)
+    socket
+    |> assign(:job, nil)
+    |> assign(:client_match, nil)
   end
 
-  defp apply_action(socket, :new, _params) do
+  defp apply_action(socket, :new, params) do
     bid = socket.assigns.current_business_id
-    assign(socket, :job, %Job{business_id: bid})
+    job = build_new_job(bid, params)
+    assign(socket, :job, job)
+  end
+
+  defp build_new_job(bid, params) do
+    job = %Job{business_id: bid}
+
+    case parse_id_param(params["client_id"]) do
+      nil ->
+        job
+
+      client_id ->
+        case Clients.get_client(client_id, bid) do
+          nil ->
+            job
+
+          client ->
+            contact = ClientContact.from_struct(client)
+
+            job
+            |> struct(contact)
+            |> Map.put(:client_id, client.id)
+            |> Map.put(:client, client)
+        end
+    end
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
@@ -121,12 +153,19 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   def handle_info({RompCrmWeb.JobFormComponent, {:saved, _job}}, socket) do
-    {:noreply, refresh_jobs(socket)}
+    {:noreply, refresh_jobs(socket) |> assign(:client_match, nil)}
+  end
+
+  def handle_info({RompCrmWeb.JobFormComponent, {:job_save_requested, params, material_lines}}, socket) do
+    handle_job_save_requested(socket, params, material_lines)
   end
 
   defp refresh_jobs(socket) do
     bid = socket.assigns.current_business_id
-    assign(socket, :jobs, Jobs.list_jobs(bid))
+
+    socket
+    |> assign(:jobs, Jobs.list_jobs(bid))
+    |> assign(:clients_for_picker, Clients.list_clients(bid))
   end
 
   defp close_photo_viewer(socket) do
@@ -792,18 +831,128 @@ defmodule RompCrmWeb.JobsLive do
                 {:noreply, put_flash(socket, :error, "Job not found.")}
 
               job ->
-                case Jobs.update_job(job, attrs) do
-                  {:ok, _} ->
-                    {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
+                cond do
+                  job.client_id && Clients.client_contact_job_field?(field) ->
+                    case Clients.get_client(job.client_id, bid) do
+                      nil ->
+                        case Jobs.update_job(job, attrs) do
+                          {:ok, _} ->
+                            {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
 
-                  {:error, changeset} ->
-                    msg = inline_field_error(changeset, field) || "Could not save that change."
-                    {:noreply, put_flash(socket, :error, msg)}
+                          {:error, changeset} ->
+                            msg = inline_field_error(changeset, field) || "Could not save that change."
+                            {:noreply, put_flash(socket, :error, msg)}
+                        end
+
+                      client ->
+                        job_count = Clients.count_linked_jobs(client)
+
+                        {:noreply,
+                         assign(socket, :pending_client_update, %{
+                           job_id: job_id,
+                           client_id: job.client_id,
+                           client_name: client.client_name,
+                           job_count: job_count,
+                           attrs: attrs,
+                           edit_key: edit_key,
+                           kind: :field
+                         })}
+                    end
+
+                  true ->
+                    case Jobs.update_job(job, attrs) do
+                      {:ok, _} ->
+                        {:noreply, socket |> refresh_jobs() |> drop_expand_edit(edit_key)}
+
+                      {:error, changeset} ->
+                        msg = inline_field_error(changeset, field) || "Could not save that change."
+                        {:noreply, put_flash(socket, :error, msg)}
+                    end
                 end
             end
           end
       end
     end
+  end
+
+  def handle_event("confirm_client_update", _, socket) do
+    case socket.assigns.pending_client_update do
+      %{client_id: cid, attrs: attrs, edit_key: edit_key} = pending ->
+        bid = socket.assigns.current_business_id
+
+        case Clients.get_client(cid, bid) do
+          nil ->
+            {:noreply, put_flash(socket, :error, "Client not found.") |> assign(:pending_client_update, nil)}
+
+          client ->
+            case Clients.update_client_and_sync_jobs(client, attrs) do
+              {:ok, _} ->
+                {:noreply,
+                 socket
+                 |> assign(:pending_client_update, nil)
+                 |> refresh_jobs()
+                 |> drop_expand_edit(edit_key)
+                 |> maybe_clear_address_suggestion(pending)}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Could not update client.")}
+            end
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_client_update", _, socket) do
+    pending = socket.assigns.pending_client_update
+    edit_key = pending && pending.edit_key
+
+    socket =
+      socket
+      |> assign(:pending_client_update, nil)
+      |> maybe_clear_address_suggestion(pending)
+
+    socket =
+      if edit_key do
+        drop_expand_edit(socket, edit_key)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("pick_client_match", %{"client_id" => id}, socket) do
+    case socket.assigns.client_match do
+      %{params: params, material_lines: lines} ->
+        bid = socket.assigns.current_business_id
+
+        case Clients.get_client(parse_id_param(id), bid) do
+          nil ->
+            {:noreply, put_flash(socket, :error, "Client not found.")}
+
+          client ->
+            finish_job_create(socket, params, lines, client.id, client)
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("confirm_new_client_for_job", _, socket) do
+    case socket.assigns.client_match do
+      %{params: params, material_lines: lines} ->
+        finish_job_create(socket, params, lines, nil, nil)
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_client_match", _, socket) do
+    {:noreply, assign(socket, :client_match, nil)}
   end
 
   def handle_event("job_expand_commit_address", params, socket) do
@@ -828,16 +977,47 @@ defmodule RompCrmWeb.JobsLive do
               {:noreply, put_flash(socket, :error, "Job not found.")}
 
             job ->
-              case Jobs.update_job(job, attrs) do
-                {:ok, _} ->
-                  {:noreply,
-                   socket
-                   |> refresh_jobs()
-                   |> drop_expand_edit(edit_key)
-                   |> assign(:address_suggestion, nil)}
+              cond do
+                job.client_id ->
+                  case Clients.get_client(job.client_id, bid) do
+                    nil ->
+                      case Jobs.update_job(job, attrs) do
+                        {:ok, _} ->
+                          {:noreply,
+                           socket
+                           |> refresh_jobs()
+                           |> drop_expand_edit(edit_key)
+                           |> assign(:address_suggestion, nil)}
 
-                {:error, _} ->
-                  {:noreply, put_flash(socket, :error, "Could not save that address.")}
+                        {:error, _} ->
+                          {:noreply, put_flash(socket, :error, "Could not save that address.")}
+                      end
+
+                    client ->
+                      {:noreply,
+                       assign(socket, :pending_client_update, %{
+                         job_id: job_id,
+                         client_id: job.client_id,
+                         client_name: client.client_name,
+                         job_count: Clients.count_linked_jobs(client),
+                         attrs: attrs,
+                         edit_key: edit_key,
+                         kind: :address
+                       })}
+                  end
+
+                true ->
+                  case Jobs.update_job(job, attrs) do
+                    {:ok, _} ->
+                      {:noreply,
+                       socket
+                       |> refresh_jobs()
+                       |> drop_expand_edit(edit_key)
+                       |> assign(:address_suggestion, nil)}
+
+                    {:error, _} ->
+                      {:noreply, put_flash(socket, :error, "Could not save that address.")}
+                  end
               end
           end
       end
@@ -1433,4 +1613,113 @@ defmodule RompCrmWeb.JobsLive do
 
     "#{h12}:#{min} #{ampm}"
   end
+
+  defp handle_job_save_requested(socket, params, material_lines) do
+    bid = socket.assigns.current_business_id
+
+    params =
+      params
+      |> Map.delete("materials")
+      |> Map.put("business_id", to_string(bid))
+
+    client_id_raw = params |> Map.get("client_id", "") |> to_string() |> String.trim()
+
+    cond do
+      client_id_raw != "" ->
+        case parse_id_param(client_id_raw) do
+          nil ->
+            finish_job_create(socket, params, material_lines, nil, nil)
+
+          client_id ->
+            params = Map.put(params, "client_id", to_string(client_id))
+            finish_job_create(socket, params, material_lines, client_id, nil)
+        end
+
+      ClientContact.has_identity?(params) ->
+        case MatchSuggest.suggest(bid, params) do
+          {:ok, {:ambiguous, candidates}} ->
+            {:noreply,
+             assign(socket, :client_match, %{
+               params: params,
+               material_lines: material_lines,
+               candidates: candidates
+             })}
+
+          _ ->
+            finish_job_create(socket, params, material_lines, nil, nil)
+        end
+
+      true ->
+        finish_job_create(socket, params, material_lines, nil, nil)
+    end
+  end
+
+  defp finish_job_create(socket, params, material_lines, client_id, _client) do
+    bid = socket.assigns.current_business_id
+    uid = socket.assigns.current_scope.user.id
+
+    params =
+      if client_id do
+        case Clients.get_client(client_id, bid) do
+          nil ->
+            params
+
+          client ->
+            params
+            |> Map.merge(Clients.copy_client_contact_to_job_attrs(client))
+            |> Map.put("client_id", to_string(client.id))
+        end
+      else
+        Map.delete(params, "client_id")
+      end
+
+    case Jobs.create_job(params) do
+      {:ok, job} ->
+        job =
+          if client_id == nil && ClientContact.has_identity?(params) do
+            case Clients.create_client_from_contact_and_link_job(job, ClientContact.from_map(params)) do
+              {:ok, _client, linked} -> linked
+              _ -> job
+            end
+          else
+            job
+          end
+
+        :ok = Jobs.sync_root_materials_only(job, material_lines_to_list(material_lines))
+        job = Jobs.get_job!(job.id, bid)
+
+        BusinessAuditLogs.record(%{
+          business_id: bid,
+          actor_user_id: uid,
+          source: "web",
+          action: "jobs.create",
+          entity_type: "jobs",
+          entity_id: job.id,
+          metadata: %{client_name: job.client_name, job_id: job.id}
+        })
+
+        {:noreply,
+         socket
+         |> assign(:client_match, nil)
+         |> refresh_jobs()
+         |> push_patch(to: ~p"/")}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Could not create job. Check the form and try again.")}
+    end
+  end
+
+  defp material_lines_to_list(text) do
+    text
+    |> to_string()
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp maybe_clear_address_suggestion(socket, %{kind: :address}) do
+    assign(socket, :address_suggestion, nil)
+  end
+
+  defp maybe_clear_address_suggestion(socket, _), do: socket
 end

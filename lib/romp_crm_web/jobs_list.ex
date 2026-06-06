@@ -150,8 +150,14 @@ defmodule RompCrmWeb.JobsList do
   Soonest schedule date for a job: minimum of job `scheduled_on` and each work item's `scheduled_on`.
   """
   def effective_schedule_date(%Job{} = job) do
+    work_items =
+      case job.work_items do
+        items when is_list(items) -> items
+        _ -> []
+      end
+
     job_dates =
-      (job.work_items || [])
+      work_items
       |> Enum.map(& &1.scheduled_on)
       |> Enum.reject(&is_nil/1)
 

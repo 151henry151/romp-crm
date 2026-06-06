@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.9.111] - 2026-06-06
+
+### Added
+
+- **Clients**: persistent client records per workspace with **`/clients`** list/expand/edit/delete, linked jobs, and **+ Job** per row
+- **Jobs**: optional client picker on create; AI/deterministic match when typing new contact details; confirmation dialog when editing contact fields on linked jobs (updates client and all linked jobs)
+- **SMS AI**: clients snapshot in unified inbound extraction; optional **`client_id`** on job creates; server links or creates clients after SMS job creates
+- **Data export**: **`clients.csv`** checkbox in Settings → Data export (email, download, and scheduled exports)
+
+### Changed
+
+- **Jobs export**: backfill migration links existing jobs to deduped client rows
+
+### Fixed
+
+- **`Clients.delete_client_and_jobs/1`**: reload linked jobs before delete so orphaned job rows are removed
+- **`JobsList.effective_schedule_date/1`**: treat unloaded **`work_items`** as empty
+
+## [0.9.110] - 2026-05-30
+
+### Added
+
+- **Accounts**: email **`SIGNUP_NOTIFY_EMAILS`** (comma-separated) when a new user registers, joins via invitation, or is created from gift redemption
+
+### Fixed
+
+- **Migrations**: rename duplicate **`20260530120000`** SMS channel migration to **`20260530120001`**
+
 ## [0.9.109] - 2026-05-30
 
 ### Changed

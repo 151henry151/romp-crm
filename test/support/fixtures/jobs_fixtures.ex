@@ -45,6 +45,6 @@ defmodule RompCrm.JobsFixtures do
       })
 
     {:ok, job} = RompCrm.Jobs.create_job(attrs)
-    job
+    RompCrm.Jobs.get_job!(job.id, job.business_id)
   end
 end

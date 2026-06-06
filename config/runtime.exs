@@ -258,6 +258,19 @@ if config_env() == :prod do
         |> Enum.map(&String.downcase/1)
     end
 
+  signup_notify_emails =
+    case System.get_env("SIGNUP_NOTIFY_EMAILS") |> to_string() |> String.trim() do
+      "" ->
+        []
+
+      csv ->
+        csv
+        |> String.split(",")
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.map(&String.downcase/1)
+    end
+
   email_logo_url =
     case System.get_env("EMAIL_LOGO_URL") |> to_string() |> String.trim() do
       "" -> Application.get_env(:romp_crm, :email_logo_url)
@@ -293,6 +306,7 @@ if config_env() == :prod do
     registration_email_allowlist: registration_allowlist,
     enforce_registration_allowlist: enforce_registration_allowlist,
     admin_emails: admin_emails,
+    signup_notify_emails: signup_notify_emails,
     twilio_sms_allowed_from_normalized: twilio_allow_norm,
     subscription_paywall_enabled: subscription_paywall_enabled,
     paypal_mode: paypal_mode,

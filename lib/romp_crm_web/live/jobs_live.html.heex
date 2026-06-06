@@ -579,6 +579,7 @@
       current_business_id={@current_business_id}
       actor_user_id={@current_scope.user.id}
       can_edit_jobs={@can_edit_jobs}
+      clients_for_picker={@clients_for_picker}
       patch={~p"/"}
     />
   </.modal>
@@ -602,5 +603,60 @@
       total={length(viewer_job.photos)}
     />
   <% end %>
+<% end %>
+<%= if @pending_client_update do %>
+  <.modal id="client-update-confirm-modal" show on_cancel={JS.push("cancel_client_update")}>
+    <div class="space-y-4">
+      <h2 class="text-lg font-semibold text-base-content">Update client contact?</h2>
+      <p class="text-sm text-base-content/80">
+        This will update contact details for
+        <span class="font-medium">{@pending_client_update.client_name || "this client"}</span>
+        and all {@pending_client_update.job_count} linked job(s).
+      </p>
+      <div class="flex flex-wrap gap-2 pt-2">
+        <button type="button" phx-click="confirm_client_update" class="btn btn-primary btn-sm">
+          Update client and jobs
+        </button>
+        <button type="button" phx-click="cancel_client_update" class="btn btn-ghost btn-sm">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </.modal>
+<% end %>
+<%= if @client_match do %>
+  <.modal id="client-match-modal" show on_cancel={JS.push("cancel_client_match")}>
+    <div class="space-y-4">
+      <h2 class="text-lg font-semibold text-base-content">Link to existing client?</h2>
+      <p class="text-sm text-base-content/80">
+        This contact may match an existing client. Pick one to link, or create a new client record.
+      </p>
+      <ul class="space-y-2">
+        <%= for candidate <- @client_match.candidates do %>
+          <li>
+            <button
+              type="button"
+              phx-click="pick_client_match"
+              phx-value-client_id={candidate.id}
+              class="btn btn-outline btn-sm w-full justify-start text-left"
+            >
+              <span class="font-medium">{candidate.client_name}</span>
+              <%= if candidate.reason != "" do %>
+                <span class="text-base-content/60 ml-2">— {candidate.reason}</span>
+              <% end %>
+            </button>
+          </li>
+        <% end %>
+      </ul>
+      <div class="flex flex-wrap gap-2 pt-2 border-t border-base-300">
+        <button type="button" phx-click="confirm_new_client_for_job" class="btn btn-primary btn-sm">
+          Create new client
+        </button>
+        <button type="button" phx-click="cancel_client_match" class="btn btn-ghost btn-sm">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </.modal>
 <% end %>
 </Layouts.app>

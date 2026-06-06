@@ -3,6 +3,7 @@ defmodule RompCrm.SmsPendingJobProposals do
   Stores AI-proposed job creates from MMS screenshots/notes until the contractor confirms via SMS.
   """
 
+  alias RompCrm.Clients
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.Repo
@@ -71,6 +72,12 @@ defmodule RompCrm.SmsPendingJobProposals do
 
       case Jobs.create_job(attrs) do
         {:ok, %Job{} = job} ->
+          job =
+            case Clients.finalize_job_client_link(job, attrs) do
+              {:ok, linked} -> linked
+              _ -> job
+            end
+
           job = Jobs.get_job!(job.id, business_id)
 
           photo_results =

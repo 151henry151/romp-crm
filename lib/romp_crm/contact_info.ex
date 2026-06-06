@@ -122,7 +122,10 @@ defmodule RompCrm.ContactInfo do
   def national_placeholder("1"), do: "(555) 555-1234"
   def national_placeholder(_), do: "Phone number"
 
-  def validate_job_changeset(changeset) do
+  def validate_job_changeset(changeset), do: validate_contact_changeset(changeset)
+  def validate_client_changeset(changeset), do: validate_contact_changeset(changeset)
+
+  defp validate_contact_changeset(changeset) do
     import Ecto.Changeset
 
     changeset

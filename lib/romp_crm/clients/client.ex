@@ -1,18 +1,16 @@
-defmodule RompCrm.Jobs.Job do
+defmodule RompCrm.Clients.Client do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @priorities [:normal, :high]
-  @statuses [:lead, :pending, :in_progress, :done]
+  alias RompCrm.Addresses
+  alias RompCrm.Clients.ClientContact
 
-  def priorities, do: @priorities
-  def statuses, do: @statuses
-
-  schema "jobs" do
+  schema "clients" do
     belongs_to :business, RompCrm.Businesses.Business
-    belongs_to :client, RompCrm.Clients.Client
 
     field :client_name, :string
+    field :phone, :string
+    field :client_email, :string
     field :address, :string
     field :address_line1, :string
     field :address_line2, :string
@@ -25,25 +23,12 @@ defmodule RompCrm.Jobs.Job do
     field :billing_city, :string
     field :billing_state, :string
     field :billing_postal_code, :string
-    field :phone, :string
-    field :client_email, :string
-    field :work_description, :string
-    field :priority, Ecto.Enum, values: @priorities, default: :normal
-    field :status, Ecto.Enum, values: @statuses, default: :lead
-    field :referred_by, :string
     field :notes, :string
-    field :next_action, :string
-    field :scheduled_on, :date
-    field :scheduled_time, :time
 
-    has_many :work_items, RompCrm.Jobs.JobWorkItem, on_replace: :delete
-    has_many :materials, RompCrm.Jobs.JobMaterial
-    has_many :photos, RompCrm.Jobs.JobPhoto
+    has_many :jobs, RompCrm.Jobs.Job
 
     timestamps(type: :utc_datetime)
   end
-
-  alias RompCrm.Addresses
 
   @address_fields [
     :address,
@@ -60,36 +45,16 @@ defmodule RompCrm.Jobs.Job do
     :billing_postal_code
   ]
 
-  def changeset(job, attrs) do
-    job
-    |> cast(attrs, [
-      :business_id,
-      :client_id,
-      :client_name,
-      :phone,
-      :client_email,
-      :work_description,
-      :priority,
-      :status,
-      :referred_by,
-      :notes,
-      :next_action,
-      :scheduled_on,
-      :scheduled_time
-    ] ++ @address_fields)
+  def changeset(client, attrs) do
+    client
+    |> cast(attrs, [:business_id, :client_name, :phone, :client_email, :notes] ++ @address_fields)
     |> normalize_billing_address_different()
     |> maybe_clear_billing_fields()
     |> put_legacy_address()
-    |> cast_assoc(:work_items,
-      with: &RompCrm.Jobs.JobWorkItem.changeset/2,
-      sort_param: :work_items_sort,
-      drop_param: :work_items_drop
-    )
-    |> drop_empty_work_items()
     |> normalize_blank_client_name()
-    |> validate_required([:business_id, :priority, :status])
-    |> validate_job_has_identity()
-    |> RompCrm.ContactInfo.validate_job_changeset()
+    |> validate_required([:business_id])
+    |> validate_client_has_identity()
+    |> RompCrm.ContactInfo.validate_client_changeset()
   end
 
   defp normalize_blank_client_name(changeset) do
@@ -100,62 +65,25 @@ defmodule RompCrm.Jobs.Job do
     end
   end
 
-  defp validate_job_has_identity(changeset) do
-    if job_has_identity?(changeset) do
+  defp validate_client_has_identity(changeset) do
+    if client_has_identity?(changeset) do
       changeset
     else
       add_error(
         changeset,
         :client_name,
-        "Enter a client name or at least one other detail (address, work summary, phone, notes)"
+        "Enter a client name or at least one other detail (address, phone, email, notes)"
       )
     end
   end
 
-  defp job_has_identity?(changeset) do
-    Enum.any?(identity_fields(), fn field ->
+  defp client_has_identity?(changeset) do
+    Enum.any?(ClientContact.identity_fields(), fn field ->
       case get_change(changeset, field) || get_field(changeset, field) do
         val when is_binary(val) -> String.trim(val) != ""
         _ -> false
       end
     end)
-  end
-
-  defp identity_fields do
-    [
-      :client_name,
-      :address,
-      :address_line1,
-      :work_description,
-      :phone,
-      :notes,
-      :next_action,
-      :referred_by
-    ]
-  end
-
-  defp drop_empty_work_items(changeset) do
-    case get_change(changeset, :work_items) do
-      items when is_list(items) ->
-        kept =
-          Enum.reject(items, fn
-            %Ecto.Changeset{} = wi ->
-              title =
-                get_change(wi, :title) || get_field(wi, :title) || ""
-                |> to_string()
-                |> String.trim()
-
-              title == ""
-
-            _ ->
-              false
-          end)
-
-        put_change(changeset, :work_items, kept)
-
-      _ ->
-        changeset
-    end
   end
 
   defp normalize_billing_address_different(changeset) do
@@ -200,7 +128,6 @@ defmodule RompCrm.Jobs.Job do
     }
 
     formatted = Addresses.format_parts(parts)
-
     put_change(changeset, :address, if(formatted == "", do: nil, else: formatted))
   end
 end

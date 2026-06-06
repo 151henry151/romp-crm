@@ -6,6 +6,7 @@ defmodule RompCrm.DataExport do
   alias RompCrm.Accounts.User
   alias RompCrm.Accounts.UserNotifier
   alias RompCrm.Businesses
+  alias RompCrm.Clients.Client
   alias RompCrm.DataExportSchedule
   alias RompCrm.Employees.{Employee, EmployeeTimeEntry}
   alias RompCrm.Jobs.Job
@@ -15,10 +16,10 @@ defmodule RompCrm.DataExport do
 
   require Logger
 
-  @export_kind_strings ~w(jobs employees time_log audit_log)
+  @export_kind_strings ~w(jobs clients employees time_log audit_log)
 
   @doc "Ordered export kinds (canonical); also the default when **`data_export_kinds_json`** is unset."
-  def all_export_kinds, do: [:jobs, :employees, :time_log, :audit_log]
+  def all_export_kinds, do: [:jobs, :clients, :employees, :time_log, :audit_log]
 
   @doc """
   Parses **`params["export_kinds"]`** (from HTML **`export_kinds[]`** checkboxes) into a unique
@@ -198,6 +199,7 @@ defmodule RompCrm.DataExport do
   end
 
   defp file_for_kind(business_ids, :jobs), do: {"jobs.csv", build_jobs_csv(business_ids)}
+  defp file_for_kind(business_ids, :clients), do: {"clients.csv", build_clients_csv(business_ids)}
   defp file_for_kind(business_ids, :employees), do: {"employees.csv", build_employees_csv(business_ids)}
   defp file_for_kind(business_ids, :time_log), do: {"time_log.csv", build_time_log_csv(business_ids)}
   defp file_for_kind(business_ids, :audit_log), do: {"audit_log.csv", build_audit_log_csv(business_ids)}
@@ -255,7 +257,7 @@ defmodule RompCrm.DataExport do
   (`BusinessMembership` role **owner**).
 
   Uses **`users.data_export_kinds_json`** and **`users.data_export_business_ids_json`** (same
-  selections as the settings checkboxes). When those columns are unset, behaves like all four
+  selections as the settings checkboxes). When those columns are unset, behaves like all export
   kinds and all owned workspaces were selected.
   """
   def deliver_email_export(%User{} = user) do
@@ -370,6 +372,87 @@ defmodule RompCrm.DataExport do
           j.next_action,
           format_dt(j.inserted_at),
           format_dt(j.updated_at)
+        ]
+        |> Enum.map(&csv_cell/1)
+        |> Enum.join(",")
+      end)
+
+    Enum.join([Enum.map(header, &csv_cell/1) |> Enum.join(",") | lines], "\n") <> "\n"
+  end
+
+  def build_clients_csv(business_ids) do
+    rows =
+      if business_ids == [] do
+        []
+      else
+        Repo.all(
+          from c in Client,
+            where: c.business_id in ^business_ids,
+            order_by: [asc: c.business_id, asc: c.client_name, asc: c.id]
+        )
+      end
+
+    job_counts =
+      if business_ids == [] do
+        %{}
+      else
+        Repo.all(
+          from j in Job,
+            where: j.business_id in ^business_ids and not is_nil(j.client_id),
+            group_by: j.client_id,
+            select: {j.client_id, count(j.id)}
+        )
+        |> Map.new()
+      end
+
+    header = [
+      "business_id",
+      "client_id",
+      "client_name",
+      "address",
+      "address_line1",
+      "address_line2",
+      "city",
+      "state",
+      "postal_code",
+      "billing_address_different",
+      "billing_address_line1",
+      "billing_address_line2",
+      "billing_city",
+      "billing_state",
+      "billing_postal_code",
+      "phone",
+      "client_email",
+      "notes",
+      "linked_job_count",
+      "inserted_at",
+      "updated_at"
+    ]
+
+    lines =
+      Enum.map(rows, fn c ->
+        [
+          c.business_id,
+          c.id,
+          c.client_name,
+          c.address,
+          c.address_line1,
+          c.address_line2,
+          c.city,
+          c.state,
+          c.postal_code,
+          c.billing_address_different,
+          c.billing_address_line1,
+          c.billing_address_line2,
+          c.billing_city,
+          c.billing_state,
+          c.billing_postal_code,
+          c.phone,
+          c.client_email,
+          c.notes,
+          Map.get(job_counts, c.id, 0),
+          format_dt(c.inserted_at),
+          format_dt(c.updated_at)
         ]
         |> Enum.map(&csv_cell/1)
         |> Enum.join(",")

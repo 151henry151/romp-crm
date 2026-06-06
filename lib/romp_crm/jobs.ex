@@ -46,11 +46,13 @@ defmodule RompCrm.Jobs do
           asc: j.client_name
         ],
         preload: [
+          :client,
           work_items: ^work_items_preload_query(),
           materials: ^materials_preload_query(),
           photos: ^photos_preload_query()
         ]
     )
+    |> Enum.map(&RompCrm.Clients.merge_client_onto_job/1)
   end
 
   def get_job!(id, business_id) when is_integer(id) and is_integer(business_id) do
@@ -58,11 +60,13 @@ defmodule RompCrm.Jobs do
       from j in Job,
         where: j.id == ^id and j.business_id == ^business_id,
         preload: [
+          :client,
           work_items: ^work_items_preload_query(),
           materials: ^materials_preload_query(),
           photos: ^photos_preload_query()
         ]
     )
+    |> RompCrm.Clients.merge_client_onto_job()
   end
 
   def get_job(id, business_id) when is_integer(id) and is_integer(business_id) do
@@ -70,11 +74,16 @@ defmodule RompCrm.Jobs do
       from j in Job,
         where: j.id == ^id and j.business_id == ^business_id,
         preload: [
+          :client,
           work_items: ^work_items_preload_query(),
           materials: ^materials_preload_query(),
           photos: ^photos_preload_query()
         ]
     )
+    |> case do
+      nil -> nil
+      job -> RompCrm.Clients.merge_client_onto_job(job)
+    end
   end
 
   @doc false

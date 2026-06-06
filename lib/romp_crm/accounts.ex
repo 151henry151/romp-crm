@@ -67,6 +67,7 @@ defmodule RompCrm.Accounts do
       |> Ecto.Changeset.change(attrs)
       |> Ecto.Changeset.unique_constraint(:email)
       |> Repo.insert()
+      |> tap_notify_signup(:gift)
     end
   end
 
@@ -208,8 +209,10 @@ defmodule RompCrm.Accounts do
       true ->
         Repo.transact(fn ->
           with {:ok, user} <- Repo.insert(changeset),
-               {:ok, user} <- mark_invited_member_profile(user),
-               do: {:ok, user}
+               {:ok, user} <- mark_invited_member_profile(user) do
+            notify_signup_admins(user, :invitation)
+            {:ok, user}
+          end
         end)
     end
   end
@@ -280,8 +283,10 @@ defmodule RompCrm.Accounts do
       true ->
         Repo.transact(fn ->
           with {:ok, user} <- Repo.insert(changeset),
-               {:ok, user} <- maybe_mark_pending_paywall(user),
-               do: {:ok, user}
+               {:ok, user} <- maybe_mark_pending_paywall(user) do
+            notify_signup_admins(user, :standard)
+            {:ok, user}
+          end
         end)
     end
   end
@@ -326,6 +331,23 @@ defmodule RompCrm.Accounts do
     else
       {:ok, user}
     end
+  end
+
+  defp tap_notify_signup({:ok, %User{} = user} = ok, via) do
+    notify_signup_admins(user, via)
+    ok
+  end
+
+  defp tap_notify_signup(other, _via), do: other
+
+  defp notify_signup_admins(%User{} = user, via)
+       when via in [:standard, :invitation, :gift] do
+    RompCrm.ApplicationConfig.signup_notify_emails()
+    |> Enum.each(fn to ->
+      _ = UserNotifier.deliver_signup_admin_notification(to, user, via)
+    end)
+
+    :ok
   end
 
   defp registration_email_allowed?(%Ecto.Changeset{} = cs, opts) when is_list(opts) do

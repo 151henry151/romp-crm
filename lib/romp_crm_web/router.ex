@@ -158,6 +158,7 @@ defmodule RompCrmWeb.Router do
       live "/", JobsLive, :index
       live "/jobs/new", JobsLive, :new
       live "/jobs/:id/edit", JobsLive, :edit
+      live "/clients", ClientsLive, :index
 
       live "/time-log", TimeLogLive, :index
       live "/my-timeclock", MyTimeclockLive, :index

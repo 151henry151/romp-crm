@@ -167,6 +167,7 @@
   <p class="text-sm text-base-content/70 mb-4">
     Owner workspaces only (not invited-only memberships).
     <span class="font-medium text-base-content/90">Jobs</span>,
+    <span class="font-medium text-base-content/90">Clients</span>,
     <span class="font-medium text-base-content/90">Employees</span>,
     <span class="font-medium text-base-content/90">Time log</span>,
     <span class="font-medium text-base-content/90">Audit log</span> (who changed what, web + SMS).
@@ -216,6 +217,16 @@
           class="checkbox checkbox-sm mt-0.5"
         />
         <span><span class="font-medium">Jobs</span> — jobs.csv</span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="export_kinds[]"
+          value="clients"
+          checked={"clients" in @export_selected_kind_strings}
+          class="checkbox checkbox-sm mt-0.5"
+        />
+        <span><span class="font-medium">Clients</span> — clients.csv</span>
       </label>
       <label class="flex cursor-pointer items-start gap-2 text-sm">
         <input

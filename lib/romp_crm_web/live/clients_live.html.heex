@@ -1,0 +1,143 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+  content_width={:wide}
+>
+  <div class="text-base-content">
+    <div class="mb-6 flex flex-wrap items-center gap-2 border-b border-base-300 pb-3">
+      <div class="relative min-w-0 flex-1">
+        <details class="group">
+          <summary
+            class="btn btn-square btn-sm h-9 w-9 min-h-0 shrink-0 list-none cursor-pointer border border-base-content/20 bg-base-100 p-0 text-base-content shadow-sm hover:border-base-content/30 hover:bg-base-200 [&::-webkit-details-marker]:hidden"
+            aria-label={"Sort: #{ClientsList.sort_label(@sort_by)}"}
+          >
+            <.icon name="hero-bars-3-bottom-left" class="size-4 shrink-0 text-base-content" />
+          </summary>
+          <div class="absolute left-0 top-full z-30 mt-1 min-w-[12rem] rounded-lg border border-base-300 bg-base-100 p-2 shadow-lg">
+            <%= for {label, key} <- ClientsList.sort_options() do %>
+              <button
+                type="button"
+                phx-click="set_sort"
+                phx-value-sort={key}
+                class={[
+                  "block w-full rounded-md px-3 py-2 text-left text-sm whitespace-nowrap",
+                  if(@sort_by == key, do: "bg-base-200 font-semibold", else: "hover:bg-base-200/60 text-base-content/80")
+                ]}
+              >
+                {label}
+              </button>
+            <% end %>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="md:hidden space-y-3">
+      <%= for client <- ClientsList.prepare_clients(@clients, @sort_by) do %>
+        <% expanded? = @expanded_client_id == client.id %>
+        <div class={"rounded-lg border overflow-hidden #{if expanded?, do: "border-base-content/25 bg-base-200/20", else: "border-base-300"}"}>
+          <div class="flex items-stretch gap-1">
+            <button type="button" phx-click="toggle_row" phx-value-id={client.id} class="flex-1 text-left px-4 py-3 min-w-0">
+              <p class="font-semibold break-words">{ClientsList.primary_heading(client)}</p>
+              <%= if line = ClientsList.secondary_line(client) do %>
+                <p class="text-sm text-base-content/70 break-words">{line}</p>
+              <% end %>
+              <p class="text-xs text-base-content/60 mt-1">{ClientsList.job_count(client)} job(s)</p>
+            </button>
+            <%= if @can_edit_jobs do %>
+              <.link
+                patch={~p"/jobs/new?client_id=#{client.id}"}
+                class="btn btn-ghost btn-sm shrink-0 self-center mr-2 text-xs font-semibold"
+                title="New job for this client"
+              >
+                + Job
+              </.link>
+            <% end %>
+          </div>
+          <%= if expanded? do %>
+            <div class="border-t border-base-300 px-4 py-3 text-sm space-y-3">
+              <.client_expanded_inline_fields client={client} can_edit={@can_edit_jobs} edit_keys={@client_expand_editing} address_suggestion={@address_suggestion} />
+              <div class="pt-2 border-t border-base-300">
+                <p class="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-2">Jobs</p>
+                <%= if client.jobs == [] do %>
+                  <p class="text-sm text-base-content/60">No jobs yet.</p>
+                <% else %>
+                  <ul class="space-y-1">
+                    <%= for job <- client.jobs do %>
+                      <li class="flex items-center justify-between gap-2 text-sm">
+                        <span class="min-w-0 break-words">{job.work_description || job.client_name || "Job ##{job.id}"}</span>
+                        <span class="shrink-0 text-xs text-base-content/60">{JobsList.status_label(job.status)}</span>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+              </div>
+              <.client_delete_bar client={client} delete_step={Map.get(@client_delete_steps, client.id, 0)} job_count={ClientsList.job_count(client)} can_edit={@can_edit_jobs} />
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-zebra w-full">
+        <thead>
+          <tr class="text-base-content/70">
+            <th>Client</th>
+            <th class="hidden lg:table-cell">Contact</th>
+            <th>Jobs</th>
+            <th class="w-24"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for client <- ClientsList.prepare_clients(@clients, @sort_by) do %>
+            <% expanded? = @expanded_client_id == client.id %>
+            <tr class={if expanded?, do: "bg-base-200/30", else: ""}>
+              <td class="align-top">
+                <button type="button" phx-click="toggle_row" phx-value-id={client.id} class="text-left w-full">
+                  <span class="font-semibold">{ClientsList.primary_heading(client)}</span>
+                </button>
+              </td>
+              <td class="hidden lg:table-cell align-top text-sm text-base-content/80">{ClientsList.secondary_line(client) || "—"}</td>
+              <td class="align-top text-sm">{ClientsList.job_count(client)}</td>
+              <td class="align-top text-right">
+                <%= if @can_edit_jobs do %>
+                  <.link patch={~p"/jobs/new?client_id=#{client.id}"} class="btn btn-ghost btn-xs font-semibold">+ Job</.link>
+                <% end %>
+              </td>
+            </tr>
+            <%= if expanded? do %>
+              <tr>
+                <td colspan="4" class="bg-base-200/20 border-t border-base-300 px-4 py-3">
+                  <.client_expanded_inline_fields client={client} can_edit={@can_edit_jobs} edit_keys={@client_expand_editing} address_suggestion={@address_suggestion} />
+                  <div class="pt-3 mt-3 border-t border-base-300">
+                    <p class="text-xs font-medium uppercase tracking-wide text-base-content/50 mb-2">Jobs</p>
+                    <%= if client.jobs == [] do %>
+                      <p class="text-sm text-base-content/60">No jobs yet.</p>
+                    <% else %>
+                      <ul class="grid gap-1 sm:grid-cols-2">
+                        <%= for job <- client.jobs do %>
+                          <li class="text-sm flex justify-between gap-2 rounded border border-base-300/60 px-2 py-1">
+                            <span class="min-w-0 break-words">{job.work_description || "Job ##{job.id}"}</span>
+                            <span class="shrink-0 text-xs">{JobsList.status_label(job.status)}</span>
+                          </li>
+                        <% end %>
+                      </ul>
+                    <% end %>
+                  </div>
+                  <.client_delete_bar client={client} delete_step={Map.get(@client_delete_steps, client.id, 0)} job_count={ClientsList.job_count(client)} can_edit={@can_edit_jobs} />
+                </td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Layouts.app>

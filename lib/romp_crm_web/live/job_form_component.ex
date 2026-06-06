@@ -2,7 +2,8 @@ defmodule RompCrmWeb.JobFormComponent do
   use RompCrmWeb, :live_component
 
   alias RompCrm.BusinessAuditLogs
-  alias RompCrm.BusinessAuditLogs.Detail
+  alias RompCrm.Clients
+  alias RompCrm.Clients.ClientContact
   alias RompCrm.Jobs
   alias RompCrm.Jobs.Job
   alias RompCrm.Jobs.JobWorkItem
@@ -26,6 +27,7 @@ defmodule RompCrmWeb.JobFormComponent do
      |> assign_new(:actor_user_id, fn -> nil end)
      |> assign_new(:can_edit_jobs, fn -> true end)
      |> assign_new(:address_suggestion, fn -> nil end)
+     |> assign_new(:clients_for_picker, fn -> [] end)
      |> assign(:form, form)}
   end
 
@@ -66,8 +68,9 @@ defmodule RompCrmWeb.JobFormComponent do
   def handle_event("validate", %{"job" => params} = outer, socket) do
     if socket.assigns.can_edit_jobs do
       params = normalize_job_params(params)
-      changeset = Jobs.change_job(socket.assigns.job, params)
-      {:noreply, assign(socket, :form, to_form(changeset, action: :validate))}
+      job = merge_client_pick(socket, params)
+      changeset = Jobs.change_job(job, params)
+      {:noreply, assign(socket, :job, job) |> assign(:form, to_form(changeset, action: :validate))}
     else
       _ = outer
       {:noreply, socket}
@@ -216,52 +219,8 @@ defmodule RompCrmWeb.JobFormComponent do
   end
 
   defp create_job(socket, params, material_lines) do
-    bid = socket.assigns.current_business_id
-    uid = socket.assigns.actor_user_id
-
-    params =
-      params
-      |> Map.delete("materials")
-      |> Map.put("business_id", to_string(bid))
-
-    case Jobs.create_job(params) do
-      {:ok, job} ->
-        :ok = Jobs.sync_root_materials_only(job, material_lines_to_list(material_lines))
-        job = Jobs.get_job!(job.id, bid)
-        lines = material_lines_to_list(material_lines)
-
-        BusinessAuditLogs.record(%{
-          business_id: bid,
-          actor_user_id: uid,
-          source: "web",
-          action: "jobs.create",
-          entity_type: "jobs",
-          entity_id: job.id,
-          metadata: %{
-            client_name: job.client_name,
-            job_id: job.id,
-            changes:
-              Detail.changes_for_job_created(job) ++
-                if(lines == [],
-                  do: [],
-                  else: [
-                    %{
-                      type: "root_materials_replaced",
-                      job_id: job.id,
-                      client_name: job.client_name,
-                      lines: lines
-                    }
-                  ]
-                )
-          }
-        })
-
-        notify_parent({:saved, job})
-        {:noreply, push_patch(socket, to: socket.assigns.patch)}
-
-      {:error, changeset} ->
-        {:noreply, assign(socket, :form, to_form(changeset))}
-    end
+    notify_parent({:job_save_requested, params, material_lines})
+    {:noreply, socket}
   end
 
   defp update_job(socket, params, material_lines) do
@@ -310,6 +269,47 @@ defmodule RompCrmWeb.JobFormComponent do
     end
   end
 
+  defp merge_client_pick(socket, %{"client_id" => id}) when id not in [nil, ""] do
+    bid = socket.assigns.current_business_id
+
+    case Integer.parse(to_string(id)) do
+      {client_id, _} ->
+        case Clients.get_client(client_id, bid) do
+          nil ->
+            socket.assigns.job
+
+          client ->
+            contact = ClientContact.from_struct(client)
+
+            socket.assigns.job
+            |> struct(contact)
+            |> Map.put(:client_id, client.id)
+            |> Map.put(:client, client)
+        end
+
+      :error ->
+        socket.assigns.job
+    end
+  end
+
+  defp merge_client_pick(socket, _), do: socket.assigns.job
+
+  defp client_picker_options(clients) do
+    base = [{"— Type contact or pick existing client —", ""}]
+
+    Enum.reduce(clients, base, fn client, acc ->
+      label =
+        [client.client_name, client.phone]
+        |> Enum.map(&(&1 |> to_string() |> String.trim()))
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.join(" · ")
+
+      label = if label == "", do: "Client ##{client.id}", else: label
+      [{label, to_string(client.id)} | acc]
+    end)
+    |> Enum.reverse()
+  end
+
   defp notify_parent(msg), do: send(self(), {__MODULE__, msg})
 
   @impl true
@@ -335,6 +335,7 @@ defmodule RompCrmWeb.JobFormComponent do
       assigns
       |> assign(:photo_action, photo_action)
       |> assign(:work_item_photo_options, work_item_options)
+      |> assign(:client_picker_options, client_picker_options(assigns.clients_for_picker))
 
     ~H"""
     <div>
@@ -348,6 +349,15 @@ defmodule RompCrmWeb.JobFormComponent do
         phx-submit="save"
         class="mt-4 space-y-4"
       >
+        <%= if @action == :new do %>
+          <.input
+            field={@form[:client_id]}
+            type="select"
+            label="Existing client (optional)"
+            options={@client_picker_options}
+          />
+        <% end %>
+
         <.input field={@form[:client_name]} type="text" label="Client Name" />
         <p class="text-xs text-base-content/60 -mt-2">
           Client name, address, work summary, phone, or notes — at least one is required.

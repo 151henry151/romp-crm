@@ -7,6 +7,7 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
+  alias RompCrm.Clients
   alias RompCrm.EmployeePermissions
   alias RompCrm.Employees
   alias RompCrm.Employees.TimeEntryActions
@@ -147,6 +148,7 @@ defmodule RompCrm.SmsInboundProcessor do
     )
 
     jobs_snapshot = Jobs.snapshot_for_sms_ai(business_id)
+    clients_snapshot = Clients.snapshot_for_sms_ai(business_id)
     allowed_job_ids = MapSet.new(Enum.map(jobs_snapshot, fn row -> row["id"] end))
 
     open_time_entries = TimeTracking.snapshot_for_sms_ai(business_id)
@@ -235,7 +237,8 @@ defmodule RompCrm.SmsInboundProcessor do
           reminder_wall_tz,
           mms_urls,
           mms_image_blocks,
-          recent_deleted_jobs
+          recent_deleted_jobs,
+          clients_snapshot
         )
     end
   end
@@ -259,7 +262,8 @@ defmodule RompCrm.SmsInboundProcessor do
          reminder_wall_tz,
          mms_urls,
          mms_image_blocks,
-         recent_deleted_jobs
+         recent_deleted_jobs,
+         clients_snapshot
        ) do
     case SmsUnifiedInboundExtractor.extract(
            body_for_ai,
@@ -269,7 +273,8 @@ defmodule RompCrm.SmsInboundProcessor do
            prior_turns,
            reminder_wall_tz: reminder_wall_tz,
            mms_image_blocks: mms_image_blocks,
-           recent_deleted_jobs: recent_deleted_jobs
+           recent_deleted_jobs: recent_deleted_jobs,
+           clients_snapshot: clients_snapshot
          ) do
       {:ok,
        %{
@@ -1232,6 +1237,12 @@ defmodule RompCrm.SmsInboundProcessor do
 
     case Jobs.create_job(attrs) do
       {:ok, %Job{} = job} ->
+        job =
+          case Clients.finalize_job_client_link(job, attrs) do
+            {:ok, linked} -> linked
+            _ -> job
+          end
+
         job = Jobs.get_job!(job.id, business_id)
         changes = Detail.changes_for_job_created(job)
 

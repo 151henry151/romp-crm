@@ -107,6 +107,7 @@ defmodule RompCrm.DataExportTest do
 
       assert DataExport.export_form_selected_kind_strings(user) == [
                "jobs",
+               "clients",
                "employees",
                "time_log",
                "audit_log"
@@ -190,6 +191,48 @@ defmodule RompCrm.DataExportTest do
       assert csv =~ "OnlyOne"
       refute csv =~ "OnlyTwo"
       assert csv =~ to_string(j1.id)
+    end
+  end
+
+  describe "build_clients_csv/1" do
+    test "includes only clients for given business ids" do
+      owner = AccountsFixtures.user_fixture()
+      {:ok, biz} = Businesses.create_business(owner, %{name: "Client Co"})
+      other = AccountsFixtures.user_fixture()
+      {:ok, other_biz} = Businesses.create_business(other, %{name: "Other Co"})
+
+      {:ok, client} =
+        RompCrm.Clients.create_client(%{
+          business_id: biz.id,
+          client_name: "Ada Client",
+          phone: "+18025550101",
+          notes: "VIP"
+        })
+
+      {:ok, _} =
+        RompCrm.Clients.create_client(%{
+          business_id: other_biz.id,
+          client_name: "Secret Client",
+          phone: "+18025550102"
+        })
+
+      {:ok, job} =
+        RompCrm.Jobs.create_job(%{
+          "business_id" => biz.id,
+          "client_id" => client.id,
+          "client_name" => client.client_name,
+          "phone" => client.phone,
+          "priority" => "normal",
+          "status" => "lead"
+        })
+
+      csv = DataExport.build_clients_csv([biz.id])
+      assert csv =~ "Ada Client"
+      assert csv =~ "VIP"
+      assert csv =~ to_string(client.id)
+      assert csv =~ ",1,"
+      refute csv =~ "Secret Client"
+      assert csv =~ to_string(job.business_id)
     end
   end
 

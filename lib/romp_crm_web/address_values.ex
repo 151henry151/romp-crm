@@ -1,7 +1,24 @@
 defmodule RompCrmWeb.AddressValues do
   @moduledoc false
 
+  alias RompCrm.Clients.Client
   alias RompCrm.Jobs.Job
+
+  def from_client(%Client{} = client) do
+    %{
+      "address_line1" => client.address_line1 || "",
+      "address_line2" => client.address_line2 || "",
+      "city" => client.city || "",
+      "state" => client.state || "",
+      "postal_code" => client.postal_code || "",
+      "billing_address_different" => client.billing_address_different || false,
+      "billing_address_line1" => client.billing_address_line1 || "",
+      "billing_address_line2" => client.billing_address_line2 || "",
+      "billing_city" => client.billing_city || "",
+      "billing_state" => client.billing_state || "",
+      "billing_postal_code" => client.billing_postal_code || ""
+    }
+  end
 
   def from_job(%Job{} = job) do
     %{

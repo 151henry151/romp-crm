@@ -67,6 +67,19 @@ defmodule RompCrmWeb.AddressFormHandlers do
 
   def job_address_attrs_from_params(_), do: %{}
 
+  def client_address_attrs_from_params(%{"client" => client_params}) when is_map(client_params) do
+    client_params
+    |> Addresses.merge_ai_address_attrs()
+    |> Map.take(
+      @service_keys ++
+        ["billing_address_different"] ++ @billing_keys
+    )
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Map.new()
+  end
+
+  def client_address_attrs_from_params(_), do: %{}
+
   defp typed_parts(params, "billing") do
     %{
       "address_line1" => params["billing_address_line1"],

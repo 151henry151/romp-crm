@@ -53,4 +53,7 @@ config :romp_crm,
   twilio_voice_webhook_public_url: "https://example.test/romp-crm/webhooks/twilio/voice",
   twilio_voice_forward_e164: "+18024587299",
   data_export_scheduler_enabled: false,
-  reminder_scheduler_enabled: false
+  reminder_scheduler_enabled: false,
+  signup_notify_emails: []
+
+config :romp_crm, RompCrm.Mailer, adapter: Swoosh.Adapters.Test

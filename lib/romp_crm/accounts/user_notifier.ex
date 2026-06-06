@@ -262,6 +262,8 @@ defmodule RompCrm.Accounts.UserNotifier do
 
   defp data_export_file_blurb("jobs.csv"), do: "jobs (owner businesses)"
 
+  defp data_export_file_blurb("clients.csv"), do: "clients (persistent contact records)"
+
   defp data_export_file_blurb("employees.csv"), do: "employees"
 
   defp data_export_file_blurb("time_log.csv"), do: "job + employee time"
@@ -374,5 +376,61 @@ defmodule RompCrm.Accounts.UserNotifier do
       |> html_body(EmailHtml.layout(inner))
 
     Mailer.deliver(email)
+  end
+
+  @doc """
+  Notifies an operator address that a new Romp CRM account was created.
+
+  **`via`** is `:standard`, `:invitation`, or `:gift`.
+  """
+  def deliver_signup_admin_notification(to_email, %User{} = user, via)
+      when is_binary(to_email) and via in [:standard, :invitation, :gift] do
+    {via_label, via_detail} = signup_via_copy(via, user)
+    status = user.subscription_status || "unknown"
+
+    text = """
+    A new Romp CRM account was created.
+
+    Email: #{user.email}
+    User ID: #{user.id}
+    Sign-up type: #{via_label}
+    Subscription status: #{status}
+    #{via_detail}
+    """
+
+    inner =
+      [
+        EmailHtml.h1(EmailHtml.escape("New Romp CRM sign-up")),
+        EmailHtml.p(EmailHtml.escape("A new account was created on Romp CRM.")),
+        EmailHtml.bullet_list([
+          EmailHtml.escape("Email: #{user.email}"),
+          EmailHtml.escape("User ID: #{user.id}"),
+          EmailHtml.escape("Sign-up type: #{via_label}"),
+          EmailHtml.escape("Subscription status: #{status}")
+        ]),
+        signup_via_html(via_detail)
+      ]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join()
+
+    deliver(to_email, "Romp CRM — new account: #{user.email}", String.trim(text), inner)
+  end
+
+  defp signup_via_copy(:standard, _user) do
+    {"Standard registration", ""}
+  end
+
+  defp signup_via_copy(:invitation, _user) do
+    {"Business invitation", "The user registered from a team invitation link."}
+  end
+
+  defp signup_via_copy(:gift, _user) do
+    {"Gift redemption", "The user was created when redeeming a gifted subscription."}
+  end
+
+  defp signup_via_html(""), do: ""
+
+  defp signup_via_html(detail) when is_binary(detail) do
+    EmailHtml.muted_p(EmailHtml.escape(detail))
   end
 end
