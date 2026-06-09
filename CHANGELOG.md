@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.112] - 2026-06-09
+
+### Fixed
+
+- **Registration**: when the same email registers again during an active cardless free trial, resend the magic link and redirect to log-in instead of sending the user to PayPal checkout
+- **Subscribe page**: hide PayPal resume checkout when the pending account already has active trial access
+- **Registration form**: disable submit button after first click to reduce accidental double registration
+
 ## [0.9.111] - 2026-06-06
 
 ### Added

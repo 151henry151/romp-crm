@@ -353,14 +353,30 @@ defmodule RompCrmWeb.UserRegistrationController do
       {:ok, user} ->
         cond do
           existed_before? and Billing.paywall_enabled?() and Accounts.resumable_paywall_signup?(user) ->
-            conn
-            |> delete_session(:cardless_trial_signup)
-            |> put_session(:pending_paywall_user_id, user.id)
-            |> put_flash(
-              :info,
-              "This email already has an account waiting for billing. Continue on the subscription page to add PayPal."
-            )
-            |> redirect(to: ~p"/subscribe")
+            if Billing.subscription_active?(user) do
+              {:ok, _} =
+                Accounts.deliver_login_instructions(
+                  user,
+                  &url(~p"/users/log-in/#{&1}")
+                )
+
+              conn
+              |> delete_session(:cardless_trial_signup)
+              |> put_flash(
+                :info,
+                "You already started your #{trial_days}-day free trial. Check #{user.email} for your sign-in link (we just sent another copy)."
+              )
+              |> redirect(to: ~p"/users/log-in")
+            else
+              conn
+              |> delete_session(:cardless_trial_signup)
+              |> put_session(:pending_paywall_user_id, user.id)
+              |> put_flash(
+                :info,
+                "This email already has an account waiting for billing. Continue on the subscription page to add PayPal."
+              )
+              |> redirect(to: ~p"/subscribe")
+            end
 
           true ->
             case Accounts.apply_cardless_promo_trial(user, trial_days) do

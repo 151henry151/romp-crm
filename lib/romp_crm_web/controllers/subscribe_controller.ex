@@ -90,11 +90,19 @@ defmodule RompCrmWeb.SubscribeController do
 
       {:show, conn} ->
         nav = layout_nav_assigns(conn)
+        pending_user =
+          case pending_paywall_user(conn) do
+            %User{} = u ->
+              if Billing.subscription_active?(u), do: nil, else: u
+
+            other ->
+              other
+          end
 
         render(conn, :show,
           [
             paywall: Billing.paywall_enabled?(),
-            pending_user: pending_paywall_user(conn),
+            pending_user: pending_user,
             paypal_trial_days: Billing.paypal_trial_days()
           ] ++ Map.to_list(nav)
         )

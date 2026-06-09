@@ -82,7 +82,7 @@
         </fieldset>
       <% end %>
 
-      <.button phx-disable-with="Creating account..." class="btn btn-brand mt-4 w-full">
+      <.button phx-disable-with="Creating account..." class="btn btn-brand mt-4 w-full" onclick="this.disabled=true;this.form.submit();">
         Create an account
       </.button>
     </.form>

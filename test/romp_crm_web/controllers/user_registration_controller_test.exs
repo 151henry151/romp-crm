@@ -220,23 +220,36 @@ defmodule RompCrmWeb.UserRegistrationControllerTest do
       end)
     end
 
-    test "cardless trial signup for duplicate pending paywall email redirects to subscribe", %{conn: conn} do
+    test "duplicate pending paywall email without gift trial redirects to subscribe", %{conn: conn} do
       with_subscription_paywall_enabled(fn ->
         email = unique_user_email()
         assert {:ok, _} = Accounts.register_user(valid_user_attributes(email: email))
 
-        t = CardlessTrialToken.sign()
-
         conn =
-          conn
-          |> get(~p"/users/register?#{[t: t]}")
-          |> post(~p"/users/register", %{
+          post(conn, ~p"/users/register", %{
             "user" => valid_user_attributes(email: email)
           })
 
         assert redirected_to(conn) == ~p"/subscribe"
         assert conn.assigns.flash["info"] =~ "subscription page"
-        refute get_session(conn, :cardless_trial_signup)
+      end)
+    end
+
+    test "duplicate signup with active gift trial resends magic link instead of PayPal", %{conn: conn} do
+      with_subscription_paywall_enabled(fn ->
+        email = unique_user_email()
+        assert {:ok, user} = Accounts.register_user(valid_user_attributes(email: email))
+        assert {:ok, _} = Accounts.apply_cardless_promo_trial(user, 30)
+
+        conn =
+          post(conn, ~p"/users/register", %{
+            "user" => valid_user_attributes(email: email)
+          })
+
+        assert redirected_to(conn) == ~p"/users/log-in"
+        assert conn.assigns.flash["info"] =~ "already started"
+        assert conn.assigns.flash["info"] =~ "sign-in link"
+        refute conn.assigns.flash["info"] =~ "PayPal"
       end)
     end
   end
