@@ -16,6 +16,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   alias RompCrm.Ai.CustomerBookingExtractor
   alias RompCrm.Bookings
   alias RompCrm.Bookings.{AvailabilitySummary, BookingLink, EscalationCoordinator, Escalations, Intake, JobScheduleSync, Orchestrator}
+  alias RompCrm.ClientChats
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
@@ -55,6 +56,21 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "Client booking inbound: sid=#{message_sid} phone=#{phone_norm} candidate_links=#{length(links)}"
     )
 
+    if human_takeover_active?(links, phone_norm) do
+      ClientChats.record_inbound_while_taken_over(links, phone_norm, body)
+      {:ok, :human_takeover_silent}
+    else
+      process_with_agent(phone_norm, body, links, params, message_sid)
+    end
+  end
+
+  defp human_takeover_active?(links, phone_norm) do
+    Enum.any?(links, fn %BookingLink{business_id: bid} ->
+      ClientChats.taken_over?(bid, phone_norm)
+    end)
+  end
+
+  defp process_with_agent(phone_norm, body, links, params, message_sid) do
     contexts = Enum.map(links, &booking_context(&1, phone_norm))
 
     prior_turns =

@@ -70,14 +70,14 @@ defmodule RompCrm.SmsConversations do
           where: m.thread_kind == "client",
           order_by: [desc: m.id],
           limit: ^max_msgs,
-          select: %{direction: m.direction, body: m.body}
+          select: %{direction: m.direction, body: m.body, channel: m.channel}
       )
 
     turns =
       rows
       |> Enum.reverse()
-      |> Enum.map(fn %{direction: d, body: b} ->
-        role = if d == "outbound", do: :assistant, else: :client
+      |> Enum.map(fn %{direction: d, body: b, channel: ch} ->
+        role = client_turn_role(d, ch)
         {role, b || ""}
       end)
 
@@ -88,9 +88,13 @@ defmodule RompCrm.SmsConversations do
   Appends one message to a client booking thread. **`user_id`** is the technician
   who owns the booking conversation (attribution), not the sender.
   """
-  def record_client_message(business_id, user_id, phone_normalized, direction, body)
+  def record_client_message(business_id, user_id, phone_normalized, direction, body, opts \\ [])
+
+  def record_client_message(business_id, user_id, phone_normalized, direction, body, opts)
       when is_integer(business_id) and is_integer(user_id) and is_binary(phone_normalized) and
-             direction in ["inbound", "outbound"] and is_binary(body) do
+             direction in ["inbound", "outbound"] and is_binary(body) and is_list(opts) do
+    channel = Keyword.get(opts, :channel, "sms")
+
     %Message{}
     |> Message.changeset(%{
       business_id: business_id,
@@ -98,11 +102,44 @@ defmodule RompCrm.SmsConversations do
       phone_normalized: phone_normalized,
       direction: direction,
       body: String.slice(String.trim(body), 0, 6000),
-      channel: "sms",
+      channel: channel,
       thread_kind: "client"
     })
     |> Repo.insert()
+    |> tap(fn
+      {:ok, _} ->
+        Phoenix.PubSub.broadcast(
+          RompCrm.PubSub,
+          "client_chat:#{business_id}:#{phone_normalized}",
+          {:message, business_id, phone_normalized}
+        )
+
+      _ ->
+        :ok
+    end)
   end
+
+  @doc "All client-thread messages for a workspace phone, oldest first."
+  def list_client_thread_messages(business_id, phone_normalized, opts \\ [])
+      when is_integer(business_id) and is_binary(phone_normalized) do
+    limit = Keyword.get(opts, :limit, 500)
+
+    Repo.all(
+      from m in Message,
+        where: m.business_id == ^business_id,
+        where: m.phone_normalized == ^phone_normalized,
+        where: m.thread_kind == "client",
+        order_by: [asc: m.id],
+        limit: ^limit,
+        preload: [:user]
+    )
+  end
+
+  defp client_turn_role("inbound", _), do: :client
+
+  defp client_turn_role("outbound", "sms_human"), do: :human
+
+  defp client_turn_role("outbound", _), do: :assistant
 
   defp trim_thread_to_char_budget(turns, max_chars) do
     orig_len = length(turns)
@@ -138,7 +175,14 @@ defmodule RompCrm.SmsConversations do
   defp format_turn_lines(turns) do
     turns
     |> Enum.map(fn {role, text} ->
-      label = if role == :assistant, do: "Assistant", else: "Contractor"
+      label =
+        case role do
+          :assistant -> "Assistant"
+          :human -> "Team member"
+          :client -> "Customer"
+          _ -> "Contractor"
+        end
+
       "#{label}: #{text}"
     end)
     |> Enum.join("\n")

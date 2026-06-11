@@ -136,5 +136,9 @@ defmodule RompCrmWeb.ChatComponents do
     "bg-sky-600 text-white dark:bg-sky-500 dark:text-white"
   end
 
+  defp bubble_tone(:customer) do
+    "bg-base-200 text-base-content dark:bg-neutral-600 dark:text-neutral-50"
+  end
+
   defp bubble_tone(_), do: "bg-base-300 text-base-content"
 end

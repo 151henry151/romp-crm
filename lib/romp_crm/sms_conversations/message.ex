@@ -22,7 +22,7 @@ defmodule RompCrm.SmsConversations.Message do
     |> cast(attrs, [:business_id, :user_id, :phone_normalized, :direction, :channel, :thread_kind, :body])
     |> validate_required([:business_id, :user_id, :phone_normalized, :direction, :body])
     |> validate_inclusion(:direction, ["inbound", "outbound"])
-    |> validate_inclusion(:channel, ["sms", "in_app"])
+    |> validate_inclusion(:channel, ["sms", "in_app", "sms_human"])
     |> validate_inclusion(:thread_kind, ["contractor", "client"])
     |> validate_length(:body, max: 6000)
   end

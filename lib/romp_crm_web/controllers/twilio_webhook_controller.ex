@@ -141,6 +141,11 @@ defmodule RompCrmWeb.TwilioWebhookController do
               "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
             )
 
+          {:ok, :human_takeover_silent} ->
+            Logger.info(
+              "Twilio SMS: client message recorded during human takeover from=#{inspect(from)} sid=#{message_sid}"
+            )
+
           :ignore ->
             Logger.info(
               "Twilio SMS: no active client booking conversation from=#{inspect(from)} sid=#{message_sid}"

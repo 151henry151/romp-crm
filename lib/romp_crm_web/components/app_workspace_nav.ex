@@ -116,8 +116,8 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     <.link navigate={~p"/clients"} class={@pill} {@mobile_attrs}>
       Clients
     </.link>
-    <.link navigate={~p"/chat"} class={@pill} {@mobile_attrs}>
-      Chat
+    <.link navigate={~p"/chats"} class={@pill} {@mobile_attrs}>
+      Chats
     </.link>
     <.link navigate={~p"/reminders"} class={@pill} {@mobile_attrs}>
       Reminders

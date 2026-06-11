@@ -179,7 +179,8 @@ defmodule RompCrmWeb.Router do
       live "/my-timeclock", MyTimeclockLive, :index
       live "/reminders", RemindersLive, :index
       live "/bookings", BookingsLive, :index
-      live "/chat", AgentChatLive, :index
+      live "/chats", ChatsLive, :index
+      live "/chat", ChatsLive, :index
       live "/scheduling-agent-test", SchedulingAgentTestLive, :index
     end
 

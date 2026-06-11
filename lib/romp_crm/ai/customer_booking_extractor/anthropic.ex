@@ -83,7 +83,13 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
         turns ->
           lines =
             Enum.map_join(turns, "\n", fn {role, text} ->
-              label = if role == :assistant, do: "Business", else: "Customer"
+              label =
+                case role do
+                  :human -> "Team member"
+                  :assistant -> "Scheduling assistant"
+                  _ -> "Customer"
+                end
+
               "#{label}: #{text}"
             end)
 

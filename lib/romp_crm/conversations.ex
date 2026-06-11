@@ -17,12 +17,23 @@ defmodule RompCrm.Conversations do
   Messages for a thread, oldest first.
 
   **`:agent`** — all persisted agent lines for the workspace (SMS and in-app).
+  **`:client`** — scheduling/customer SMS for one normalized phone.
   """
   def list_thread_messages(:agent, business_id, opts \\ []) when is_integer(business_id) do
     SmsConversations.list_business_agent_messages(business_id, opts)
   end
 
-  @doc "Build display rows for a chat UI (`viewer_user` is the logged-in user)."
+  def list_thread_messages(:client, business_id, phone_normalized, opts)
+      when is_integer(business_id) and is_binary(phone_normalized) and is_list(opts) do
+    SmsConversations.list_client_thread_messages(business_id, phone_normalized, opts)
+  end
+
+  def list_thread_messages(:client, business_id, phone_normalized)
+      when is_integer(business_id) and is_binary(phone_normalized) do
+    list_thread_messages(:client, business_id, phone_normalized, [])
+  end
+
+  @doc "Build display rows for the contractor agent chat UI."
   def format_thread_rows(messages, %User{} = viewer_user, business_id) when is_list(messages) do
     names = display_names_for_users(business_id, messages)
 
@@ -100,4 +111,34 @@ defmodule RompCrm.Conversations do
   end
 
   defp photo_urls(_), do: []
+
+  @doc "Build display rows for a client scheduling SMS thread."
+  def format_client_thread_rows(messages, client_name \\ "Customer") when is_list(messages) do
+    Enum.map(messages, fn msg ->
+      {label, role, side} = client_sender_meta(msg, client_name)
+
+      %{
+        id: msg.id,
+        label: label,
+        role: role,
+        side: side,
+        text: display_text(msg.body),
+        photos: photo_urls(msg.body),
+        inserted_at: msg.inserted_at,
+        channel: msg.channel || "sms"
+      }
+    end)
+  end
+
+  defp client_sender_meta(%{direction: "inbound"}, client_name) do
+    {client_name, :customer, :left}
+  end
+
+  defp client_sender_meta(%{direction: "outbound", channel: "sms_human"}, _client_name) do
+    {"You (live)", :self, :right}
+  end
+
+  defp client_sender_meta(%{direction: "outbound"}, _client_name) do
+    {"Scheduling assistant", :agent, :left}
+  end
 end

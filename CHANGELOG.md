@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.12.0] - 2026-06-11
+
+### Added
+
+- **Chats page** (`/chats`, `/chat` alias): sidebar to switch between the RompCRM agent and customer scheduling SMS threads
+- **Client chat takeover**: pause the scheduling agent, text the customer live by SMS, and hand off back with customer notifications; full thread history (agent, customer, and human) feeds back into the scheduling agent via `list_client_turns_for_ai/3`
+- **`ClientChats`** and **`client_chat_takeovers`** table to track active human takeover per business + client phone
+- **`SmsConversations.list_client_thread_messages/3`**: load client scheduling threads for the Chats UI
+- **`Conversations.format_client_thread_rows/2`**: messenger rows for customer SMS threads
+
+### Changed
+
+- Rename nav **Chat** → **Chats**; route primary path to `/chats`
+- **`CustomerBookingProcessor`**: when a thread is human-taken-over, record inbound SMS without scheduling-agent auto-reply
+- **`SmsConversations`**: support `sms_human` channel for live technician outbound; PubSub on client thread updates
+- **Customer booking AI prompt**: label prior human messages as "Team member" in thread context
+
+### Removed
+
+- **`AgentChatLive`** (replaced by **`ChatsLive`**)
+
 ## [0.11.0] - 2026-06-11
 
 ### Added
