@@ -241,4 +241,32 @@ img.brand-logo-dark {
       content: "...";
     }
   }
+
+  .chats-page {
+    @apply flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden;
+  }
+
+  .chats-workspace {
+    @apply flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:flex-row;
+  }
+
+  .chats-sidebar {
+    @apply flex min-h-0 flex-col gap-1 overflow-y-auto rounded-xl border border-base-300 bg-base-100/80 p-2 shadow-sm md:w-52 md:shrink-0;
+  }
+
+  .chats-thread-card {
+    @apply grid min-h-0 overflow-hidden rounded-xl border border-base-300 bg-base-100/80 p-3 shadow-sm md:min-h-0 md:flex-1;
+  }
+
+  .chats-thread-card--client {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .chats-thread-card--agent {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .chats-message-panel {
+    @apply min-h-0 overflow-y-auto overscroll-contain rounded-lg border border-base-300/60 bg-base-200/20 p-2;
+  }
 }

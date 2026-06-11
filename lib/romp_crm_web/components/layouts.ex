@@ -53,6 +53,10 @@ defmodule RompCrmWeb.Layouts do
     default: false,
     doc: "first-login SMS assistant intro modal"
 
+  attr :viewport_fill, :boolean,
+    default: false,
+    doc: "when true, main fills the viewport between header and footer (for full-height chat UIs)"
+
   slot :inner_block, required: true
   slot :header_extras
 
@@ -64,7 +68,8 @@ defmodule RompCrmWeb.Layouts do
       |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
 
     ~H"""
-    <header class="border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
+    <div class={[@viewport_fill && "flex min-h-dvh flex-col"]}>
+    <header class="shrink-0 border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
       <div class={["mx-auto w-full", @app_shell_class]}>
         <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
           <%= if @current_scope && @current_scope.user && @show_workspace_nav do %>
@@ -146,8 +151,21 @@ defmodule RompCrmWeb.Layouts do
       </div>
     </header>
 
-    <main class={["px-4 sm:px-6 lg:px-8", @main_py_class]}>
-      <div class={["mx-auto w-full space-y-4", @main_inner_class]}>
+    <main
+      class={[
+        "px-4 sm:px-6 lg:px-8",
+        @viewport_fill && "flex min-h-0 flex-1 flex-col overflow-hidden !py-2 sm:!py-3",
+        !@viewport_fill && @main_py_class
+      ]}
+    >
+      <div
+        class={[
+          "mx-auto w-full",
+          @main_inner_class,
+          @viewport_fill && "flex min-h-0 flex-1 flex-col overflow-hidden",
+          !@viewport_fill && "space-y-4"
+        ]}
+      >
         {render_slot(@inner_block)}
       </div>
     </main>
@@ -161,9 +179,10 @@ defmodule RompCrmWeb.Layouts do
       />
     <% end %>
 
-    <.legal_footer current_scope={@current_scope} />
+    <.legal_footer current_scope={@current_scope} class={@viewport_fill && "shrink-0"} />
 
     <.flash_group flash={@flash} />
+    </div>
     """
   end
 
@@ -219,6 +238,7 @@ defmodule RompCrmWeb.Layouts do
   Footer links to published Privacy Policy and Terms of Service on rompcrm.com.
   """
   attr :current_scope, :any, default: nil
+  attr :class, :string, default: nil
 
   def legal_footer(assigns) do
     show_admin? =
@@ -228,7 +248,10 @@ defmodule RompCrmWeb.Layouts do
     assigns = assign(assigns, :show_admin_link, show_admin?)
 
     ~H"""
-    <footer class="border-t border-base-300/80 mt-auto px-4 py-8 text-center text-xs text-base-content/65">
+    <footer class={[
+      "border-t border-base-300/80 mt-auto px-4 py-8 text-center text-xs text-base-content/65",
+      @class
+    ]}>
       <nav class="flex flex-wrap justify-center gap-x-4 gap-y-1">
         <a
           href="https://rompcrm.com/privacy-policy.html"

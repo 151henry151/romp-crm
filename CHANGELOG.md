@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.7] - 2026-06-11
+
+### Fixed
+
+- **Chats scroll**: use viewport-filling app layout and CSS grid (`minmax(0, 1fr)` message row) so long threads scroll inside the message panel instead of growing the page
+
 ## [0.12.6] - 2026-06-11
 
 ### Fixed
