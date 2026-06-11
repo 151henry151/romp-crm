@@ -31,7 +31,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
            duration_max_minutes: 180
          }}
 
-      assert {:ok, [{:booking_done, summary}]} = Orchestrator.run_operations([op], ctx)
+      assert {:ok, [{:ok, summary}]} = Orchestrator.run_operations([op], ctx)
       assert summary =~ "Bob Smith"
 
       [link] = Bookings.active_links_for_client_phone("18025300293")
@@ -70,7 +70,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
            duration_max_minutes: 120
          }}
 
-      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+      assert {:ok, [{:ok, _}]} = Orchestrator.run_operations([op], ctx)
 
       [link] = Bookings.active_links_for_client_phone("18025550101")
       assert link.client_id == client.id
@@ -168,7 +168,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
       turns = SmsConversations.list_client_turns_for_ai(business.id, "18025300293")
       assert [{:assistant, first_sms}] = turns
       assert first_sms =~ "openings"
-      assert first_sms =~ ~r/morning|afternoon|evening/
+      assert first_sms =~ ~r/\d{1,2}:\d{2} (AM|PM)/
     end
 
     test "invalid phone is skipped with reason", %{ctx: ctx} do
@@ -199,7 +199,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
         })
 
       op = {:booking_update_duration, link.id, 30, 60}
-      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+      assert {:ok, [{:ok, _}]} = Orchestrator.run_operations([op], ctx)
 
       reloaded = Bookings.get_booking_link!(link.id)
       assert reloaded.duration_min_minutes == 30
@@ -246,7 +246,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
         })
 
       op = {:booking_confirm_soft, request.id, ~U[2026-06-18 14:00:00Z], ~U[2026-06-18 17:00:00Z]}
-      assert {:ok, [{:booking_done, summary}]} = Orchestrator.run_operations([op], ctx)
+      assert {:ok, [{:ok, summary}]} = Orchestrator.run_operations([op], ctx)
       assert summary =~ "confirmed"
 
       assert Repo.reload!(request).status == "converted"
@@ -268,7 +268,7 @@ defmodule RompCrm.Bookings.OrchestratorTest do
         })
 
       op = {:booking_cancel, booking.id, "customer request"}
-      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+      assert {:ok, [{:ok, _}]} = Orchestrator.run_operations([op], ctx)
       assert Bookings.get_booking!(booking.id).status == "cancelled"
     end
   end

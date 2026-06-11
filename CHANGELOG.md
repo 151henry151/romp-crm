@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.6] - 2026-06-11
+
+### Added
+
+- **`Bookings.AvailabilitySummary`**: compute `open_slots`, `local_slot_offerings`, and contractor phrasing from the real availability engine (concrete appointment times, not workday bounds)
+- **`Bookings.JobScheduleSync`**: when a booking is confirmed, set the linked job's `scheduled_on`, `scheduled_time`, work-item dates, and move `lead` → `pending`
+
+### Changed
+
+- **Customer booking SMS AI**: only offer times from `local_slot_offerings` / `open_slots`; forbid inventing broad windows like "8am–3:30pm today"
+- **Contractor booking ask SMS**: list specific local appointment times instead of vague "Thursday morning/afternoon" day-parts
+- **Confirmed bookings** (SMS, web, technician confirm): sync schedule onto the linked job via `JobScheduleSync`
+
 ## [0.10.5] - 2026-06-11
 
 ### Added

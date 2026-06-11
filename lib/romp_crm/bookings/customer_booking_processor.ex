@@ -15,7 +15,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.CustomerBookingExtractor
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.{BookingLink, EscalationCoordinator, Escalations, Intake, Orchestrator}
+  alias RompCrm.Bookings.{AvailabilitySummary, BookingLink, EscalationCoordinator, Escalations, Intake, JobScheduleSync, Orchestrator}
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
@@ -173,6 +173,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
              }) do
           {:ok, booking} ->
             _ = Bookings.mark_booking_link(link, "booked")
+            _ = JobScheduleSync.sync_from_booking(booking)
             notify_technician_of_booking(link, booking)
             {nonempty_reply(result.reply_sms), [link]}
 
@@ -252,6 +253,15 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
     business = Businesses.get_business!(link.business_id)
     prefs = Prefs.decode(link.technician_user && link.technician_user.scheduling_prefs_json)
 
+    summary =
+      AvailabilitySummary.compute(
+        link.business_id,
+        link.technician_user_id,
+        link.duration_max_minutes || 120,
+        days: @slot_preview_days,
+        max_slots: @slot_preview_count
+      )
+
     %{
       "booking_link_id" => link.id,
       "business_name" => business.name,
@@ -261,35 +271,11 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "duration_max_minutes" => link.duration_max_minutes,
       "timezone" => prefs.timezone,
       "booking_url" => Orchestrator.booking_url(link.token),
-      "open_slots" => slot_preview(link, prefs),
+      "open_slots" => summary.open_slots,
+      "local_slot_offerings" => summary.local_slot_offerings,
       "intake" => Intake.snapshot_for_link(link),
       "scheduling_memories" => Escalations.memories_snapshot_for_ai(link.business_id)
     }
-  end
-
-  defp slot_preview(%BookingLink{} = link, %Prefs{} = prefs) do
-    today = DateTime.utc_now() |> DateTime.shift_zone!(prefs.timezone) |> DateTime.to_date()
-    to_date = Date.add(today, @slot_preview_days - 1)
-
-    with {:ok, busy} <-
-           Scheduling.combined_busy_blocks(
-             link.business_id,
-             link.technician_user_id,
-             {today, to_date},
-             prefs.timezone
-           ) do
-      busy
-      |> AvailabilityEngine.available_slots(today, to_date, prefs, link.duration_max_minutes)
-      |> Enum.take(@slot_preview_count)
-      |> Enum.map(fn slot ->
-        %{
-          "start" => DateTime.to_iso8601(slot.start),
-          "end" => DateTime.to_iso8601(slot.end)
-        }
-      end)
-    else
-      _ -> []
-    end
   end
 
   defp conflict_status(%BookingLink{} = link, window, duration_minutes) do

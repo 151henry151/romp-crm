@@ -219,7 +219,8 @@ defmodule RompCrm.Bookings do
       with {:ok, booking} <- create_booking(booking_attrs),
            {:ok, _} <-
              request |> BookingRequest.changeset(%{status: "converted"}) |> Repo.update(),
-           :ok <- maybe_mark_link_booked(request.booking_link_id) do
+           :ok <- maybe_mark_link_booked(request.booking_link_id),
+           _ <- RompCrm.Bookings.JobScheduleSync.sync_from_booking(booking) do
         booking
       else
         {:error, changeset} -> Repo.rollback(changeset)

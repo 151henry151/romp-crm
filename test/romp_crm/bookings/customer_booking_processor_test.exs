@@ -42,8 +42,25 @@ defmodule RompCrm.Bookings.CustomerBookingProcessorTest do
   describe "hard booking via SMS" do
     test "available time creates a confirmed booking and marks link booked", %{
       business: business,
+      user: user,
+      client: client,
       link: link
     } do
+      {:ok, job} =
+        RompCrm.Jobs.create_job(%{
+          business_id: business.id,
+          client_id: client.id,
+          client_name: client.client_name,
+          work_description: "toilet flange replacement",
+          status: :lead,
+          work_items: [%{title: "toilet flange replacement", sort_order: 0}]
+        })
+
+      link =
+        link
+        |> Ecto.Changeset.change(%{job_id: job.id})
+        |> RompCrm.Repo.update!()
+
       body =
         "STUB_BOOK " <>
           Jason.encode!(%{
@@ -69,6 +86,13 @@ defmodule RompCrm.Bookings.CustomerBookingProcessorTest do
       assert booking.booking_link_id == link.id
       assert booking.confirmed_via == "sms"
       assert Repo.reload!(link).status == "booked"
+
+      if link.job_id do
+        job = RompCrm.Jobs.get_job!(link.job_id, business.id)
+        assert job.status == :pending
+        assert job.scheduled_on == ~D[2026-06-16]
+        assert job.scheduled_time == ~T[14:00:00]
+      end
 
       turns = SmsConversations.list_client_turns_for_ai(business.id, @client_phone)
       assert Enum.any?(turns, fn {role, t} -> role == :client and t =~ "STUB_BOOK" end)

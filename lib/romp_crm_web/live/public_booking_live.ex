@@ -108,6 +108,7 @@ defmodule RompCrmWeb.PublicBookingLive do
              confirmed_via: "web"
            }) do
       _ = Bookings.mark_booking_link(link, "booked")
+      _ = RompCrm.Bookings.JobScheduleSync.sync_from_booking(booking)
       notify_after_web_booking(link, booking, socket.assigns.business, prefs)
 
       {:noreply,

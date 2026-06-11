@@ -91,7 +91,7 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
       end
 
     """
-    A customer is replying by SMS about scheduling service work. Their active booking conversation(s) — one JSON object per business they are scheduling with — are below. `open_slots` are UTC instants the technician is actually free; `timezone` is the technician's IANA zone for interpreting the customer's wall-clock phrases.
+    A customer is replying by SMS about scheduling service work. Their active booking conversation(s) — one JSON object per business they are scheduling with — are below. `open_slots` are UTC start/end instants the technician is actually free; `local_slot_offerings` lists the **only** times you may offer (pre-formatted in local wall clock); `timezone` is the technician's IANA zone for interpreting the customer's phrases.
 
     Booking contexts:
     ---
@@ -135,7 +135,7 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
     `{ "type": "hard_booking", "starts_at": "<ISO 8601 UTC>", "ends_at": "<ISO 8601 UTC>" }`
     - Interpret wall-clock phrases ("Tuesday at 2", "tomorrow morning") in the context's `timezone`, convert to UTC.
     - Size the window from `duration_max_minutes`.
-    - Only offer/accept times consistent with `open_slots`. If their requested time is not available, set `action` to null and suggest 2–3 nearby open slots in `reply_sms` (state times in the customer's local time).
+    - **Only** offer or accept times that appear in `local_slot_offerings` (or match an `open_slots` start/end). **Never** describe generic work hours (e.g. "8am–5pm", "until 3:30pm today") as availability — those are not in the data. If their requested time is not available, set `action` to null and suggest **2–3 choices copied from `local_slot_offerings`** in `reply_sms`. When several days are available, do not imply only "today" is open unless today is the only offering.
 
     **Soft availability** — customer gives a general window ("anytime Thursday", "weekday mornings") and the conversation supports flexible scheduling:
     `{ "type": "soft_availability", "availability_text": "<their words, normalized>", "windows": [ { "start": "<ISO UTC>", "end": "<ISO UTC>" } ] }`
