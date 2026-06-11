@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.4] - 2026-06-11
+
+### Added
+
+- **SMS inbound role router**: when a phone number is both a registered Romp CRM user and an active client in a booking conversation, default inbound SMS to the **client scheduling** thread; ask a clarifying question when the message clearly targets contractor CRM work (`SmsInboundRoleRouter`, `sms_inbound_role_prompts`)
+- **Booking initiate inference**: when contractor SMS creates a lead with customer phone and work description but the AI omits `booking_actions`, synthesize a `booking_initiate` op server-side unless the contractor said lead-only (`SmsBookingInitiateInference`)
+
+### Changed
+
+- **Twilio SMS webhook**: route through `SmsInboundRoleRouter` before contractor vs client processors
+- **Unified extractor prompt**: default to create + booking initiate when the contractor supplies customer name, phone, and work (unless they explicitly want a lead only)
+
 ## [0.10.3] - 2026-06-10
 
 ### Added

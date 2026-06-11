@@ -19,6 +19,7 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.SmsMms
+  alias RompCrm.SmsBookingInitiateInference
   alias RompCrm.SmsPendingJobProposals
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.MmsImageDownload
@@ -489,6 +490,10 @@ defmodule RompCrm.SmsInboundProcessor do
         rem_ops_raw,
         caps
       )
+
+    booking_ops_raw =
+      booking_ops_raw ++
+        SmsBookingInitiateInference.supplement(booking_ops_raw, job_ops_raw, body_text)
 
     # Booking conversations create clients/links, so gate on job-edit capability.
     booking_ops = if EmployeePermissions.can_edit_jobs?(caps), do: booking_ops_raw, else: []

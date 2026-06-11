@@ -53,6 +53,36 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
     assert first_sms =~ link.token
   end
 
+  test "create with phone and work infers booking initiate when AI omits booking_actions", %{
+    user: user,
+    business: business
+  } do
+    payload =
+      Jason.encode!(%{
+        "assistant_sms" => "Added Jasmine Blair and texted her to schedule the sink repair.",
+        "job_actions" => [
+          %{
+            "intent" => "create",
+            "job" => %{
+              "client_name" => "Jasmine Blair",
+              "phone" => "8027349389",
+              "work_description" => "fix camping sink"
+            }
+          }
+        ]
+      })
+
+    assert {:ok, reply} =
+             SmsInboundProcessor.process(user, business.id, "STUB_JSON " <> payload,
+               delivery: :in_app
+             )
+
+    assert reply =~ "Jasmine"
+
+    [link] = Bookings.active_links_for_client_phone("18027349389")
+    assert link.job_type_label == "fix camping sink"
+  end
+
   test "one message can create the lead and start the booking conversation", %{
     user: user,
     business: business

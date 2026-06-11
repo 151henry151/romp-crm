@@ -20,6 +20,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
   alias RompCrm.SmsMms
   alias RompCrm.SmsPendingJobProposals
   alias RompCrm.SmsInboundProcessor
+  alias RompCrm.SmsInboundRoleRouter
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.MmsImageDownload
   alias RompCrm.Twilio.Messages
@@ -127,43 +128,54 @@ defmodule RompCrmWeb.TwilioWebhookController do
         twiml_ok(conn)
 
       true ->
-        case Accounts.get_user_by_phone_normalized(norm) do
-          nil ->
-            case CustomerBookingProcessor.deliver_from_twilio(conn.body_params) do
-              {:ok, _reply} ->
-                Logger.info(
-                  "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
-                )
+        route_twilio_inbound_sms(conn, norm, from, message_sid)
+    end
+  end
 
-              :ignore ->
-                Logger.info(
-                  "Twilio SMS: no user with profile phone matching from=#{inspect(from)} sid=#{message_sid}"
-                )
-            end
+  defp route_twilio_inbound_sms(conn, _norm, from, message_sid) do
+    case SmsInboundRoleRouter.route(conn.body_params) do
+      {:client, params} ->
+        case CustomerBookingProcessor.deliver_from_twilio(params) do
+          {:ok, _reply} ->
+            Logger.info(
+              "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
+            )
+
+          :ignore ->
+            Logger.info(
+              "Twilio SMS: no active client booking conversation from=#{inspect(from)} sid=#{message_sid}"
+            )
+        end
+
+        twiml_ok(conn)
+
+      {:contractor, user} ->
+        case Businesses.resolve_sms_business_id(user) do
+          {:ok, business_id} ->
+            deliver_inbound_sms(conn, user, business_id)
+
+          {:error, :no_membership} ->
+            Logger.warning(
+              "Twilio SMS: user id=#{user.id} has no business membership sid=#{message_sid}"
+            )
 
             twiml_ok(conn)
 
-          user ->
-            case Businesses.resolve_sms_business_id(user) do
-              {:ok, business_id} ->
-                deliver_inbound_sms(conn, user, business_id)
+          {:error, :ambiguous_sms_routing} ->
+            Logger.warning(
+              "Twilio SMS: user id=#{user.id} belongs to multiple businesses; set a workspace in the Jobs picker or SMS workspace in Settings sid=#{message_sid}"
+            )
 
-              {:error, :no_membership} ->
-                Logger.warning(
-                  "Twilio SMS: user id=#{user.id} has no business membership sid=#{message_sid}"
-                )
-
-                twiml_ok(conn)
-
-              {:error, :ambiguous_sms_routing} ->
-                Logger.warning(
-                  "Twilio SMS: user id=#{user.id} belongs to multiple businesses; set a workspace in the Jobs picker or SMS workspace in Settings sid=#{message_sid}"
-                )
-
-                maybe_reply_routing_help(from)
-                twiml_ok(conn)
-            end
+            maybe_reply_routing_help(from)
+            twiml_ok(conn)
         end
+
+      {:asked_disambiguation, _reply} ->
+        Logger.info(
+          "Twilio SMS: dual-role disambiguation prompt sent from=#{inspect(from)} sid=#{message_sid}"
+        )
+
+        twiml_ok(conn)
     end
   end
 
