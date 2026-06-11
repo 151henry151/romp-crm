@@ -5,7 +5,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessorTest do
   import RompCrm.JobsFixtures
 
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.CustomerBookingProcessor
+  alias RompCrm.Bookings.{CustomerBookingProcessor, Escalations}
   alias RompCrm.SmsConversations
 
   @client_phone "18025300293"
@@ -106,6 +106,76 @@ defmodule RompCrm.Bookings.CustomerBookingProcessorTest do
       assert reply =~ "no longer available"
 
       assert Repo.reload!(link).status == "pending"
+    end
+  end
+
+  describe "customer intake via job_updates" do
+    test "stores customer comments and contact details on the linked job", %{
+      business: business,
+      link: link
+    } do
+      {:ok, job} =
+        RompCrm.Jobs.create_job(%{
+          business_id: business.id,
+          client_id: link.client_id,
+          client_name: "Bob Smith",
+          phone: "+18025300293",
+          work_description: "toilet flange replacement"
+        })
+
+      {:ok, link} =
+        link
+        |> Ecto.Changeset.change(job_id: job.id)
+        |> RompCrm.Repo.update()
+
+      body =
+        "STUB_CLARIFY " <>
+          Jason.encode!(%{
+            "reply_sms" => "Thanks — got your details.",
+            "resolved_booking_link_id" => link.id,
+            "action" => nil,
+            "job_updates" => %{
+              "customer_comments" => "My kitchen sink faucet leaks when I turn it to hot",
+              "address" => "34 Banner Hill Lane, Poestenkill NY",
+              "client_email" => "bob@example.com",
+              "billing_same_as_service" => true
+            }
+          })
+
+      assert {:ok, reply} = CustomerBookingProcessor.deliver_from_twilio(twilio_params(body))
+      assert reply =~ "details"
+
+      updated = RompCrm.Jobs.get_job!(job.id, business.id)
+      assert updated.customer_comments =~ "faucet leaks"
+      assert updated.client_email == "bob@example.com"
+      assert updated.address_line1 =~ "34 Banner Hill"
+      assert Bookings.intake_flag?(Bookings.get_booking_link!(link.id), "billing_confirmed")
+    end
+  end
+
+  describe "question escalation via SMS" do
+    test "escalates unanswerable client questions to the contractor", %{
+      business: business,
+      link: link
+    } do
+      body =
+        "STUB_CLARIFY " <>
+          Jason.encode!(%{
+            "reply_sms" =>
+              "I don't have the answer to that, but I've reached out to a live person on our team to find out for you.",
+            "resolved_booking_link_id" => link.id,
+            "action" => %{
+              "type" => "escalate_question",
+              "question_text" => "Do you charge extra to dispose of my old washing machine?"
+            }
+          })
+
+      assert {:ok, reply} = CustomerBookingProcessor.deliver_from_twilio(twilio_params(body))
+      assert reply =~ "don't have the answer"
+
+      assert [escalation] = Escalations.list_open_for_business(business.id)
+      assert escalation.question_text =~ "washing machine"
+      assert escalation.status == "pending_contractor"
     end
   end
 

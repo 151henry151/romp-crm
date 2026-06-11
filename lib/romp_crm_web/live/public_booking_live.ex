@@ -233,9 +233,16 @@ defmodule RompCrmWeb.PublicBookingLive do
     end
 
     # Heads-up SMS to the technician
+    address =
+      case Bookings.service_address_for_link(link) do
+        nil -> ""
+        addr -> " Address: #{addr}."
+      end
+
     notify_technician(
       link,
-      "New booking: #{client_name(link)} — #{link.job_type_label} — #{window} (booked online)."
+      "#{client_name(link)} booked the #{link.job_type_label} online for #{window}.#{address}" <>
+        " If that time doesn't work, reply here as soon as you can and I'll reach out to reschedule."
     )
   end
 

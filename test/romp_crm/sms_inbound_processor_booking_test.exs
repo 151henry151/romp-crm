@@ -53,6 +53,62 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
     assert first_sms =~ link.token
   end
 
+  test "one message can create the lead and start the booking conversation", %{
+    user: user,
+    business: business
+  } do
+    payload =
+      Jason.encode!(%{
+        "assistant_sms" => "Added Jasmine Blair and texted her to schedule the sink replacement.",
+        "job_actions" => [
+          %{
+            "intent" => "create",
+            "job" => %{
+              "client_name" => "Jasmine Blair",
+              "phone" => "8027349384",
+              "work_description" => "replace kitchen sink"
+            }
+          }
+        ],
+        "booking_actions" => [
+          %{
+            "intent" => "initiate",
+            "client_name" => "Jasmine Blair",
+            "phone" => "8027349384",
+            "job_type_label" => "kitchen sink replacement",
+            "duration_min_minutes" => 120,
+            "duration_max_minutes" => 180
+          }
+        ]
+      })
+
+    assert {:ok, reply} =
+             SmsInboundProcessor.process(user, business.id, "STUB_JSON " <> payload,
+               delivery: :in_app
+             )
+
+    assert reply =~ "Jasmine"
+
+    # One job, one client, and a booking link tied to both — no duplicates.
+    [job] = Repo.all(RompCrm.Jobs.Job)
+    assert job.client_name == "Jasmine Blair"
+    assert job.work_description == "replace kitchen sink"
+    assert is_integer(job.client_id)
+    assert Repo.aggregate(RompCrm.Clients.Client, :count) == 1
+
+    [link] = Bookings.active_links_for_client_phone("18027349384")
+    assert link.job_id == job.id
+    assert link.client_id == job.client_id
+
+    # First customer SMS: business name, openings, and the booking link.
+    turns = SmsConversations.list_client_turns_for_ai(business.id, "18027349384")
+    assert [{:assistant, first_sms}] = turns
+    assert first_sms =~ "Booking Test Plumbing"
+    assert first_sms =~ "kitchen sink replacement"
+    assert first_sms =~ link.token
+    assert first_sms =~ "openings"
+  end
+
   test "booking confirm_soft via agent converts the pending request", %{
     user: user,
     business: business

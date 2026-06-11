@@ -6,6 +6,7 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.Bookings
+  alias RompCrm.Bookings.Escalations
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Clients
@@ -170,6 +171,106 @@ defmodule RompCrm.SmsInboundProcessor do
 
     recent_deleted_jobs = BusinessAuditLogs.recent_deleted_jobs_snapshot(business_id)
 
+    escalation_result =
+      if Escalations.open_for_business?(business_id) do
+        RompCrm.Bookings.EscalationCoordinator.handle_contractor_message(
+          user,
+          business_id,
+          body_text
+        )
+      else
+        :continue
+      end
+
+    case escalation_result do
+      {:handled, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "booking_escalation_handled",
+          results: []
+        })
+
+      :continue ->
+        :continue_escalation
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_escalation ->
+        if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
+          handle_pending_proposals(
+            ctx,
+            from,
+            user,
+            business_id,
+            phone_norm,
+            body_text,
+            body_stored,
+            message_sid,
+            body_for_ai,
+            jobs_snapshot,
+            allowed_job_ids,
+            open_time_entries,
+            employees_snapshot,
+            allowed_employee_ids,
+            prior_turns,
+            reminder_wall_tz,
+            recent_deleted_jobs,
+            clients_snapshot
+          )
+        else
+          :continue_extract
+        end
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_extract ->
+        handle_pending_proposals(
+          ctx,
+          from,
+          user,
+          business_id,
+          phone_norm,
+          body_text,
+          body_stored,
+          message_sid,
+          body_for_ai,
+          jobs_snapshot,
+          allowed_job_ids,
+          open_time_entries,
+          employees_snapshot,
+          allowed_employee_ids,
+          prior_turns,
+          reminder_wall_tz,
+          recent_deleted_jobs,
+          clients_snapshot
+        )
+    end
+  end
+
+  defp handle_pending_proposals(
+         ctx,
+         from,
+         user,
+         business_id,
+         phone_norm,
+         body_text,
+         body_stored,
+         message_sid,
+         body_for_ai,
+         jobs_snapshot,
+         allowed_job_ids,
+         open_time_entries,
+         employees_snapshot,
+         allowed_employee_ids,
+         prior_turns,
+         reminder_wall_tz,
+         recent_deleted_jobs,
+         clients_snapshot
+       ) do
     if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
       case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
         {:ok, results} ->
@@ -777,7 +878,10 @@ defmodule RompCrm.SmsInboundProcessor do
            Bookings.Orchestrator.run_operations(booking_ops, %{
              business_id: job_ctx.business_id,
              user_id: job_ctx.user_id,
-             message_sid: job_ctx.message_sid
+             message_sid: job_ctx.message_sid,
+             # Jobs created by this same message, so "add the lead and schedule
+             # with her" links the booking to the new job/client (no duplicates).
+             created_jobs: for({:created, %Job{} = job, _} <- job_results, do: job)
            }) do
       {:ok, job_results ++ time_results ++ emp_results ++ rem_results ++ booking_results}
     end

@@ -392,6 +392,7 @@ defmodule RompCrmWeb.JobFormComponent do
         <.input field={@form[:scheduled_on]} type="date" label="Job scheduled date (optional)" />
 
         <.input field={@form[:work_description]} type="textarea" label="Work summary (optional)" rows="2" />
+        <.input field={@form[:customer_comments]} type="textarea" label="Customer comments (optional)" rows="2" />
 
         <div class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-3">
           <div class="flex items-center justify-between gap-2">

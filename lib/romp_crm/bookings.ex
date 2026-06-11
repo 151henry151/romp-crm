@@ -94,6 +94,36 @@ defmodule RompCrm.Bookings do
     )
   end
 
+  @doc "Reads one intake flag from a booking link's JSON blob."
+  def intake_flag?(%BookingLink{} = link, key) when is_binary(key) do
+    link.intake_flags_json
+    |> decode_intake_flags()
+    |> Map.get(key) == true
+  end
+
+  @doc "Sets one intake flag and persists the JSON blob."
+  def mark_intake_flag(%BookingLink{} = link, key, value)
+      when is_binary(key) and is_boolean(value) do
+    flags =
+      link.intake_flags_json
+      |> decode_intake_flags()
+      |> Map.put(key, value)
+
+    link
+    |> BookingLink.changeset(%{intake_flags_json: Jason.encode!(flags)})
+    |> Repo.update()
+  end
+
+  defp decode_intake_flags(nil), do: %{}
+  defp decode_intake_flags(""), do: %{}
+
+  defp decode_intake_flags(json) when is_binary(json) do
+    case Jason.decode(json) do
+      {:ok, %{} = map} -> map
+      _ -> %{}
+    end
+  end
+
   @doc "Marks pending links past their expiry as expired; returns the count."
   def expire_stale_links do
     now = DateTime.utc_now(:second)
@@ -216,6 +246,24 @@ defmodule RompCrm.Bookings do
           {:error, changeset} -> {:error, changeset}
         end
     end
+  end
+
+  @doc """
+  Display address for the work behind a booking link: the linked job's service
+  address when set, else the client's. Nil when neither has one.
+  """
+  def service_address_for_link(%BookingLink{} = link) do
+    job = link.job_id && Repo.get(RompCrm.Jobs.Job, link.job_id)
+    client = link.client_id && Repo.get(RompCrm.Clients.Client, link.client_id)
+
+    [job, client]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.find_value(fn record ->
+      case RompCrm.Addresses.format_service(record) do
+        addr when is_binary(addr) and addr not in ["", "—"] -> addr
+        _ -> nil
+      end
+    end)
   end
 
   ## AI snapshot

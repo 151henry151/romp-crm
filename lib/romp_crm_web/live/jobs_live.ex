@@ -1526,7 +1526,7 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   defp inline_job_field_allowed?(f)
-       when f in ~w(client_name address phone client_email work_description notes referred_by next_action priority status scheduled_on),
+       when f in ~w(client_name address phone client_email work_description customer_comments notes referred_by next_action priority status scheduled_on),
        do: true
 
   defp inline_job_field_allowed?(_), do: false
@@ -1557,7 +1557,7 @@ defmodule RompCrmWeb.JobsLive do
   end
 
   defp build_inline_job_update_attrs(field, raw)
-       when field in ~w(client_name address work_description notes referred_by next_action) do
+       when field in ~w(client_name address work_description customer_comments notes referred_by next_action) do
     %{field => raw |> to_string()}
   end
 
@@ -1567,7 +1567,7 @@ defmodule RompCrmWeb.JobsLive do
   defp inline_field_error(changeset, "client_email"), do: first_changeset_error(changeset, :client_email)
 
   defp inline_field_error(changeset, field)
-       when field in ~w(client_name work_description notes referred_by next_action priority status) do
+       when field in ~w(client_name work_description customer_comments notes referred_by next_action priority status) do
     first_changeset_error(changeset, String.to_existing_atom(field))
   end
 

@@ -190,6 +190,21 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         </.job_field>
         <.job_field
           variant={@variant}
+          label="Customer comments"
+          editing?={editing?(@edit_keys, EK.job(@job.id, "customer_comments"))}
+          edit_key={EK.job(@job.id, "customer_comments")}
+          job_id={@job.id}
+          field="customer_comments"
+        >
+          <:readonly>
+            <span class="whitespace-pre-wrap break-words text-base-content">{display(@job.customer_comments)}</span>
+          </:readonly>
+          <:editor>
+            <textarea name="value" rows="3" class="textarea textarea-bordered textarea-sm w-full min-w-0 text-sm"><%= @job.customer_comments || "" %></textarea>
+          </:editor>
+        </.job_field>
+        <.job_field
+          variant={@variant}
           label="Job scheduled (optional)"
           editing?={editing?(@edit_keys, EK.job(@job.id, "scheduled_on"))}
           edit_key={EK.job(@job.id, "scheduled_on")}
@@ -252,6 +267,10 @@ defmodule RompCrmWeb.JobExpandedInlineFields do
         <p>
           <span class="font-medium text-base-content/90">Work description:</span>
           <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">{display(@job.work_description)}</span>
+        </p>
+        <p>
+          <span class="font-medium text-base-content/90">Customer comments:</span>
+          <span class="mt-1 block whitespace-pre-wrap break-words text-base-content">{display(@job.customer_comments)}</span>
         </p>
         <%= if @job.scheduled_on do %>
           <p>

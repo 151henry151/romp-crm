@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.10.3] - 2026-06-10
+
+### Added
+
+- **Scheduling question escalations**: when a client asks something the booking agent cannot answer (pricing, policies, disposal fees, etc.), escalate via `escalate_question` instead of guessing — reply to the client that a live team member is checking, text the contractor with the question and client phone, and track open escalations in `booking_escalations`
+- **Contractor escalation replies**: contractor SMS is routed through `EscalationCoordinator` when open escalations exist — handle direct outreach, provide an answer, confirm whether to save a **scheduling memory**, then relay the answer to the client
+- **Per-business scheduling memories** (`scheduling_memories`): stored answers from escalations; included in customer booking AI context so similar future questions can be answered without re-escalating
+
+### Changed
+
+- **Customer booking extractor prompt**: check `scheduling_memories` before escalating; never invent pricing or policy answers
+- **Contractor SMS inbound**: try booking escalation handling before the unified CRM extractor when the workspace has open escalations
+
+## [0.10.2] - 2026-06-10
+
+### Added
+
+- **Jobs**: `customer_comments` text field — verbatim issue or work-request description from the customer during SMS self-scheduling
+- **Booking intake**: `Bookings.Intake` snapshot and `job_updates` handling in the customer booking SMS agent — collects work description, service address confirmation, email, and billing address (same as service or different); persists to the linked job and client; creates a job row when the booking link has none yet
+- **Booking links**: `intake_flags_json` to track billing-address confirmation during the conversation
+
+### Changed
+
+- **Customer booking extractor prompt**: instruct the agent to ask for missing intake in one fluid message when possible, confirm on-file addresses/email, and populate `job_updates` from customer replies (may accompany a scheduling action)
+- **Jobs UI / export**: show and export `customer_comments` alongside work description
+
+## [0.10.1] - 2026-06-10
+
+### Changed
+
+- **Booking initiate**: link the booking to a job created by the same inbound agent message (matched by phone, else client name) and reuse that job's client; otherwise reuse an existing business client matched by normalized phone before creating a new one — pass `created_jobs` from `SmsInboundProcessor` job results into `Bookings.Orchestrator`
+- **First customer SMS**: include up to two concrete openings ("We have openings Tuesday afternoon or Wednesday morning") computed from merged busy blocks and the technician's scheduling prefs over the next 7 days, and introduce the sender as "the scheduling assistant for <business>"
+- **Technician booking confirmations** (SMS and web bookings): rephrase as "I reached out to <client> and we've scheduled the <job> for <window>", append the service address from the linked job or client when available (`Bookings.service_address_for_link/1`), and add a reply-to-reschedule prompt
+- **Unified extractor prompt**: document that one message may emit both a `job_actions` create and a `booking_actions` initiate (server links them by phone), and instruct the model to ask for a corrected phone number instead of emitting `initiate` when the stated phone is not a valid US number
+
 ## [0.10.0] - 2026-06-10
 
 ### Added

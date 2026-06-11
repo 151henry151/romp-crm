@@ -21,6 +21,7 @@ defmodule RompCrm.Bookings.BookingLink do
     field :client_phone_normalized, :string
     field :status, :string, default: "pending"
     field :expires_at, :utc_datetime
+    field :intake_flags_json, :string
 
     timestamps(type: :utc_datetime)
   end
@@ -40,7 +41,8 @@ defmodule RompCrm.Bookings.BookingLink do
       :duration_max_minutes,
       :client_phone_normalized,
       :status,
-      :expires_at
+      :expires_at,
+      :intake_flags_json
     ])
     |> validate_required([:business_id, :technician_user_id, :token, :status])
     |> validate_inclusion(:status, @statuses)

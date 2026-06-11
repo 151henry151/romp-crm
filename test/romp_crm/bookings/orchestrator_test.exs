@@ -77,6 +77,100 @@ defmodule RompCrm.Bookings.OrchestratorTest do
       assert Repo.aggregate(RompCrm.Clients.Client, :count) == 1
     end
 
+    test "links the booking to a job created in the same message and reuses its client", %{
+      ctx: ctx,
+      business: business
+    } do
+      {:ok, job} =
+        RompCrm.Jobs.create_job(%{
+          business_id: business.id,
+          client_name: "Jasmine Blair",
+          phone: "8027349384",
+          work_description: "replace kitchen sink"
+        })
+
+      {:ok, job} =
+        Clients.finalize_job_client_link(job, %{
+          "client_name" => "Jasmine Blair",
+          "phone" => "8027349384"
+        })
+
+      job = RompCrm.Jobs.get_job!(job.id, business.id)
+      assert is_integer(job.client_id)
+
+      op =
+        {:booking_initiate,
+         %{
+           client_id: nil,
+           client_name: "Jasmine Blair",
+           phone: "8027349384",
+           job_id: nil,
+           job_type_label: "kitchen sink replacement",
+           duration_min_minutes: 120,
+           duration_max_minutes: 180
+         }}
+
+      ctx = Map.put(ctx, :created_jobs, [job])
+
+      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+
+      [link] = Bookings.active_links_for_client_phone("18027349384")
+      assert link.job_id == job.id
+      assert link.client_id == job.client_id
+      assert Repo.aggregate(RompCrm.Clients.Client, :count) == 1
+    end
+
+    test "reuses an existing client matched by phone when no ids are given", %{
+      ctx: ctx,
+      business: business
+    } do
+      {:ok, client} =
+        Clients.create_client(%{
+          business_id: business.id,
+          client_name: "Maria Lopez",
+          phone: "+18025550101"
+        })
+
+      op =
+        {:booking_initiate,
+         %{
+           client_id: nil,
+           client_name: "Maria Lopez",
+           phone: "802-555-0101",
+           job_id: nil,
+           job_type_label: "kitchen faucet replacement",
+           duration_min_minutes: 90,
+           duration_max_minutes: 120
+         }}
+
+      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+
+      [link] = Bookings.active_links_for_client_phone("18025550101")
+      assert link.client_id == client.id
+      assert Repo.aggregate(RompCrm.Clients.Client, :count) == 1
+    end
+
+    test "first SMS mentions concrete openings", %{ctx: ctx, business: business} do
+      op =
+        {:booking_initiate,
+         %{
+           client_id: nil,
+           client_name: "Bob Smith",
+           phone: "802-530-0293",
+           job_id: nil,
+           job_type_label: "toilet flange replacement",
+           duration_min_minutes: 120,
+           duration_max_minutes: 180
+         }}
+
+      assert {:ok, [{:booking_done, _}]} = Orchestrator.run_operations([op], ctx)
+
+      turns = SmsConversations.list_client_turns_for_ai(business.id, "18025300293")
+      assert [{:assistant, first_sms}] = turns
+      assert first_sms =~ "openings"
+      assert first_sms =~ ~r/morning|afternoon|evening/
+    end
+
     test "invalid phone is skipped with reason", %{ctx: ctx} do
       op =
         {:booking_initiate,

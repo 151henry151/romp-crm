@@ -15,7 +15,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.CustomerBookingExtractor
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.{BookingLink, Orchestrator}
+  alias RompCrm.Bookings.{BookingLink, EscalationCoordinator, Escalations, Intake, Orchestrator}
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
@@ -69,6 +69,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
     case CustomerBookingExtractor.extract(body, contexts, prior_turns) do
       {:ok, result} ->
         resolved = resolve_link(result.resolved_booking_link_id, links)
+        resolved = maybe_apply_job_updates(resolved, links, result.job_updates)
         {reply, recorded_links} = handle_result(result, resolved, links, phone_norm)
 
         record_exchange(recorded_links, phone_norm, body, reply)
@@ -90,6 +91,33 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   end
 
   # ── Resolution and action handling ──────────────────────────────────────────
+
+  defp maybe_apply_job_updates(resolved, _links, job_updates)
+       when job_updates in [nil, %{}] do
+    resolved
+  end
+
+  defp maybe_apply_job_updates(resolved, links, job_updates) when is_map(job_updates) do
+    target =
+      resolved ||
+        case links do
+          [%BookingLink{} = only] -> only
+          _ -> nil
+        end
+
+    case target do
+      %BookingLink{} = link ->
+        case Intake.apply_updates(link, job_updates) do
+          {:ok, updated_link, _job} -> updated_link
+          {:error, reason} ->
+            Logger.warning("Client intake update failed: #{inspect(reason)}")
+            link
+        end
+
+      _ ->
+        resolved
+    end
+  end
 
   defp resolve_link(nil, [only_link]), do: only_link
   defp resolve_link(nil, _links), do: nil
@@ -188,6 +216,23 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
     end
   end
 
+  defp handle_result(%{action: %{type: :escalate_question, question_text: question}} = result, %BookingLink{} = link, _links, _phone_norm) do
+    case EscalationCoordinator.escalate_from_client(link, %{
+           question_text: question,
+           client_reply: result.reply_sms
+         }) do
+      {:ok, _escalation, client_reply} ->
+        {nonempty_reply(client_reply), [link]}
+
+      {:error, reason} ->
+        Logger.warning("Client booking escalation failed: #{inspect(reason)}")
+
+        {nonempty_reply(result.reply_sms) ||
+           "I don't have the answer to that, but I've reached out to our team and will get back to you soon.",
+         [link]}
+    end
+  end
+
   defp handle_result(%{action: %{type: :cancel_booking, booking_id: booking_id}} = result, %BookingLink{} = link, _links, _phone_norm) do
     case Repo.get(RompCrm.Bookings.Booking, booking_id) do
       %{business_id: bid} = booking when bid == link.business_id ->
@@ -216,7 +261,9 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "duration_max_minutes" => link.duration_max_minutes,
       "timezone" => prefs.timezone,
       "booking_url" => Orchestrator.booking_url(link.token),
-      "open_slots" => slot_preview(link, prefs)
+      "open_slots" => slot_preview(link, prefs),
+      "intake" => Intake.snapshot_for_link(link),
+      "scheduling_memories" => Escalations.memories_snapshot_for_ai(link.business_id)
     }
   end
 
@@ -272,9 +319,16 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
 
   defp notify_technician_of_booking(link, booking) do
     notify_technician(link, fn business, client_name, tz ->
-      "New booking: #{client_name} — #{link.job_type_label} — " <>
+      address =
+        case Bookings.service_address_for_link(link) do
+          nil -> ""
+          addr -> " Address: #{addr}."
+        end
+
+      "I reached out to #{client_name} and we've scheduled the #{link.job_type_label} for " <>
         format_window(booking.starts_at, booking.ends_at, tz) <>
-        " (#{business.name}, booked by text)."
+        " (#{business.name}, booked by text).#{address}" <>
+        " If that time doesn't work, reply here as soon as you can and I'll reach out to reschedule."
     end)
   end
 

@@ -403,8 +403,10 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     - Drain snake / clog → 60–60
     - Annual inspection → 60–60
     Scale similarly for other trades. The contractor can override later; if they state a duration, use theirs.
-    Phone is **required** — if the contractor gave no phone and no clients-snapshot match has one, ask for it in **`assistant_sms`** with empty `booking_actions`.
+    Phone is **required** — if the contractor gave no phone and no clients-snapshot match has one, ask for it in **`assistant_sms`** with empty `booking_actions`. If the stated phone is **not a valid US number** (10 digits, or 11 starting with 1 — e.g. only 9 digits), do **not** emit `initiate`; ask the contractor to re-send the correct number in **`assistant_sms`** (you may still emit the `job_actions` create).
     The server sends the customer an SMS with a self-scheduling web link and an invitation to reply by text; do **not** draft that message yourself. Confirm in **`assistant_sms`** what you set up (job type + duration estimate).
+
+    **Create + schedule in one message:** "Jasmine Blair, 802-734-9384, needs her kitchen sink replaced — schedule the job with her" means **both** a `job_actions` create (new lead with name/phone/work description) **and** a `booking_actions` initiate. Emit both; on the initiate, omit `job_id`/`client_id` for the just-created lead — the server links the booking to the job and client created by this same message (matched by phone), never duplicating the client.
 
     **Edit a duration estimate:** `{ "intent": "update_duration", "booking_link_id": <int from active_booking_links>, "duration_min_minutes": <int>, "duration_max_minutes": <int> }`
 

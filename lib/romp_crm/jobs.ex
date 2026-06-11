@@ -166,6 +166,7 @@ defmodule RompCrm.Jobs do
         "phone" => j.phone,
         "client_email" => j.client_email,
         "work_description" => j.work_description,
+        "customer_comments" => j.customer_comments,
         "notes" => j.notes,
         "next_action" => j.next_action,
         "referred_by" => j.referred_by,

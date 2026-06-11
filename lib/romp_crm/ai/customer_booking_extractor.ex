@@ -14,6 +14,9 @@ defmodule RompCrm.Ai.CustomerBookingExtractor do
         * `%{type: :hard_booking, starts_at: DateTime, ends_at: DateTime}`
         * `%{type: :soft_availability, availability_text: String, windows: [%{start, end}]}`
         * `%{type: :cancel_booking, booking_id: integer}`
+        * `%{type: :escalate_question, question_text: String}` — client asked something you cannot answer from memories or context; do not guess
+    * `job_updates` — optional map of customer intake fields to persist on the job
+      (`customer_comments`, address/email/billing fields); may accompany any action
 
   Configure **`customer_booking_adapter`** (tests use **`DeterministicStub`**).
   """
@@ -45,10 +48,21 @@ defmodule RompCrm.Ai.CustomerBookingExtractor do
 
     resolved_id = parse_optional_id(Map.get(map, "resolved_booking_link_id"))
 
-    with {:ok, action} <- parse_action(Map.get(map, "action")) do
-      {:ok, %{reply_sms: reply, resolved_booking_link_id: resolved_id, action: action}}
+    with {:ok, action} <- parse_action(Map.get(map, "action")),
+         {:ok, job_updates} <- parse_job_updates(Map.get(map, "job_updates")) do
+      {:ok,
+       %{
+         reply_sms: reply,
+         resolved_booking_link_id: resolved_id,
+         action: action,
+         job_updates: job_updates
+       }}
     end
   end
+
+  defp parse_job_updates(nil), do: {:ok, nil}
+  defp parse_job_updates(%{} = map), do: {:ok, stringify_keys(map)}
+  defp parse_job_updates(_), do: {:error, :invalid_job_updates}
 
   defp parse_action(nil), do: {:ok, nil}
   defp parse_action(""), do: {:ok, nil}
@@ -85,6 +99,15 @@ defmodule RompCrm.Ai.CustomerBookingExtractor do
         case parse_optional_id(m["booking_id"]) do
           nil -> {:error, :missing_booking_id}
           id -> {:ok, %{type: :cancel_booking, booking_id: id}}
+        end
+
+      "escalate_question" ->
+        text = m["question_text"] |> to_string() |> String.trim()
+
+        if text == "" do
+          {:error, :missing_question_text}
+        else
+          {:ok, %{type: :escalate_question, question_text: text}}
         end
 
       _ ->

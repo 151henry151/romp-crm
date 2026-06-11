@@ -19,6 +19,9 @@ defmodule RompCrm.Bookings.Orchestrator do
 
   @doc """
   Runs booking ops with `ctx` = `%{business_id, user_id, message_sid}`.
+  `ctx` may also carry `:created_jobs` — `%Job{}` rows created earlier in the
+  same inbound message — so an "add the lead and schedule with her" text links
+  the booking to the just-created job/client instead of duplicating them.
   Always returns `{:ok, results}` (failures surface per-op as `{:skipped, reason}`).
   """
   def run_operations(ops, ctx) when is_list(ops) and is_map(ctx) do
@@ -38,13 +41,16 @@ defmodule RompCrm.Bookings.Orchestrator do
         {:skipped, :invalid_phone}
 
       true ->
-        with {:ok, client} <- resolve_client(attrs, phone_norm, ctx),
+        matched_job = match_created_job(ctx, attrs, phone_norm)
+        job_id = attrs.job_id || (matched_job && matched_job.id)
+
+        with {:ok, client} <- resolve_client(attrs, phone_norm, matched_job, ctx),
              {:ok, link} <-
                Bookings.create_booking_link(%{
                  business_id: ctx.business_id,
                  technician_user_id: ctx.user_id,
                  client_id: client.id,
-                 job_id: attrs.job_id,
+                 job_id: job_id,
                  job_type_label: attrs.job_type_label,
                  duration_min_minutes: attrs.duration_min_minutes,
                  duration_max_minutes: attrs.duration_max_minutes,
@@ -127,20 +133,54 @@ defmodule RompCrm.Bookings.Orchestrator do
 
   # ── Client resolution ──────────────────────────────────────────────────────
 
-  defp resolve_client(%{client_id: client_id} = attrs, phone_norm, ctx) do
-    existing = if client_id, do: Clients.get_client(client_id, ctx.business_id)
+  # A job created earlier in this same inbound message whose phone (or, lacking
+  # a phone, client name) matches the booking target.
+  defp match_created_job(ctx, attrs, phone_norm) do
+    created = Map.get(ctx, :created_jobs) || []
 
-    cond do
-      existing != nil ->
-        {:ok, existing}
+    Enum.find(created, fn job ->
+      job_phone = Phone.normalize_us(job.phone || "")
 
-      true ->
-        Clients.create_client(%{
-          business_id: ctx.business_id,
-          client_name: attrs.client_name,
-          phone: Phone.to_e164(phone_norm) || attrs.phone
-        })
+      cond do
+        job_phone != "" -> job_phone == phone_norm
+        true -> same_name?(job.client_name, attrs.client_name)
+      end
+    end)
+  end
+
+  defp same_name?(a, b) when is_binary(a) and is_binary(b) do
+    norm = fn s -> s |> String.downcase() |> String.trim() end
+    norm.(a) != "" and norm.(a) == norm.(b)
+  end
+
+  defp same_name?(_, _), do: false
+
+  defp resolve_client(%{client_id: client_id} = attrs, phone_norm, matched_job, ctx) do
+    by_id = if client_id, do: Clients.get_client(client_id, ctx.business_id)
+
+    from_job =
+      if matched_job && matched_job.client_id,
+        do: Clients.get_client(matched_job.client_id, ctx.business_id)
+
+    existing = by_id || from_job || client_by_phone(ctx.business_id, phone_norm)
+
+    if existing do
+      {:ok, existing}
+    else
+      Clients.create_client(%{
+        business_id: ctx.business_id,
+        client_name: attrs.client_name,
+        phone: Phone.to_e164(phone_norm) || attrs.phone
+      })
     end
+  end
+
+  defp client_by_phone(_business_id, ""), do: nil
+
+  defp client_by_phone(business_id, phone_norm) do
+    business_id
+    |> Clients.list_clients()
+    |> Enum.find(fn client -> Phone.normalize_us(client.phone || "") == phone_norm end)
   end
 
   # ── SMS composition / delivery ─────────────────────────────────────────────
@@ -148,12 +188,59 @@ defmodule RompCrm.Bookings.Orchestrator do
   defp compose_first_sms(client, link, ctx) do
     business = Businesses.get_business!(ctx.business_id)
     first_name = client.client_name |> to_string() |> String.split(" ") |> List.first()
-    greeting = if first_name in [nil, ""], do: "Hi", else: "Hi #{first_name},"
+    greeting = if first_name in [nil, ""], do: "Hi,", else: "Hi #{first_name},"
 
-    "#{greeting} this is #{business.name} reaching out about your #{label_or_job(link)} " <>
-      "(typically #{duration_phrase(link)}). Pick a time that works for you here: " <>
-      "#{booking_url(link.token)} — or just reply to this message with your availability " <>
-      "and we'll work around your schedule."
+    "#{greeting} this is the scheduling assistant for #{business.name} reaching out about " <>
+      "your #{label_or_job(link)} (typically #{duration_phrase(link)}).#{openings_phrase(link, ctx)} " <>
+      "Pick a time here: #{booking_url(link.token)} — or just reply to this message with your " <>
+      "general availability and we'll work around your schedule."
+  end
+
+  # " We have openings Tuesday afternoon or Wednesday morning." — first two
+  # distinct day/part-of-day openings over the next week, empty when none.
+  defp openings_phrase(link, ctx) do
+    tz = technician_timezone(ctx)
+    today = DateTime.utc_now() |> DateTime.shift_zone!(tz) |> DateTime.to_date()
+    prefs = technician_prefs(ctx)
+
+    {:ok, busy} =
+      RompCrm.Scheduling.combined_busy_blocks(
+        ctx.business_id,
+        ctx.user_id,
+        {today, Date.add(today, 6)},
+        tz
+      )
+
+    duration = link.duration_max_minutes || 60
+
+    busy
+    |> RompCrm.Scheduling.AvailabilityEngine.available_slots(today, Date.add(today, 6), prefs, duration)
+    |> Enum.reject(&(DateTime.compare(&1.start, DateTime.utc_now()) == :lt))
+    |> Enum.map(fn slot ->
+      local = DateTime.shift_zone!(slot.start, tz)
+      {Calendar.strftime(local, "%A"), day_period(local.hour)}
+    end)
+    |> Enum.uniq()
+    |> Enum.take(2)
+    |> case do
+      [] -> ""
+      pairs -> " We have openings " <> Enum.map_join(pairs, " or ", fn {day, period} -> "#{day} #{period}" end) <> "."
+    end
+  rescue
+    e ->
+      Logger.warning("Booking openings preview failed: #{Exception.message(e)}")
+      ""
+  end
+
+  defp day_period(hour) when hour < 12, do: "morning"
+  defp day_period(hour) when hour < 17, do: "afternoon"
+  defp day_period(_), do: "evening"
+
+  defp technician_prefs(ctx) do
+    case RompCrm.Repo.get(RompCrm.Accounts.User, ctx.user_id) do
+      nil -> RompCrm.Scheduling.Prefs.default()
+      user -> RompCrm.Scheduling.Prefs.decode(user.scheduling_prefs_json)
+    end
   end
 
   defp deliver_client_sms(e164, body, phone_norm, ctx) do
