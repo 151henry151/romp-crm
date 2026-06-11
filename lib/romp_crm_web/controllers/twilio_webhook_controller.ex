@@ -5,6 +5,7 @@ defmodule RompCrmWeb.TwilioWebhookController do
 
   alias RompCrm.Accounts
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
+  alias RompCrm.Bookings.CustomerBookingProcessor
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Businesses
@@ -128,9 +129,17 @@ defmodule RompCrmWeb.TwilioWebhookController do
       true ->
         case Accounts.get_user_by_phone_normalized(norm) do
           nil ->
-            Logger.info(
-              "Twilio SMS: no user with profile phone matching from=#{inspect(from)} sid=#{message_sid}"
-            )
+            case CustomerBookingProcessor.deliver_from_twilio(conn.body_params) do
+              {:ok, _reply} ->
+                Logger.info(
+                  "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
+                )
+
+              :ignore ->
+                Logger.info(
+                  "Twilio SMS: no user with profile phone matching from=#{inspect(from)} sid=#{message_sid}"
+                )
+            end
 
             twiml_ok(conn)
 

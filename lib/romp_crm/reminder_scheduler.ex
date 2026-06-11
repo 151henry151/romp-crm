@@ -27,6 +27,7 @@ defmodule RompCrm.ReminderScheduler do
   def handle_info(:tick, state) do
     if Application.get_env(:romp_crm, :reminder_scheduler_enabled, true) do
       _ = RompCrm.Reminders.run_scheduled_deliveries()
+      _ = RompCrm.Bookings.expire_stale_links()
     end
 
     schedule_tick()

@@ -71,4 +71,60 @@ defmodule RompCrm.SmsConversationsTest do
     assert String.length(formatted) <= 100
     assert List.last(turns) == {:assistant, "reply b"}
   end
+
+  describe "client threads (booking conversations)" do
+    test "record_client_message and list_client_turns_for_ai keep a separate thread", %{
+      user: user,
+      business: biz
+    } do
+      phone = "18025550300"
+
+      assert {:ok, _} =
+               SmsConversations.record_client_message(
+                 biz.id,
+                 user.id,
+                 phone,
+                 "outbound",
+                 "Hi Bob, this is Test Co about your flange replacement..."
+               )
+
+      assert {:ok, _} =
+               SmsConversations.record_client_message(
+                 biz.id,
+                 user.id,
+                 phone,
+                 "inbound",
+                 "Tuesday at 2pm works"
+               )
+
+      turns = SmsConversations.list_client_turns_for_ai(biz.id, phone)
+
+      assert [
+               {:assistant, "Hi Bob, this is Test Co about your flange replacement..."},
+               {:client, "Tuesday at 2pm works"}
+             ] == turns
+    end
+
+    test "contractor thread queries exclude client-thread rows for the same phone", %{
+      user: user,
+      business: biz
+    } do
+      phone = "18025550301"
+
+      assert {:ok, _} =
+               SmsConversations.record_exchange(biz.id, user.id, phone, "contractor msg", "ok")
+
+      assert {:ok, _} =
+               SmsConversations.record_client_message(biz.id, user.id, phone, "inbound", "client msg")
+
+      contractor_turns = SmsConversations.list_prior_turns_for_ai(biz.id, phone)
+      refute Enum.any?(contractor_turns, fn {_, t} -> t == "client msg" end)
+
+      client_turns = SmsConversations.list_client_turns_for_ai(biz.id, phone)
+      refute Enum.any?(client_turns, fn {_, t} -> t == "contractor msg" end)
+
+      agent_msgs = SmsConversations.list_business_agent_messages(biz.id)
+      refute Enum.any?(agent_msgs, &(&1.body == "client msg"))
+    end
+  end
 end

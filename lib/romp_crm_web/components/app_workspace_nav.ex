@@ -122,6 +122,9 @@ defmodule RompCrmWeb.AppWorkspaceNav do
     <.link navigate={~p"/reminders"} class={@pill} {@mobile_attrs}>
       Reminders
     </.link>
+    <.link navigate={~p"/bookings"} class={@pill} {@mobile_attrs}>
+      Bookings
+    </.link>
     <.link navigate={~p"/time-log"} class={@pill} {@mobile_attrs}>
       Job time log
     </.link>

@@ -5,6 +5,7 @@ defmodule RompCrm.SmsInboundProcessor do
 
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
+  alias RompCrm.Bookings
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Clients
@@ -274,7 +275,8 @@ defmodule RompCrm.SmsInboundProcessor do
            reminder_wall_tz: reminder_wall_tz,
            mms_image_blocks: mms_image_blocks,
            recent_deleted_jobs: recent_deleted_jobs,
-           clients_snapshot: clients_snapshot
+           clients_snapshot: clients_snapshot,
+           bookings_snapshot: Bookings.snapshot_for_sms_ai(business_id)
          ) do
       {:ok,
        %{
@@ -283,6 +285,7 @@ defmodule RompCrm.SmsInboundProcessor do
          time_operations: time_ops_raw,
          emp_operations: emp_ops_raw,
          reminder_operations: rem_ops_raw,
+         booking_operations: booking_ops_raw,
          proposed_job_creates: proposed_raw,
          image_kind: image_kind
        }} ->
@@ -330,6 +333,7 @@ defmodule RompCrm.SmsInboundProcessor do
             time_ops_raw,
             emp_ops_raw,
             rem_ops_raw,
+            booking_ops_raw,
             ctx.params
           )
         end
@@ -371,6 +375,7 @@ defmodule RompCrm.SmsInboundProcessor do
          time_ops_raw,
          emp_ops_raw,
          rem_ops_raw,
+         booking_ops_raw,
          body_params
        ) do
     caps = EmployeePermissions.for(user, business_id)
@@ -384,17 +389,22 @@ defmodule RompCrm.SmsInboundProcessor do
         caps
       )
 
-    had_extracted_ops =
-      job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != []
+    # Booking conversations create clients/links, so gate on job-edit capability.
+    booking_ops = if EmployeePermissions.can_edit_jobs?(caps), do: booking_ops_raw, else: []
 
-    all_ops = job_ops ++ time_ops ++ emp_ops ++ rem_ops
+    had_extracted_ops =
+      job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != [] or
+        booking_ops_raw != []
+
+    all_ops = job_ops ++ time_ops ++ emp_ops ++ rem_ops ++ booking_ops
 
     log_base = %{
       message_sid: message_sid,
       planned_job_ops: job_ops_raw,
       planned_time_ops: time_ops_raw,
       planned_emp_ops: emp_ops_raw,
-      planned_reminder_ops: rem_ops_raw
+      planned_reminder_ops: rem_ops_raw,
+      planned_booking_ops: booking_ops_raw
     }
 
     cond do
@@ -467,6 +477,7 @@ defmodule RompCrm.SmsInboundProcessor do
                time_ops,
                emp_ops,
                rem_ops,
+               booking_ops,
                job_ctx,
                allowed_employee_ids
              ) do
@@ -748,7 +759,7 @@ defmodule RompCrm.SmsInboundProcessor do
   defp maybe_record_sms_exchange(_, _, "", _, _, _), do: :ok
 
   # Runs all operation lists and collects results. Job fuzzy-match errors trigger clarification.
-  defp run_all_operations(job_ops, time_ops, emp_ops, rem_ops, job_ctx, allowed_employee_ids) do
+  defp run_all_operations(job_ops, time_ops, emp_ops, rem_ops, booking_ops, job_ctx, allowed_employee_ids) do
     with {:ok, job_results} <- run_job_operations(job_ops, job_ctx),
          {:ok, time_results} <- run_time_operations(time_ops, job_ctx),
          {:ok, emp_results} <-
@@ -761,8 +772,14 @@ defmodule RompCrm.SmsInboundProcessor do
              job_ctx.user_id,
              Map.get(job_ctx, :sms_audit_base, %{})
            ),
-         {:ok, rem_results} <- run_reminder_operations(rem_ops, job_ctx) do
-      {:ok, job_results ++ time_results ++ emp_results ++ rem_results}
+         {:ok, rem_results} <- run_reminder_operations(rem_ops, job_ctx),
+         {:ok, booking_results} <-
+           Bookings.Orchestrator.run_operations(booking_ops, %{
+             business_id: job_ctx.business_id,
+             user_id: job_ctx.user_id,
+             message_sid: job_ctx.message_sid
+           }) do
+      {:ok, job_results ++ time_results ++ emp_results ++ rem_results ++ booking_results}
     end
   end
 

@@ -345,6 +345,12 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:show_paypal_subscription_help, show_subscription_help)
     |> assign(:show_cancel_subscription, show_cancel_subscription)
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
+    |> assign(:calendar_credentials, RompCrm.Scheduling.CalendarCredentials.list_for_user(user.id))
+    |> assign(:scheduling_prefs, RompCrm.Scheduling.Prefs.decode(user.scheduling_prefs_json))
+    |> assign(
+      :google_calendar_configured,
+      RompCrm.Scheduling.GoogleCalendarSource.oauth_configured?()
+    )
   end
 
   defp export_email_sent_flash(kinds, workspace_count) do

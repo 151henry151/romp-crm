@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0] - 2026-06-10
+
+### Added
+
+- **Customer self-scheduling**: booking links (`booking_links`), confirmed appointments (`bookings`), and soft-availability requests (`booking_requests`) with a public mobile-first LiveView at **`/book/:token`** (slot picker, soft availability form, invalid/expired/booked states) and an nginx short link **`https://rompcrm.com/book/<token>`**
+- **Technician AI booking actions**: `booking_actions` in the unified SMS extractor (`initiate`, `update_duration`, `confirm_soft`, `cancel`) executed by **`Bookings.Orchestrator`** — AI estimates a duration range, creates the link, and texts the client an opening SMS with the booking URL
+- **Client-side AI SMS booking**: **`CustomerBookingProcessor`** routes inbound SMS from phones with active booking links (Twilio webhook unknown-sender branch) through **`CustomerBookingExtractor`** (Anthropic + deterministic stub); supports hard bookings with conflict checks, soft availability capture, and cancellations, recording exchanges on a separate `client` SMS thread (`thread_kind` column)
+- **Multi-business collision handling**: when one client phone has active booking links with several businesses on the shared Twilio number, the AI asks a clarifying question and no booking action runs until the business is resolved
+- **Availability engine**: **`RompCrm.Scheduling.AvailabilityEngine`** (merge busy blocks, generate open slots from working-hour prefs, conflict check) with **`Prefs`** (timezone, workday hours, work days, buffer) stored on `users.scheduling_prefs_json`
+- **External calendars (read-only free/busy)**: `CalendarSource` behaviour with **`InternalJobsSource`** (scheduled jobs + confirmed bookings), **`GoogleCalendarSource`** (OAuth freebusy with transparent token refresh), and **`AppleCalendarSource`** (iCloud CalDAV via app-specific password); credentials AES-256-GCM encrypted at rest (`calendar_credentials` table); **`RompCrm.Scheduling.combined_busy_blocks/4`** merges all sources and degrades gracefully when a provider errors
+- **Settings**: Scheduling & calendars section — working hours/work days/buffer/timezone form, Google Calendar connect/disconnect (OAuth, `calendar.freebusy` scope), Apple Calendar connect/disconnect (Apple ID + app-specific password)
+- **Bookings page** (`/bookings`): pending availability replies with pick-a-time confirm flow, open booking links with duration edit and cancel, upcoming bookings with cancel; confirmations and cancellations text the client
+- **Expiry sweep**: scheduler tick marks pending booking links past `expires_at` as expired
+- **Env**: `GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `GOOGLE_CALENDAR_REDIRECT_BASE`, `CALENDAR_CREDENTIALS_KEY`, `BOOKING_LINK_BASE_URL` documented in `deploy/romp-crm.env.example`
+
+### Changed
+
+- **SMS conversations**: contractor-thread queries filter on `thread_kind = "contractor"`; add `record_client_message/5` and `list_client_turns_for_ai/3` for client threads
+
 ## [0.9.112] - 2026-06-09
 
 ### Fixed

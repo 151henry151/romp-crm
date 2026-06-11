@@ -160,6 +160,183 @@
 
     <.button variant="primary" phx-disable-with="Saving...">Save profile</.button>
   </.form>
+
+  <div class="divider" />
+
+  <h2 class="text-lg font-semibold text-base-content mb-1">Scheduling &amp; calendars</h2>
+  <p class="text-sm text-base-content/70 mb-4">
+    Used when clients book appointments through your booking links: open slots come from your
+    working hours minus scheduled jobs, confirmed bookings, and busy times on any connected calendar.
+    Only free/busy times are read — never event details.
+  </p>
+
+  <form action={~p"/users/settings/scheduling"} method="post" class="rounded-lg border border-base-300 bg-base-200/30 p-4 space-y-4">
+    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+    <input type="hidden" name="_method" value="put" />
+
+    <div>
+      <label for="sched_timezone" class="mb-1 block text-sm font-medium text-base-content">
+        Scheduling time zone
+      </label>
+      <select
+        id="sched_timezone"
+        name="prefs[timezone]"
+        class="select select-bordered select-sm w-full max-w-md bg-base-100"
+      >
+        <%= for {label, value} <- RompCrm.Reminders.profile_timezone_select_options() do %>
+          <option value={value} selected={value == @scheduling_prefs.timezone}>{label}</option>
+        <% end %>
+      </select>
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <div>
+        <label for="sched_start" class="mb-1 block text-sm font-medium text-base-content">Workday starts</label>
+        <input
+          id="sched_start"
+          type="time"
+          name="prefs[workday_start]"
+          value={@scheduling_prefs.workday_start |> Time.to_iso8601() |> String.slice(0, 5)}
+          class="input input-bordered input-sm bg-base-100"
+        />
+      </div>
+      <div>
+        <label for="sched_end" class="mb-1 block text-sm font-medium text-base-content">Workday ends</label>
+        <input
+          id="sched_end"
+          type="time"
+          name="prefs[workday_end]"
+          value={@scheduling_prefs.workday_end |> Time.to_iso8601() |> String.slice(0, 5)}
+          class="input input-bordered input-sm bg-base-100"
+        />
+      </div>
+      <div>
+        <label for="sched_buffer" class="mb-1 block text-sm font-medium text-base-content">Buffer between jobs</label>
+        <select id="sched_buffer" name="prefs[buffer_minutes]" class="select select-bordered select-sm bg-base-100">
+          <%= for {label, mins} <- [{"None", 0}, {"15 minutes", 15}, {"30 minutes", 30}, {"45 minutes", 45}, {"1 hour", 60}] do %>
+            <option value={mins} selected={mins == @scheduling_prefs.buffer_minutes}>{label}</option>
+          <% end %>
+        </select>
+      </div>
+    </div>
+
+    <fieldset class="space-y-1">
+      <legend class="mb-1 text-sm font-medium text-base-content">Work days</legend>
+      <div class="flex flex-wrap gap-3">
+        <%= for {label, day} <- [{"Mon", 1}, {"Tue", 2}, {"Wed", 3}, {"Thu", 4}, {"Fri", 5}, {"Sat", 6}, {"Sun", 7}] do %>
+          <label class="label cursor-pointer justify-start gap-1.5 py-0">
+            <input
+              type="checkbox"
+              name="prefs[work_days][]"
+              value={day}
+              checked={day in @scheduling_prefs.work_days}
+              class="checkbox checkbox-sm"
+            />
+            <span class="label-text text-sm">{label}</span>
+          </label>
+        <% end %>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="btn btn-brand btn-sm">Save scheduling preferences</button>
+  </form>
+
+  <% google_cred = Enum.find(@calendar_credentials, &(&1.source == "google")) %>
+  <% apple_cred = Enum.find(@calendar_credentials, &(&1.source == "apple")) %>
+
+  <div class="rounded-lg border border-base-300 bg-base-200/30 p-4 space-y-4">
+    <p class="font-semibold text-base-content">Connected calendars</p>
+
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p class="text-sm font-medium text-base-content">Google Calendar</p>
+        <%= if google_cred do %>
+          <p class="text-xs text-base-content/60">
+            <%= if google_cred.status == "error" do %>
+              Connection error — reconnect below. <span class="text-error">{google_cred.last_sync_error}</span>
+            <% else %>
+              Connected<%= if google_cred.last_synced_at do %>, last checked {Calendar.strftime(google_cred.last_synced_at, "%b %-d, %H:%M UTC")}<% end %>.
+            <% end %>
+          </p>
+        <% else %>
+          <p class="text-xs text-base-content/60">Not connected.</p>
+        <% end %>
+      </div>
+      <div class="flex gap-2">
+        <%= if @google_calendar_configured do %>
+          <a href={~p"/users/settings/calendars/google/connect"} class="btn btn-outline btn-sm">
+            {if google_cred, do: "Reconnect", else: "Connect Google"}
+          </a>
+        <% else %>
+          <span class="text-xs text-base-content/50">Not available on this server yet.</span>
+        <% end %>
+        <%= if google_cred do %>
+          <form action={~p"/users/settings/calendars/google/disconnect"} method="post">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <button type="submit" class="btn btn-ghost btn-sm text-error">Disconnect</button>
+          </form>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="border-t border-base-300/70 pt-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p class="text-sm font-medium text-base-content">Apple Calendar (iCloud)</p>
+          <%= if apple_cred do %>
+            <p class="text-xs text-base-content/60">
+              <%= if apple_cred.status == "error" do %>
+                Connection error — re-enter your app-specific password below.
+              <% else %>
+                Connected<%= if apple_cred.last_synced_at do %>, last checked {Calendar.strftime(apple_cred.last_synced_at, "%b %-d, %H:%M UTC")}<% end %>.
+              <% end %>
+            </p>
+          <% else %>
+            <p class="text-xs text-base-content/60">Not connected.</p>
+          <% end %>
+        </div>
+        <%= if apple_cred do %>
+          <form action={~p"/users/settings/calendars/apple/disconnect"} method="post">
+            <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+            <button type="submit" class="btn btn-ghost btn-sm text-error">Disconnect</button>
+          </form>
+        <% end %>
+      </div>
+
+      <form action={~p"/users/settings/calendars/apple"} method="post" class="mt-3 space-y-2">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <p class="text-xs text-base-content/60">
+          Sign in with your Apple ID and an
+          <a
+            href="https://support.apple.com/102654"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="font-medium text-brand hover:underline"
+          >app-specific password</a>
+          (not your main Apple password). Generate one at appleid.apple.com under Sign-In &amp; Security.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <input
+            type="email"
+            name="apple[apple_id]"
+            placeholder="you@icloud.com"
+            autocomplete="off"
+            class="input input-bordered input-sm bg-base-100"
+          />
+          <input
+            type="password"
+            name="apple[app_password]"
+            placeholder="xxxx-xxxx-xxxx-xxxx"
+            autocomplete="off"
+            class="input input-bordered input-sm bg-base-100"
+          />
+          <button type="submit" class="btn btn-outline btn-sm">
+            {if apple_cred, do: "Update Apple connection", else: "Connect Apple"}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   </section>
 
   <section class="space-y-6">

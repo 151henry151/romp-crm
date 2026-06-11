@@ -108,6 +108,9 @@ defmodule RompCrm.Twilio.SmsReplyBuilder do
           t = DateTime.to_iso8601(r.fire_at)
           ["saved a reminder for #{t}"]
 
+        {:booking_done, summary} when is_binary(summary) ->
+          [String.trim_trailing(summary, ".")]
+
         {:skipped, _} ->
           []
 

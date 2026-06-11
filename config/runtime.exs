@@ -93,6 +93,31 @@ if config_env() == :prod do
     secret_key_base: secret_key_base,
     check_origin: check_origin
 
+  # Short customer-facing booking URL (nginx proxies `/book/` to the app).
+  config :romp_crm,
+         :booking_link_base_url,
+         System.get_env("BOOKING_LINK_BASE_URL") || "https://#{host}/book"
+
+  # Google Calendar read-only freebusy (Settings → Connected calendars).
+  # Without these, the Connect Google button is hidden; Apple CalDAV needs no config.
+  if System.get_env("GOOGLE_CALENDAR_CLIENT_ID") do
+    config :romp_crm, :google_calendar_oauth,
+      client_id: System.get_env("GOOGLE_CALENDAR_CLIENT_ID"),
+      client_secret: System.get_env("GOOGLE_CALENDAR_CLIENT_SECRET")
+  end
+
+  # OAuth redirect base; must match the authorized redirect URI in Google Cloud
+  # (defaults to the endpoint URL, which includes any path prefix like /romp-crm).
+  if base = System.get_env("GOOGLE_CALENDAR_REDIRECT_BASE") do
+    config :romp_crm, :google_calendar_redirect_base, String.trim_trailing(base, "/")
+  end
+
+  # Optional dedicated key for calendar credential encryption at rest
+  # (falls back to a key derived from SECRET_KEY_BASE).
+  if key = System.get_env("CALENDAR_CREDENTIALS_KEY") do
+    config :romp_crm, :calendar_credentials_key, key
+  end
+
   mail_from_name = System.get_env("MAIL_FROM_NAME") || "Romp CRM"
 
   mail_from_address =

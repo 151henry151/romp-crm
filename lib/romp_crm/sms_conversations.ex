@@ -36,6 +36,7 @@ defmodule RompCrm.SmsConversations do
       Repo.all(
         from m in Message,
           where: m.business_id == ^business_id and m.phone_normalized == ^phone_normalized,
+          where: m.thread_kind == "contractor",
           order_by: [desc: m.id],
           limit: ^max_msgs,
           select: %{direction: m.direction, body: m.body}
@@ -50,6 +51,57 @@ defmodule RompCrm.SmsConversations do
       end)
 
     trim_thread_to_char_budget(turns, max_chars)
+  end
+
+  @doc """
+  Client booking-thread turns for **`business_id`** + client phone, oldest first,
+  each **`{:client | :assistant, body}`**. Same trimming options as
+  **`list_prior_turns_for_ai/3`**.
+  """
+  def list_client_turns_for_ai(business_id, phone_normalized, opts \\ [])
+      when is_integer(business_id) and is_binary(phone_normalized) do
+    max_msgs = Keyword.get(opts, :max_messages, @default_max_messages)
+    max_chars = Keyword.get(opts, :max_chars, @default_max_chars)
+
+    rows =
+      Repo.all(
+        from m in Message,
+          where: m.business_id == ^business_id and m.phone_normalized == ^phone_normalized,
+          where: m.thread_kind == "client",
+          order_by: [desc: m.id],
+          limit: ^max_msgs,
+          select: %{direction: m.direction, body: m.body}
+      )
+
+    turns =
+      rows
+      |> Enum.reverse()
+      |> Enum.map(fn %{direction: d, body: b} ->
+        role = if d == "outbound", do: :assistant, else: :client
+        {role, b || ""}
+      end)
+
+    trim_thread_to_char_budget(turns, max_chars)
+  end
+
+  @doc """
+  Appends one message to a client booking thread. **`user_id`** is the technician
+  who owns the booking conversation (attribution), not the sender.
+  """
+  def record_client_message(business_id, user_id, phone_normalized, direction, body)
+      when is_integer(business_id) and is_integer(user_id) and is_binary(phone_normalized) and
+             direction in ["inbound", "outbound"] and is_binary(body) do
+    %Message{}
+    |> Message.changeset(%{
+      business_id: business_id,
+      user_id: user_id,
+      phone_normalized: phone_normalized,
+      direction: direction,
+      body: String.slice(String.trim(body), 0, 6000),
+      channel: "sms",
+      thread_kind: "client"
+    })
+    |> Repo.insert()
   end
 
   defp trim_thread_to_char_budget(turns, max_chars) do
@@ -101,6 +153,7 @@ defmodule RompCrm.SmsConversations do
     Repo.all(
       from m in Message,
         where: m.business_id == ^business_id,
+        where: m.thread_kind == "contractor",
         order_by: [asc: m.id],
         limit: ^limit,
         preload: [:user]
@@ -117,6 +170,7 @@ defmodule RompCrm.SmsConversations do
         where: m.business_id == ^business_id,
         where: m.phone_normalized == ^phone_normalized,
         where: m.direction == "inbound",
+        where: m.thread_kind == "contractor",
         order_by: [desc: m.id],
         limit: ^limit,
         select: m.body

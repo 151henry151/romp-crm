@@ -79,6 +79,15 @@ defmodule RompCrmWeb.Router do
     post "/users/register", UserRegistrationController, :create
   end
 
+  # Customer self-scheduling — public, no auth (token is the credential).
+  scope "/", RompCrmWeb do
+    pipe_through [:browser]
+
+    live_session :public_booking, root_layout: {RompCrmWeb.Layouts, :public} do
+      live "/book/:token", PublicBookingLive, :show
+    end
+  end
+
   scope "/", RompCrmWeb do
     pipe_through [:browser]
 
@@ -124,6 +133,12 @@ defmodule RompCrmWeb.Router do
     put "/users/settings", UserSettingsController, :update
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
 
+    put "/users/settings/scheduling", CalendarSettingsController, :update_scheduling
+    post "/users/settings/calendars/apple", CalendarSettingsController, :connect_apple
+    post "/users/settings/calendars/:source/disconnect", CalendarSettingsController, :disconnect
+    get "/users/settings/calendars/google/connect", CalendarSettingsController, :google_connect
+    get "/users/settings/calendars/google/callback", CalendarSettingsController, :google_callback
+
     post "/business/switch", BusinessSwitchController, :update
 
     post "/jobs/:job_id/photos", JobPhotoController, :create
@@ -163,6 +178,7 @@ defmodule RompCrmWeb.Router do
       live "/time-log", TimeLogLive, :index
       live "/my-timeclock", MyTimeclockLive, :index
       live "/reminders", RemindersLive, :index
+      live "/bookings", BookingsLive, :index
       live "/chat", AgentChatLive, :index
     end
 

@@ -1,0 +1,224 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  content_width={:wide}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+>
+  <div class="space-y-6 text-base-content">
+    <div>
+      <h1 class="text-xl font-semibold">Bookings</h1>
+      <p class="mt-1 text-sm text-base-content/70">
+        Client self-scheduling: open booking links, availability replies waiting on you, and
+        confirmed appointments. Times shown in
+        <span class="font-medium text-base-content/90">{@tz}</span>
+        (change in <.link href={~p"/users/settings"} class="link-brand">Settings</.link>).
+      </p>
+    </div>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4">
+      <h2 class="text-sm font-semibold mb-1">Availability replies — pick a time</h2>
+      <p class="text-xs text-base-content/60 mb-3">
+        These clients sent their general availability instead of booking a slot. Confirm a time and
+        they'll get a confirmation text.
+      </p>
+
+      <%= if @requests == [] do %>
+        <p class="text-sm text-base-content/60">Nothing waiting on you.</p>
+      <% else %>
+        <ul class="space-y-3">
+          <%= for request <- @requests do %>
+            <li class="rounded-lg border border-base-300/70 bg-base-200/30 p-3" id={"request-#{request.id}"}>
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-medium">
+                    {client_name(request)} — {job_label(request)}
+                    <span class="text-base-content/60 font-normal">({duration_text(request)})</span>
+                  </p>
+                  <p class="mt-1 text-sm text-base-content/80">
+                    “{request.availability_text}”
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <%= if @confirming_request_id != request.id do %>
+                    <button
+                      phx-click="confirm_start"
+                      phx-value-request_id={request.id}
+                      class="btn btn-brand btn-xs"
+                    >
+                      Pick a time
+                    </button>
+                    <button
+                      phx-click="dismiss_request"
+                      phx-value-request_id={request.id}
+                      data-confirm="Dismiss this availability request? The client will not be notified."
+                      class="btn btn-ghost btn-xs text-error"
+                    >
+                      Dismiss
+                    </button>
+                  <% end %>
+                </div>
+              </div>
+
+              <%= if @confirming_request_id == request.id do %>
+                <form phx-submit="confirm_request" class="mt-3 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="request_id" value={request.id} />
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-base-content/80">Date</label>
+                    <input type="date" name="date" required class="input input-bordered input-sm" />
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-base-content/80">Start time</label>
+                    <input type="time" name="time" required class="input input-bordered input-sm" />
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-base-content/80">Duration</label>
+                    <select name="duration_minutes" class="select select-bordered select-sm">
+                      <%= for {label, mins} <- [{"30 min", 30}, {"1 hour", 60}, {"1.5 hours", 90}, {"2 hours", 120}, {"3 hours", 180}, {"4 hours", 240}, {"Full day (8h)", 480}] do %>
+                        <option value={mins} selected={mins == (request.duration_max_minutes || 60)}>
+                          {label}
+                        </option>
+                      <% end %>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-brand btn-sm">Confirm &amp; text client</button>
+                  <button type="button" phx-click="confirm_cancel" class="btn btn-ghost btn-sm">
+                    Cancel
+                  </button>
+                </form>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4">
+      <h2 class="text-sm font-semibold mb-1">Open booking links</h2>
+      <p class="text-xs text-base-content/60 mb-3">
+        Waiting on the client to pick a time. Links expire automatically after two weeks.
+      </p>
+
+      <%= if @links == [] do %>
+        <p class="text-sm text-base-content/60">
+          No open links. Start one from Chat or by texting the assistant, e.g.
+          “set up a booking with Dave for a water heater swap”.
+        </p>
+      <% else %>
+        <ul class="space-y-3">
+          <%= for link <- @links do %>
+            <li class="rounded-lg border border-base-300/70 bg-base-200/30 p-3" id={"link-#{link.id}"}>
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium">
+                    {client_name(link)} — {job_label(link)}
+                    <span class="text-base-content/60 font-normal">({duration_text(link)})</span>
+                  </p>
+                  <p class="mt-1 break-all text-xs text-base-content/60">
+                    {booking_url(link.token)}
+                    <%= if link.expires_at do %>
+                      · expires {Calendar.strftime(link.expires_at, "%b %-d")}
+                    <% end %>
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <%= if @editing_link_id != link.id do %>
+                    <button
+                      phx-click="edit_duration_start"
+                      phx-value-link_id={link.id}
+                      class="btn btn-outline btn-xs"
+                    >
+                      Edit duration
+                    </button>
+                    <button
+                      phx-click="cancel_link"
+                      phx-value-link_id={link.id}
+                      data-confirm="Cancel this booking link? The client's link will stop working."
+                      class="btn btn-ghost btn-xs text-error"
+                    >
+                      Cancel link
+                    </button>
+                  <% end %>
+                </div>
+              </div>
+
+              <%= if @editing_link_id == link.id do %>
+                <form phx-submit="edit_duration_save" class="mt-3 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="link_id" value={link.id} />
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-base-content/80">Min (minutes)</label>
+                    <input
+                      type="number"
+                      name="min_minutes"
+                      min="15"
+                      step="15"
+                      value={link.duration_min_minutes}
+                      class="input input-bordered input-sm w-28"
+                    />
+                  </div>
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-base-content/80">Max (minutes)</label>
+                    <input
+                      type="number"
+                      name="max_minutes"
+                      min="15"
+                      step="15"
+                      value={link.duration_max_minutes}
+                      class="input input-bordered input-sm w-28"
+                    />
+                  </div>
+                  <button type="submit" class="btn btn-brand btn-sm">Save</button>
+                  <button type="button" phx-click="edit_duration_cancel" class="btn btn-ghost btn-sm">
+                    Cancel
+                  </button>
+                </form>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+
+    <section class="rounded-lg border border-base-300 bg-base-100 p-4">
+      <h2 class="text-sm font-semibold mb-3">Upcoming bookings</h2>
+
+      <%= if @bookings == [] do %>
+        <p class="text-sm text-base-content/60">No upcoming confirmed bookings.</p>
+      <% else %>
+        <ul class="space-y-2">
+          <%= for booking <- @bookings do %>
+            <li
+              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-300/70 bg-base-200/30 p-3"
+              id={"booking-#{booking.id}"}
+            >
+              <div>
+                <p class="text-sm font-medium">
+                  {client_name(booking)}
+                  <%= if booking.booking_link do %>
+                    — {job_label(booking.booking_link)}
+                  <% end %>
+                </p>
+                <p class="text-xs text-base-content/60">
+                  {window_text(booking.starts_at, booking.ends_at, @tz)}
+                  · booked via {booking.confirmed_via}
+                </p>
+              </div>
+              <button
+                phx-click="cancel_booking"
+                phx-value-booking_id={booking.id}
+                data-confirm="Cancel this booking? The client will be texted."
+                class="btn btn-ghost btn-xs text-error"
+              >
+                Cancel
+              </button>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+  </div>
+</Layouts.app>

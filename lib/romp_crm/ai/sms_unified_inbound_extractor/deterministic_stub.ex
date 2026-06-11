@@ -260,6 +260,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
           |> Map.put_new("time_actions", [])
           |> Map.put_new("employee_actions", [])
           |> Map.put_new("reminder_actions", [])
+          |> Map.put_new("booking_actions", [])
 
         {:ok, map}
 

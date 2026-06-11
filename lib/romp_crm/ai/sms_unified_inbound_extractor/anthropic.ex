@@ -24,6 +24,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       mms_image_blocks = Keyword.get(opts, :mms_image_blocks, [])
       recent_deleted_jobs = Keyword.get(opts, :recent_deleted_jobs, [])
       clients_snapshot = Keyword.get(opts, :clients_snapshot, [])
+      bookings_snapshot = Keyword.get(opts, :bookings_snapshot, %{})
 
       call_claude(
         api_key,
@@ -35,7 +36,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         prior_turns,
         mms_image_blocks,
         recent_deleted_jobs,
-        clients_snapshot
+        clients_snapshot,
+        bookings_snapshot
       )
     end
   end
@@ -50,7 +52,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          prior_turns,
          mms_image_blocks,
          recent_deleted_jobs,
-         clients_snapshot
+         clients_snapshot,
+         bookings_snapshot
        ) do
     user_blocks =
       build_user_content_blocks(
@@ -61,7 +64,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         prior_turns,
         mms_image_blocks,
         recent_deleted_jobs,
-        clients_snapshot
+        clients_snapshot,
+        bookings_snapshot
       )
 
     body = %{
@@ -140,7 +144,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          prior_turns,
          mms_image_blocks,
          recent_deleted_jobs,
-         clients_snapshot
+         clients_snapshot,
+         bookings_snapshot
        ) do
     text =
       user_content_text(
@@ -150,7 +155,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         employees_snapshot,
         prior_turns,
         recent_deleted_jobs,
-        clients_snapshot
+        clients_snapshot,
+        bookings_snapshot
       )
 
     image_blocks =
@@ -175,13 +181,15 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          employees_snapshot,
          prior_turns,
          recent_deleted_jobs,
-         clients_snapshot
+         clients_snapshot,
+         bookings_snapshot
        ) do
     jobs_json = encode_json(jobs_snapshot)
     clients_json = encode_json(clients_snapshot)
     open_json = encode_json(open_te_snapshot)
     emp_json = encode_json(employees_snapshot)
     deleted_json = encode_json(recent_deleted_jobs)
+    bookings_json = encode_json(bookings_snapshot)
 
     thread_block = format_prior_turns(prior_turns)
 
@@ -232,6 +240,14 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Employees snapshot:
     ---
     #{emp_json}
+    ---
+
+    Customer scheduling state (JSON object): `"active_booking_links"` (booking conversations already started),
+    `"pending_booking_requests"` (clients who texted soft availability, awaiting a confirmed time), and
+    `"upcoming_bookings"` (confirmed appointments). Ids here are authoritative for `booking_actions`.
+    Bookings snapshot:
+    ---
+    #{bookings_json}
     ---
     """
   end
@@ -296,7 +312,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       "job_actions": [ ... ],
       "time_actions": [ ... ],
       "employee_actions": [ ... ],
-      "reminder_actions": [ ... ]
+      "reminder_actions": [ ... ],
+      "booking_actions": [ ... ]
     }
 
     Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
@@ -367,6 +384,35 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     - Use when the contractor asks to be reminded later (e.g. "remind me Tuesday 11am to call Suzy"). Put the human-readable task in **`body`**. If a snapshot job clearly matches (same customer name), set **`job_id`**. Otherwise omit **`job_id`** and set metadata like `{ "no_customer_match": true, "suggested_name": "Suzy" }` when appropriate.
 
     Return `[]` when there is no reminder intent.
+
+    ---
+
+    ## booking_actions — customer self-scheduling conversations
+
+    Use when the contractor asks the agent to **reach out to a customer to schedule work** ("Text Bob Smith at 802-530-0293 to schedule his toilet flange replacement", "Send Maria a booking message for the kitchen faucet job"), to adjust a booking estimate, to confirm a soft-availability window, or to cancel a booking. The **Bookings snapshot** in the user message lists active booking links, pending soft-availability requests, and upcoming bookings — its ids are the only valid ids here.
+
+    Each element is one of:
+
+    **Start a booking conversation:**
+    `{ "intent": "initiate", "client_name": "<name>", "phone": "<customer phone from message or clients snapshot>", "client_id": <optional int from clients snapshot>, "job_id": <optional int from jobs snapshot>, "job_type_label": "<short job description, e.g. toilet flange replacement>", "duration_min_minutes": <int>, "duration_max_minutes": <int> }`
+
+    **Estimate the duration yourself** from the job type using trade knowledge. Typical plumbing examples:
+    - Toilet flange replacement → 120–180
+    - Kitchen faucet replacement → 90–120
+    - Water heater install → 180–240
+    - Drain snake / clog → 60–60
+    - Annual inspection → 60–60
+    Scale similarly for other trades. The contractor can override later; if they state a duration, use theirs.
+    Phone is **required** — if the contractor gave no phone and no clients-snapshot match has one, ask for it in **`assistant_sms`** with empty `booking_actions`.
+    The server sends the customer an SMS with a self-scheduling web link and an invitation to reply by text; do **not** draft that message yourself. Confirm in **`assistant_sms`** what you set up (job type + duration estimate).
+
+    **Edit a duration estimate:** `{ "intent": "update_duration", "booking_link_id": <int from active_booking_links>, "duration_min_minutes": <int>, "duration_max_minutes": <int> }`
+
+    **Confirm a soft-availability request at a specific time:** `{ "intent": "confirm_soft", "booking_request_id": <int from pending_booking_requests>, "starts_at": "<ISO 8601>", "ends_at": "<ISO 8601>" }` — e.g. contractor says "Book Bob for Thursday at 10". Naive timestamps are wall-clock in the user's reminder timezone. Size `ends_at` from the booking's duration estimate.
+
+    **Cancel:** `{ "intent": "cancel", "booking_id": <int from upcoming_bookings>, "reason": "<optional short reason>" }`
+
+    Return `[]` when the message has no customer-scheduling intent.
 
     ---
 

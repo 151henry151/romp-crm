@@ -34,6 +34,7 @@ defmodule RompCrm.Accounts.User do
 
     field :sms_reminders_enabled, :boolean, default: false
     field :sms_reminder_prefs_json, :string
+    field :scheduling_prefs_json, :string
 
     field :sms_assistant_intro_completed_at, :utc_datetime
 

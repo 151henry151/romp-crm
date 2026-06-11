@@ -729,6 +729,13 @@ defmodule RompCrm.Accounts do
     User.export_settings_changeset(user, attrs)
   end
 
+  @doc "Replaces the technician's scheduling preferences JSON (see `RompCrm.Scheduling.Prefs`)."
+  def update_user_scheduling_prefs(%User{} = user, json) when is_binary(json) do
+    user
+    |> Ecto.Changeset.change(scheduling_prefs_json: json)
+    |> Repo.update()
+  end
+
   @doc "Updates scheduled CSV export; recalculates **`data_export_next_run_at`** when schedule is not **`none`**."
   def update_user_export_settings(%User{} = user, attrs) when is_map(attrs) do
     user
