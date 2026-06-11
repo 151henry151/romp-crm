@@ -4,6 +4,7 @@ defmodule RompCrm.SmsInboundProcessor do
   require Logger
 
   alias RompCrm.Accounts.User
+  alias RompCrm.Repo
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.Bookings
   alias RompCrm.Bookings.Escalations
@@ -28,6 +29,8 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
   alias RompCrm.Twilio.SmsReplyBuilder
+  alias RompCrm.Ai.SchedulingPlaybookExtractor
+  alias RompCrm.Scheduling.{Playbook, Prefs, Setup, SlotApprovals}
 
   @type delivery :: :twilio_sms | :in_app
 
@@ -201,6 +204,59 @@ defmodule RompCrm.SmsInboundProcessor do
         done
 
       :continue_escalation ->
+        cond do
+          phone_norm != "" and Setup.active_session?(business_id, phone_norm) ->
+            handle_scheduling_setup_inbound(
+              ctx,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_stored,
+              message_sid,
+              body_text
+            )
+
+          SlotApprovals.pending_for_technician?(business_id, user.id) ->
+            handle_slot_approval_reply(
+              ctx,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_stored,
+              message_sid,
+              body_text
+            )
+
+          playbook_preference_message?(body_text) ->
+            handle_playbook_preference_update(
+              ctx,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_stored,
+              message_sid,
+              body_text
+            )
+
+          true ->
+            :continue_after_scheduling_hooks
+        end
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_after_scheduling_hooks ->
+        :continue_after_scheduling_hooks
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_after_scheduling_hooks ->
         if phone_norm != "" and pending_confirmation_message?(body_text) do
           handle_pending_proposals(
             ctx,
@@ -401,7 +457,8 @@ defmodule RompCrm.SmsInboundProcessor do
            mms_image_blocks: mms_image_blocks,
            recent_deleted_jobs: recent_deleted_jobs,
            clients_snapshot: clients_snapshot,
-           bookings_snapshot: Bookings.snapshot_for_sms_ai(business_id)
+           bookings_snapshot: Bookings.snapshot_for_sms_ai(business_id),
+           scheduling_snapshot: scheduling_snapshot_for_ai(business_id, user)
          ) do
       {:ok,
        %{
@@ -528,6 +585,15 @@ defmodule RompCrm.SmsInboundProcessor do
     # Booking conversations create clients/links, so gate on job-edit capability.
     booking_ops = if EmployeePermissions.can_edit_jobs?(caps), do: booking_ops_raw, else: []
 
+    {booking_ops, pending_booking_proposals, setup_reply} =
+      maybe_gate_scheduling_setup(
+        user,
+        business_id,
+        phone_norm,
+        booking_ops,
+        pending_booking_proposals
+      )
+
     had_extracted_ops =
       job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != [] or
         booking_ops_raw != []
@@ -544,6 +610,11 @@ defmodule RompCrm.SmsInboundProcessor do
     }
 
     cond do
+      is_binary(setup_reply) ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, setup_reply,
+          Map.merge(log_base, %{outcome: "scheduling_setup_started", results: []})
+        )
+
       all_ops == [] and had_extracted_ops ->
         reply =
           "You don't have permission to apply those changes in this workspace. Ask the business owner to adjust your employee permissions."
@@ -695,6 +766,37 @@ defmodule RompCrm.SmsInboundProcessor do
   end
 
   defp apply_pending_booking_or_continue(
+         ctx,
+         from,
+         user,
+         business_id,
+         phone_norm,
+         body_stored,
+         message_sid
+       ) do
+    user = Repo.get!(User, user.id)
+
+    if Setup.needs_setup?(user) do
+      case SmsPendingBookingProposals.get(business_id, phone_norm) do
+        nil ->
+          :continue_extract
+
+        proposal ->
+          held = Setup.held_intent_for_pending_booking(proposal)
+          reply = Setup.start!(business_id, user.id, phone_norm, held)
+
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "scheduling_setup_started",
+            results: []
+          })
+      end
+    else
+      do_apply_pending_booking(ctx, from, user, business_id, phone_norm, body_stored, message_sid)
+    end
+  end
+
+  defp do_apply_pending_booking(
          ctx,
          from,
          user,
@@ -1711,4 +1813,127 @@ defmodule RompCrm.SmsInboundProcessor do
     Enum.find(list, fn s -> is_binary(s) and String.trim(s) != "" end)
   end
 
+  defp scheduling_snapshot_for_ai(business_id, %User{} = user) do
+    prefs = Prefs.decode(user.scheduling_prefs_json)
+    playbook = Playbook.snapshot_for_ai(business_id, user.id)
+
+    %{
+      "prefs" => %{
+        "timezone" => prefs.timezone,
+        "workday_start" => prefs.workday_start |> Time.to_iso8601() |> String.slice(0, 5),
+        "workday_end" => prefs.workday_end |> Time.to_iso8601() |> String.slice(0, 5),
+        "work_days" => prefs.work_days,
+        "buffer_minutes" => prefs.buffer_minutes,
+        "customer_outreach_style" => prefs.customer_outreach_style,
+        "min_lead_days" => prefs.min_lead_days,
+        "scheduling_bias" => prefs.scheduling_bias
+      },
+      "playbook" => playbook,
+      "setup_completed" => not is_nil(user.scheduling_setup_completed_at)
+    }
+  end
+
+  defp maybe_gate_scheduling_setup(user, business_id, phone_norm, booking_ops, pending_proposals) do
+    user = Repo.get!(User, user.id)
+
+    cond do
+      not Setup.needs_setup?(user) ->
+        {booking_ops, pending_proposals, nil}
+
+      booking_ops != [] ->
+        initiate = Enum.find(booking_ops, &match?({:booking_initiate, _}, &1))
+
+        if initiate do
+          {:booking_initiate, attrs} = initiate
+          rest = Enum.reject(booking_ops, &match?({:booking_initiate, _}, &1))
+          held = Setup.held_intent_for_booking_initiate(attrs)
+          reply = Setup.start!(business_id, user.id, phone_norm, held)
+          {rest, [], reply}
+        else
+          {booking_ops, pending_proposals, nil}
+        end
+
+      pending_proposals != [] ->
+        [proposal | _] = pending_proposals
+        held = Setup.held_intent_for_pending_booking(proposal)
+        reply = Setup.start!(business_id, user.id, phone_norm, held)
+        {booking_ops, [], reply}
+
+      true ->
+        {booking_ops, pending_proposals, nil}
+    end
+  end
+
+  defp handle_scheduling_setup_inbound(ctx, from, user, business_id, phone_norm, body_stored, message_sid, body_text) do
+    case Setup.handle_message(user, business_id, phone_norm, body_text) do
+      :no_session ->
+        :continue_after_scheduling_hooks
+
+      {:reply, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "scheduling_setup_in_progress",
+          results: []
+        })
+
+      {:completed, reply} ->
+        user = Repo.get!(User, user.id)
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "scheduling_setup_completed",
+          results: []
+        })
+    end
+  end
+
+  defp handle_slot_approval_reply(ctx, from, user, business_id, phone_norm, body_stored, message_sid, body_text) do
+    case SlotApprovals.handle_contractor_reply(user.id, business_id, body_text) do
+      :none ->
+        :continue_after_scheduling_hooks
+
+      {:approved, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "slot_approval_granted",
+          results: []
+        })
+
+      {:rejected, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "slot_approval_rejected",
+          results: []
+        })
+    end
+  end
+
+  defp handle_playbook_preference_update(ctx, from, user, business_id, phone_norm, body_stored, message_sid, body_text) do
+    context = scheduling_snapshot_for_ai(business_id, user)
+
+    case SchedulingPlaybookExtractor.extract_playbook_update(body_text, context) do
+      {:ok, extraction} ->
+        user = Playbook.apply_extraction!(business_id, user.id, user, extraction)
+
+        reply =
+          Map.get(extraction, "assistant_summary") ||
+            Map.get(extraction, :assistant_summary) ||
+            "Updated your scheduling preferences."
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "scheduling_playbook_updated",
+          results: []
+        })
+
+      {:error, _} ->
+        :continue_after_scheduling_hooks
+    end
+  end
+
+  defp playbook_preference_message?(body) when is_binary(body) do
+    Playbook.playbook_update_message?(body)
+  end
+
+  defp playbook_preference_message?(_), do: false
 end

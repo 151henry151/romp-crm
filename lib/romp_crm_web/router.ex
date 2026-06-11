@@ -134,6 +134,7 @@ defmodule RompCrmWeb.Router do
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
 
     put "/users/settings/scheduling", CalendarSettingsController, :update_scheduling
+    post "/users/settings/scheduling/playbook/:id/deactivate", CalendarSettingsController, :deactivate_playbook_rule
     post "/users/settings/calendars/apple", CalendarSettingsController, :connect_apple
     post "/users/settings/calendars/:source/disconnect", CalendarSettingsController, :disconnect
     get "/users/settings/calendars/google/connect", CalendarSettingsController, :google_connect

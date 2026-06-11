@@ -38,6 +38,9 @@ defmodule RompCrm.AccountsFixtures do
     {:ok, {user, _expired_tokens}} =
       Accounts.login_user_by_magic_link(token)
 
+    {:ok, user} = Accounts.mark_scheduling_setup_completed(user)
+    {:ok, _} = RompCrm.Scheduling.Prefs.ensure_initialized(user)
+
     user
   end
 

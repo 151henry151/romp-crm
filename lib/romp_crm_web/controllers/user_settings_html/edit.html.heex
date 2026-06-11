@@ -167,7 +167,8 @@
   <p class="text-sm text-base-content/70 mb-4">
     Used when clients book appointments through your booking links: open slots come from your
     working hours minus scheduled jobs, confirmed bookings, and busy times on any connected calendar.
-    Only free/busy times are read — never event details.
+    Only free/busy times are read — never event details. Your time zone is inferred from your phone
+    number when you first use scheduling — change it below if needed.
   </p>
 
   <form action={~p"/users/settings/scheduling"} method="post" class="rounded-lg border border-base-300 bg-base-200/30 p-4 space-y-4">
@@ -220,6 +221,32 @@
       </div>
     </div>
 
+    <div>
+      <label for="sched_outreach" class="mb-1 block text-sm font-medium text-base-content">
+        Customer outreach style
+      </label>
+      <select id="sched_outreach" name="prefs[customer_outreach_style]" class="select select-bordered select-sm w-full max-w-md bg-base-100">
+        <%= for {label, value} <- [{"Ask what works for them", "ask"}, {"Offer specific times first", "offer"}, {"Offer times, invite alternatives", "offer_then_ask"}] do %>
+          <option value={value} selected={value == @scheduling_prefs.customer_outreach_style}>{label}</option>
+        <% end %>
+      </select>
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <div>
+        <label for="sched_min_lead" class="mb-1 block text-sm font-medium text-base-content">Minimum days notice</label>
+        <input id="sched_min_lead" type="number" min="0" max="90" name="prefs[min_lead_days]" value={@scheduling_prefs.min_lead_days} class="input input-bordered input-sm w-24 bg-base-100" />
+      </div>
+      <div>
+        <label for="sched_bias" class="mb-1 block text-sm font-medium text-base-content">Slot preference</label>
+        <select id="sched_bias" name="prefs[scheduling_bias]" class="select select-bordered select-sm bg-base-100">
+          <option value="" selected={is_nil(@scheduling_prefs.scheduling_bias)}>Default</option>
+          <option value="asap" selected={@scheduling_prefs.scheduling_bias == "asap"}>Soonest available</option>
+          <option value="spread" selected={@scheduling_prefs.scheduling_bias == "spread"}>Spread across days</option>
+        </select>
+      </div>
+    </div>
+
     <fieldset class="space-y-1">
       <legend class="mb-1 text-sm font-medium text-base-content">Work days</legend>
       <div class="flex flex-wrap gap-3">
@@ -240,6 +267,34 @@
 
     <button type="submit" class="btn btn-brand btn-sm">Save scheduling preferences</button>
   </form>
+
+  <div class="mt-4 rounded-lg border border-base-300 bg-base-200/30 p-4 space-y-3">
+    <p class="font-semibold text-base-content">Scheduling playbook</p>
+    <p class="text-sm text-base-content/70">
+      Rules learned from your SMS setup or preference updates (greetings, confirm-before-offer, custom instructions).
+      Text the assistant anytime to change how scheduling works — or remove rules here.
+    </p>
+    <%= if @scheduling_playbook_rules == [] do %>
+      <p class="text-sm text-base-content/60">No custom playbook rules yet.</p>
+    <% else %>
+      <ul class="space-y-2">
+        <%= for rule <- @scheduling_playbook_rules do %>
+          <li class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-base-300/70 bg-base-100/50 p-3 text-sm">
+            <div>
+              <p class="font-medium text-base-content">{rule.kind}</p>
+              <%= if rule.source_text do %>
+                <p class="mt-1 text-base-content/75">{rule.source_text}</p>
+              <% end %>
+            </div>
+            <form action={~p"/users/settings/scheduling/playbook/#{rule.id}/deactivate"} method="post">
+              <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+              <button type="submit" class="btn btn-ghost btn-xs">Remove</button>
+            </form>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
 
   <div class="mt-4 rounded-lg border border-base-300 bg-base-200/30 p-4">
     <p class="text-sm font-medium text-base-content">Scheduling agent preview</p>

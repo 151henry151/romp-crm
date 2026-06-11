@@ -25,6 +25,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       recent_deleted_jobs = Keyword.get(opts, :recent_deleted_jobs, [])
       clients_snapshot = Keyword.get(opts, :clients_snapshot, [])
       bookings_snapshot = Keyword.get(opts, :bookings_snapshot, %{})
+      scheduling_snapshot = Keyword.get(opts, :scheduling_snapshot, %{})
 
       call_claude(
         api_key,
@@ -37,7 +38,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         mms_image_blocks,
         recent_deleted_jobs,
         clients_snapshot,
-        bookings_snapshot
+        bookings_snapshot,
+        scheduling_snapshot
       )
     end
   end
@@ -53,7 +55,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          mms_image_blocks,
          recent_deleted_jobs,
          clients_snapshot,
-         bookings_snapshot
+         bookings_snapshot,
+         scheduling_snapshot
        ) do
     user_blocks =
       build_user_content_blocks(
@@ -65,7 +68,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         mms_image_blocks,
         recent_deleted_jobs,
         clients_snapshot,
-        bookings_snapshot
+        bookings_snapshot,
+        scheduling_snapshot
       )
 
     body = %{
@@ -145,7 +149,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          mms_image_blocks,
          recent_deleted_jobs,
          clients_snapshot,
-         bookings_snapshot
+         bookings_snapshot,
+         scheduling_snapshot
        ) do
     text =
       user_content_text(
@@ -156,7 +161,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         prior_turns,
         recent_deleted_jobs,
         clients_snapshot,
-        bookings_snapshot
+        bookings_snapshot,
+        scheduling_snapshot
       )
 
     image_blocks =
@@ -182,7 +188,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          prior_turns,
          recent_deleted_jobs,
          clients_snapshot,
-         bookings_snapshot
+         bookings_snapshot,
+         scheduling_snapshot
        ) do
     jobs_json = encode_json(jobs_snapshot)
     clients_json = encode_json(clients_snapshot)
@@ -190,6 +197,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     emp_json = encode_json(employees_snapshot)
     deleted_json = encode_json(recent_deleted_jobs)
     bookings_json = encode_json(bookings_snapshot)
+    scheduling_json = encode_json(scheduling_snapshot)
 
     thread_block = format_prior_turns(prior_turns)
 
@@ -248,6 +256,11 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Bookings snapshot:
     ---
     #{bookings_json}
+    ---
+
+    Technician scheduling prefs and playbook (JSON — use for proposing customer outreach and honoring contractor rules):
+    ---
+    #{scheduling_json}
     ---
     """
   end
@@ -420,6 +433,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     **Cancel:** `{ "intent": "cancel", "booking_id": <int from upcoming_bookings>, "reason": "<optional short reason>" }`
 
     Return `[]` when the message has no booking intent (no initiate, update, confirm, or cancel). Use **`proposed_booking_initiates`** (not `booking_actions`) when you only want to *offer* texting the customer after a new lead.
+
+    Honor **`scheduling_snapshot`** prefs and playbook when proposing customer outreach (concrete openings, outreach style, confirm-before-offer). If the contractor updates scheduling preferences in natural language ("from now on always confirm before offering times"), acknowledge in **`assistant_sms`** — the server may also process dedicated scheduling-preference messages separately.
 
     ---
 

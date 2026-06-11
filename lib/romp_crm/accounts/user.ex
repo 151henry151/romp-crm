@@ -37,6 +37,7 @@ defmodule RompCrm.Accounts.User do
     field :scheduling_prefs_json, :string
 
     field :sms_assistant_intro_completed_at, :utc_datetime
+    field :scheduling_setup_completed_at, :utc_datetime
 
     has_many :business_memberships, RompCrm.Businesses.BusinessMembership
 

@@ -41,6 +41,8 @@ defmodule RompCrm.Bookings.AvailabilitySummary do
           busy
           |> AvailabilityEngine.available_slots(today, to_date, prefs, duration_minutes)
           |> Enum.reject(&(DateTime.compare(&1.start, DateTime.utc_now()) == :lt))
+          |> apply_min_lead_days(prefs, tz)
+          |> apply_scheduling_bias(prefs)
           |> Enum.take(max_slots)
 
         _ ->
@@ -67,6 +69,41 @@ defmodule RompCrm.Bookings.AvailabilitySummary do
       %{open_slots: [], local_slot_offerings: [], contractor_phrase: ""}
   end
 
+  @doc "Filters slot offerings for customer AI when contractor must approve first."
+  def filter_offerings_for_link(summary, link_id, business_id, user_id)
+      when is_map(summary) and is_integer(link_id) do
+    alias RompCrm.Scheduling.{Playbook, SlotApprovals}
+
+    if Playbook.confirm_before_offer_slots?(business_id, user_id) do
+      approved = SlotApprovals.approved_offerings_for_link(link_id)
+
+      if approved == [] do
+        %{summary | local_slot_offerings: [], open_slots: [], contractor_phrase: ""}
+      else
+        keep = MapSet.new(approved)
+
+        offerings =
+          summary.local_slot_offerings
+          |> Enum.filter(&MapSet.member?(keep, &1))
+
+        open_slots =
+          summary.open_slots
+          |> Enum.take(length(offerings))
+
+        %{
+          summary
+          | local_slot_offerings: offerings,
+            open_slots: open_slots,
+            contractor_phrase: contractor_phrase(offerings)
+        }
+      end
+    else
+      summary
+    end
+  end
+
+  def filter_offerings_for_link(summary, _, _, _), do: summary
+
   @doc "Short phrase listing up to #{@contractor_offer_count} concrete local times."
   def contractor_phrase(offerings) when is_list(offerings) do
     case Enum.take(offerings, @contractor_offer_count) do
@@ -74,6 +111,35 @@ defmodule RompCrm.Bookings.AvailabilitySummary do
       times -> " We have openings at " <> format_time_list(times) <> "."
     end
   end
+
+  defp apply_min_lead_days(slots, %Prefs{min_lead_days: 0}, _tz), do: slots
+
+  defp apply_min_lead_days(slots, %Prefs{min_lead_days: days}, tz) when days > 0 do
+    cutoff_date =
+      DateTime.utc_now()
+      |> DateTime.shift_zone!(tz)
+      |> DateTime.to_date()
+      |> Date.add(days)
+
+    Enum.filter(slots, fn slot ->
+      slot.start |> DateTime.shift_zone!(tz) |> DateTime.to_date()
+      |> then(fn d -> Date.compare(d, cutoff_date) != :lt end)
+    end)
+  end
+
+  defp apply_scheduling_bias(slots, %Prefs{scheduling_bias: "asap"}), do: slots
+
+  defp apply_scheduling_bias(slots, %Prefs{scheduling_bias: "spread", timezone: tz}) do
+    slots
+    |> Enum.group_by(fn slot ->
+      slot.start |> DateTime.shift_zone!(tz) |> DateTime.to_date()
+    end)
+    |> Map.values()
+    |> Enum.map(&List.first/1)
+    |> Enum.sort_by(& &1.start, DateTime)
+  end
+
+  defp apply_scheduling_bias(slots, _), do: slots
 
   defp format_time_list([one]), do: one
 
@@ -99,7 +165,7 @@ defmodule RompCrm.Bookings.AvailabilitySummary do
   defp technician_prefs(user_id) do
     case Repo.get(User, user_id) do
       %User{scheduling_prefs_json: json} when is_binary(json) -> Prefs.decode(json)
-      _ -> Prefs.default()
+      _ -> Prefs.decode(nil)
     end
   end
 end

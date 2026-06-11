@@ -9,7 +9,7 @@ defmodule RompCrmWeb.CalendarSettingsController do
   alias RompCrm.Accounts
   alias RompCrm.Scheduling.CalendarCredentials
   alias RompCrm.Scheduling.GoogleCalendarSource
-  alias RompCrm.Scheduling.Prefs
+  alias RompCrm.Scheduling.{Playbook, Prefs, TimezoneInference}
 
   @settings_path "/users/settings"
 
@@ -19,14 +19,35 @@ defmodule RompCrmWeb.CalendarSettingsController do
     user = conn.assigns.current_scope.user
     raw = Map.get(params, "prefs") || %{}
 
+    tz =
+      case Map.get(raw, "timezone") |> to_string() |> String.trim() do
+        "" ->
+          user.phone_normalized
+          |> Kernel.||(user.phone)
+          |> TimezoneInference.from_phone()
+          |> then(fn inferred ->
+            case TimezoneInference.from_conn(conn) do
+              ^inferred -> inferred
+              conn_tz when inferred == "America/New_York" -> conn_tz
+              _ -> inferred
+            end
+          end)
+
+        explicit ->
+          explicit
+      end
+
     prefs =
       Prefs.decode(
         Jason.encode!(%{
-          "timezone" => Map.get(raw, "timezone"),
+          "timezone" => tz,
           "workday_start" => Map.get(raw, "workday_start"),
           "workday_end" => Map.get(raw, "workday_end"),
           "work_days" => parse_work_days(Map.get(raw, "work_days")),
-          "buffer_minutes" => parse_int(Map.get(raw, "buffer_minutes"))
+          "buffer_minutes" => parse_int(Map.get(raw, "buffer_minutes")),
+          "customer_outreach_style" => Map.get(raw, "customer_outreach_style"),
+          "min_lead_days" => parse_int(Map.get(raw, "min_lead_days")),
+          "scheduling_bias" => nilify_blank(Map.get(raw, "scheduling_bias"))
         })
       )
 
@@ -172,4 +193,28 @@ defmodule RompCrmWeb.CalendarSettingsController do
   end
 
   defp parse_int(_), do: nil
+
+  defp nilify_blank(v) when is_binary(v) do
+    if String.trim(v) == "", do: nil, else: String.trim(v)
+  end
+
+  defp nilify_blank(v), do: v
+
+  def deactivate_playbook_rule(conn, %{"id" => id}) do
+    user = conn.assigns.current_scope.user
+    business_id = user.selected_business_id || user.sms_business_id
+
+    with bid when is_integer(bid) <- business_id,
+         {rule_id, ""} <- Integer.parse(to_string(id)),
+         {:ok, _} <- Playbook.deactivate_rule!(rule_id, bid, user.id) do
+      conn
+      |> put_flash(:info, "Scheduling rule removed.")
+      |> redirect(to: @settings_path)
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Could not remove that rule.")
+        |> redirect(to: @settings_path)
+    end
+  end
 end

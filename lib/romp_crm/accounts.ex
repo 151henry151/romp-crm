@@ -736,6 +736,13 @@ defmodule RompCrm.Accounts do
     |> Repo.update()
   end
 
+  @doc "Marks first-time SMS scheduling setup complete for this technician."
+  def mark_scheduling_setup_completed(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(scheduling_setup_completed_at: DateTime.utc_now(:second))
+    |> Repo.update()
+  end
+
   @doc "Updates scheduled CSV export; recalculates **`data_export_next_run_at`** when schedule is not **`none`**."
   def update_user_export_settings(%User{} = user, attrs) when is_map(attrs) do
     user

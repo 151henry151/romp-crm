@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.13.0] - 2026-06-11
+
+### Added
+
+- **Scheduling setup (SMS)**: gate first customer scheduling text behind a one-time contractor onboarding thread (work hours, outreach style A/B/C, optional open-ended playbook description)
+- **`scheduling_playbook_rules`**: persist greeting templates, confirm-before-offer, min lead days, scheduling bias, and custom instructions extracted from natural language
+- **`SchedulingPlaybookExtractor`**: parse structured setup replies, open-ended playbook text, and ongoing preference updates from contractor SMS
+- **`TimezoneInference`**: default scheduling time zone from phone area code (or connection IP on settings save) — no timezone prompt during setup
+- **`booking_slot_approvals`**: when confirm-before-offer is enabled, hold customer slot offers until contractor replies YES via SMS
+- **Settings**: customer outreach style, minimum days notice, slot preference, and playbook rule list with remove action
+
+### Changed
+
+- **`ClientInvitationSms`**: honor outreach style and custom greeting templates from playbook
+- **`AvailabilitySummary`**: enforce `min_lead_days` and `scheduling_bias` on slot lists before AI or customer SMS see them
+- **Customer booking AI**: inject `scheduling_playbook` context; support `request_slot_approval` action when confirm-before-offer is active
+- **Unified contractor SMS AI**: include scheduling prefs/playbook snapshot in extraction context
+
+## [0.12.11] - 2026-06-11
+
+### Changed
+
+- **Chats mobile thread**: restore inner rounded border on the message panel; keep outer thread card borderless on small screens
+
 ## [0.12.10] - 2026-06-11
 
 ### Fixed

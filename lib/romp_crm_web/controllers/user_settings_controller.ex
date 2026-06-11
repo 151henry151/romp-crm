@@ -347,10 +347,18 @@ defmodule RompCrmWeb.UserSettingsController do
     |> assign(:paypal_trial_days, Billing.paypal_trial_days())
     |> assign(:calendar_credentials, RompCrm.Scheduling.CalendarCredentials.list_for_user(user.id))
     |> assign(:scheduling_prefs, RompCrm.Scheduling.Prefs.decode(user.scheduling_prefs_json))
+    |> assign(:scheduling_playbook_rules, scheduling_playbook_rules_for_settings(user))
     |> assign(
       :google_calendar_configured,
       RompCrm.Scheduling.GoogleCalendarSource.oauth_configured?()
     )
+  end
+
+  defp scheduling_playbook_rules_for_settings(user) do
+    case user.selected_business_id || user.sms_business_id do
+      bid when is_integer(bid) -> RompCrm.Scheduling.Playbook.list_rules(bid, user.id)
+      _ -> []
+    end
   end
 
   defp export_email_sent_flash(kinds, workspace_count) do

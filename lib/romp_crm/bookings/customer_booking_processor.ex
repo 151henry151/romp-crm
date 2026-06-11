@@ -20,7 +20,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
-  alias RompCrm.Scheduling.{AvailabilityEngine, Prefs}
+  alias RompCrm.Scheduling.{AvailabilityEngine, Playbook, Prefs, SlotApprovals}
   alias RompCrm.SmsConversations
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -163,8 +163,38 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   end
 
   defp handle_result(%{action: nil} = result, resolved, links, _phone_norm) do
-    reply = nonempty_reply(result.reply_sms)
+    reply = maybe_gate_slot_offer(result, resolved, nonempty_reply(result.reply_sms))
     {reply, if(resolved, do: [resolved], else: links)}
+  end
+
+  defp handle_result(%{action: %{type: :request_slot_approval} = action} = result, %BookingLink{} = link, _links, _phone_norm) do
+    offerings = action.local_offerings || []
+    full_summary = full_availability_summary(link)
+
+    offerings =
+      if offerings == [] do
+        full_summary.local_slot_offerings |> Enum.take(3)
+      else
+        offerings
+      end
+
+    if offerings != [] do
+      _ =
+        SlotApprovals.request!(
+          link,
+          offerings,
+          Enum.take(full_summary.open_slots, length(offerings)),
+          result.reply_sms
+        )
+
+      reply =
+        nonempty_reply(result.reply_sms) ||
+          "Thanks — let me check with our team on available times and I'll get back to you shortly."
+
+      {reply, [link]}
+    else
+      {nonempty_reply(result.reply_sms), [link]}
+    end
   end
 
   defp handle_result(%{action: action} = _result, nil, links, _phone_norm) do
@@ -293,6 +323,13 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
         days: @slot_preview_days,
         max_slots: @slot_preview_count
       )
+      |> AvailabilitySummary.filter_offerings_for_link(
+        link.id,
+        link.business_id,
+        link.technician_user_id
+      )
+
+  playbook = Playbook.snapshot_for_ai(link.business_id, link.technician_user_id)
 
     %{
       "booking_link_id" => link.id,
@@ -306,9 +343,51 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "open_slots" => summary.open_slots,
       "local_slot_offerings" => summary.local_slot_offerings,
       "intake" => Intake.snapshot_for_link(link),
-      "scheduling_memories" => Escalations.memories_snapshot_for_ai(link.business_id)
+      "scheduling_memories" => Escalations.memories_snapshot_for_ai(link.business_id),
+      "scheduling_playbook" => playbook,
+      "confirm_before_offer_slots" => playbook["confirm_before_offer_slots"]
     }
   end
+
+  defp full_availability_summary(%BookingLink{} = link) do
+    AvailabilitySummary.compute(
+      link.business_id,
+      link.technician_user_id,
+      link.duration_max_minutes || 120,
+      days: @slot_preview_days,
+      max_slots: @slot_preview_count
+    )
+  end
+
+  defp maybe_gate_slot_offer(result, %BookingLink{} = link, reply) do
+    if Playbook.confirm_before_offer_slots?(link.business_id, link.technician_user_id) and
+         offers_specific_slots?(reply, link) do
+      full = full_availability_summary(link)
+      offerings = Enum.take(full.local_slot_offerings, 3)
+
+      if offerings != [] do
+        _ = SlotApprovals.request!(link, offerings, Enum.take(full.open_slots, 3), reply)
+
+        "Thanks — let me check with our team on available times and I'll get back to you shortly."
+      else
+        reply
+      end
+    else
+      reply
+    end
+  end
+
+  defp maybe_gate_slot_offer(_result, _link, reply), do: reply
+
+  defp offers_specific_slots?(reply, link) when is_binary(reply) do
+    full = full_availability_summary(link)
+
+    Enum.any?(full.local_slot_offerings, fn offering ->
+      String.contains?(reply, offering)
+    end)
+  end
+
+  defp offers_specific_slots?(_, _), do: false
 
   defp conflict_status(%BookingLink{} = link, window, duration_minutes) do
     prefs = technician_prefs(link)

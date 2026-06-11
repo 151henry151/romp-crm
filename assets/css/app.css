@@ -266,12 +266,8 @@ img.brand-logo-dark {
     @apply min-h-0 flex-1 basis-0 overflow-y-auto overscroll-contain rounded-lg border border-base-300/60 bg-base-200/20 p-2;
   }
 
-  /* Mobile thread: no card chrome; padding comes from layout main (no negative margins) */
+  /* Mobile thread: drop outer card chrome only; keep inner message-panel border */
   .chats-page--thread .chats-thread-card {
     @apply max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:p-0 max-md:shadow-none;
-  }
-
-  .chats-page--thread .chats-message-panel {
-    @apply max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:py-1;
   }
 }

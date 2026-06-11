@@ -110,6 +110,15 @@ defmodule RompCrm.Ai.CustomerBookingExtractor do
           {:ok, %{type: :escalate_question, question_text: text}}
         end
 
+      "request_slot_approval" ->
+        offerings =
+          m["local_offerings"]
+          |> List.wrap()
+          |> Enum.map(&to_string/1)
+          |> Enum.reject(&(&1 == ""))
+
+        {:ok, %{type: :request_slot_approval, local_offerings: offerings}}
+
       _ ->
         {:error, :unknown_booking_action_type}
     end

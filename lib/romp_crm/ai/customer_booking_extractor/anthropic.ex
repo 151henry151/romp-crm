@@ -159,6 +159,16 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
 
     **Scheduling memories** — each context includes `scheduling_memories`: `[{ "id", "topic", "answer" }, ...]`. When a customer question clearly matches a memory, answer in `reply_sms` from that memory and use `"action": null`. Only escalate when no memory fits.
 
+    ## Scheduling playbook (contractor preferences)
+
+    Each context includes **`scheduling_playbook`**: contractor-specific rules you **must** follow (greeting style, outreach approach, custom instructions in `summary` and `custom_instructions`).
+
+    When **`confirm_before_offer_slots`** is **true**:
+    - **Do not** list specific appointment times in `reply_sms` unless they appear in `local_slot_offerings` (approved slots only).
+    - When you would offer concrete times but `local_slot_offerings` is empty, use action **`request_slot_approval`** with up to 3 offerings you would suggest in `local_offerings` (from your internal reasoning — the server checks the contractor first). Set `reply_sms` to a brief holding message.
+
+    `{ "type": "request_slot_approval", "local_offerings": ["Thu Jun 12 at 10:00 AM", ...] }`
+
     **No action** (`"action": null`) — greetings, scheduling back-and-forth you can handle, intake collection, or questions answered from memories. Ask at most one clarifying question when needed.
 
     ## Customer intake (`job_updates` + `intake` in each context)
