@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.4] - 2026-06-11
+
+### Fixed
+
+- **Chats takeover confirm dialog**: use standard modal component with solid `bg-base-100` panel and dimmed backdrop instead of transparent daisyUI `modal-box`
+
 ## [0.12.3] - 2026-06-11
 
 ### Fixed

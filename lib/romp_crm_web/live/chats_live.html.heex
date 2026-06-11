@@ -115,24 +115,25 @@
   </div>
 
   <%= if @show_takeover_confirm? do %>
-    <div class="modal modal-open" role="dialog" aria-labelledby="takeover-modal-title">
-      <div class="modal-box max-w-md">
-        <h3 id="takeover-modal-title" class="text-lg font-semibold">Take over this chat?</h3>
-        <p class="mt-2 text-sm text-base-content/80">
+    <.modal id="takeover-confirm-modal" show on_cancel={JS.push("cancel_takeover_confirm")}>
+      <div class="max-w-md space-y-4 pr-8">
+        <h2 id="takeover-modal-title" class="text-lg font-semibold text-base-content">
+          Take over this chat?
+        </h2>
+        <p class="text-sm text-base-content/80">
           The customer will receive a text:
           <span class="italic">"We're connecting you with a team member now — please hold on a moment."</span>
           The scheduling agent will stop replying until you hand the chat back.
         </p>
-        <div class="modal-action">
-          <button type="button" phx-click="cancel_takeover_confirm" class="btn btn-ghost btn-sm">
-            Cancel
-          </button>
+        <div class="flex flex-wrap gap-2 pt-2">
           <button type="button" phx-click="confirm_takeover" class="btn btn-primary btn-sm">
             Take over chat
           </button>
+          <button type="button" phx-click="cancel_takeover_confirm" class="btn btn-ghost btn-sm">
+            Cancel
+          </button>
         </div>
       </div>
-      <button type="button" class="modal-backdrop" phx-click="cancel_takeover_confirm" aria-label="Close" />
-    </div>
+    </.modal>
   <% end %>
 </Layouts.app>
