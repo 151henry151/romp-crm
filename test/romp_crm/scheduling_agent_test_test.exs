@@ -152,6 +152,60 @@ defmodule RompCrm.SchedulingAgentTestTest do
            end)
   end
 
+  test "contractor escalation reply does not crash and prompts memory offer", %{
+    user: user,
+    business: business
+  } do
+    {:ok, state, _link, _client} =
+      Sandbox.create_booking_link(Sandbox.fresh_state(), %{
+        "client_name" => "Sally",
+        "phone" => "18025551234",
+        "job_type_label" => "sink repair",
+        "duration_min_minutes" => 90,
+        "duration_max_minutes" => 120
+      })
+
+    SchedulingAgentTest.save_session(user, business.id, state)
+
+    json =
+      Jason.encode!(%{
+        "reply_sms" => "Let me check with our team.",
+        "action" => %{
+          "type" => "escalate_question",
+          "question_text" => "How many people will be coming for the sink repair?"
+        }
+      })
+
+    assert {:ok, _} =
+             SchedulingAgentTest.send_client(user, business.id, "STUB_CLARIFY #{json}")
+
+    escalation_json =
+      Jason.encode!(%{
+        "reply_sms" => "Ok — I'll let Sally know.",
+        "resolved_escalation_id" => 1,
+        "intent" => "provide_answer",
+        "contractor_answer" => "Two people will be coming for the sink repair."
+      })
+
+    assert {:ok, _meta} =
+             SchedulingAgentTest.send_contractor(
+               user,
+               business.id,
+               "STUB_ESCALATION #{escalation_json}"
+             )
+
+    state = SchedulingAgentTest.get_or_create_session(user, business.id)
+
+    [escalation] = state["pending_escalations"]
+
+    assert escalation["status"] == "pending_memory_confirm"
+    assert escalation["contractor_answer"] == "Two people will be coming for the sink repair."
+
+    assert Enum.any?(state["contractor_turns"], fn turn ->
+             turn["role"] == "assistant" and String.contains?(turn["text"], "Sally")
+           end)
+  end
+
   test "confirmed booking notifies contractor pane", %{user: user, business: business} do
     {:ok, state, link, _client} =
       Sandbox.create_booking_link(Sandbox.fresh_state(), %{

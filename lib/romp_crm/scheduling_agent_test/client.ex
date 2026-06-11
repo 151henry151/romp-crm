@@ -8,7 +8,7 @@ defmodule RompCrm.SchedulingAgentTest.Client do
   alias RompCrm.Scheduling
   alias RompCrm.Scheduling.AvailabilityEngine
   alias RompCrm.Scheduling.Prefs
-  alias RompCrm.SchedulingAgentTest.{Escalations, Notifications, Sandbox}
+  alias RompCrm.SchedulingAgentTest.{ErrorReply, Escalations, Notifications, Sandbox}
 
   @doc """
   Processes a test-customer message. Returns `{:ok, state, reply}` or `{:error, :no_active_link}`.
@@ -35,9 +35,7 @@ defmodule RompCrm.SchedulingAgentTest.Client do
             {:ok, state, reply}
 
           {:error, reason} ->
-            reply =
-              "Sorry, we couldn't process that just now in the test workspace. (#{inspect(reason)})"
-
+            reply = ErrorReply.for_reason(reason)
             state = Sandbox.append_client_turn(state, "scheduling_assistant", reply)
             {:ok, state, reply}
         end

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2] - 2026-06-11
+
+### Fixed
+
+- **Scheduling agent test workspace**: fix contractor escalation replies silently failing — outer `case` only matched 2-tuples, so handled escalations returning `{:ok, state, meta}` crashed the LiveView
+- **Scheduling agent test workspace**: show friendly AI error messages instead of raw `inspect/1` tuples when Anthropic calls fail
+
 ## [0.12.1] - 2026-06-11
 
 ### Fixed

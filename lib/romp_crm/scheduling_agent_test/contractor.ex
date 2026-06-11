@@ -7,7 +7,7 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
   alias RompCrm.Bookings.ClientInvitationSms
   alias RompCrm.Bookings.OpeningsPreview
   alias RompCrm.Reminders
-  alias RompCrm.SchedulingAgentTest.{Escalations, Sandbox}
+  alias RompCrm.SchedulingAgentTest.{ErrorReply, Escalations, Sandbox}
   alias RompCrm.SmsBookingConsent
   alias RompCrm.SmsPendingBookingProposals
   alias RompCrm.Twilio.Phone
@@ -33,13 +33,6 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
         {:ok, state, %{contractor_reply: reply, client_outreach: client_sms}}
 
       :continue ->
-        :continue_escalation
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_escalation ->
         continue_contractor(state, user, business_id, body)
     end
   end
@@ -112,7 +105,7 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
         apply_extracted(state, user, business_id, body, extracted)
 
       {:error, reason} ->
-        reply = "Sorry, I couldn't process that in the test workspace. (#{inspect(reason)})"
+        reply = ErrorReply.for_reason(reason)
 
         state =
           state
