@@ -14,6 +14,7 @@ defmodule RompCrm.SmsInboundRoleRouter do
   alias RompCrm.Bookings
   alias RompCrm.Bookings.BookingLink
   alias RompCrm.Businesses
+  alias RompCrm.ClientChats
   alias RompCrm.SmsInboundRolePrompts
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
@@ -42,6 +43,9 @@ defmodule RompCrm.SmsInboundRoleRouter do
 
     cond do
       norm == "" ->
+        {:client, params}
+
+      ClientChats.taken_over_anywhere?(norm) ->
         {:client, params}
 
       links == [] and is_nil(user) ->

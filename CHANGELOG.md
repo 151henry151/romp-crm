@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.3] - 2026-06-11
+
+### Fixed
+
+- **Chats human takeover**: record inbound customer SMS during takeover after the booking link is already `booked` (previously only `pending` links routed client SMS, so replies like Jasmine's were dropped)
+- **`ClientChats.record_inbound_while_taken_over`**: key off active takeover rows instead of pending booking links
+- **`SmsInboundRoleRouter`**: route to client scheduling when a phone has an active takeover even without a pending link
+
 ## [0.12.2] - 2026-06-11
 
 ### Fixed

@@ -65,6 +65,11 @@ defmodule RompCrm.ClientChats do
   end
 
   @doc false
+  def taken_over_anywhere?(phone_normalized) when is_binary(phone_normalized) do
+    Repo.exists?(from t in Takeover, where: t.phone_normalized == ^phone_normalized)
+  end
+
+  @doc false
   def get_takeover(business_id, phone_normalized) do
     Repo.get_by(Takeover, business_id: business_id, phone_normalized: phone_normalized)
   end
@@ -143,18 +148,26 @@ defmodule RompCrm.ClientChats do
   @doc """
   When the scheduling agent path receives inbound SMS but a human has taken over,
   record the customer message only (no AI reply).
+
+  Uses active takeover rows — not pending booking links — so inbound still works
+  after a visit is already booked.
   """
-  def record_inbound_while_taken_over(links, phone_norm, inbound_body) when is_list(links) do
-    links
-    |> Enum.filter(fn %BookingLink{} = link ->
-      taken_over?(link.business_id, phone_norm)
-    end)
-    |> Enum.uniq_by(& &1.business_id)
-    |> Enum.each(fn link ->
+  def record_inbound_while_taken_over(phone_norm, inbound_body) when is_binary(phone_norm) do
+    Repo.all(from t in Takeover, where: t.phone_normalized == ^phone_norm)
+    |> Enum.each(fn takeover ->
+      link =
+        case takeover.booking_link_id do
+          id when is_integer(id) -> Repo.get(BookingLink, id)
+          _ -> primary_link_for_phone(takeover.business_id, phone_norm)
+        end
+
+      tech_id =
+        (link && link.technician_user_id) || takeover.taken_over_by_user_id
+
       _ =
         SmsConversations.record_client_message(
-          link.business_id,
-          link.technician_user_id,
+          takeover.business_id,
+          tech_id,
           phone_norm,
           "inbound",
           inbound_body,

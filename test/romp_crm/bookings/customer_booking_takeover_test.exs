@@ -68,4 +68,27 @@ defmodule RompCrm.Bookings.CustomerBookingTakeoverTest do
              m.direction == "outbound" and m.channel == "sms" and String.contains?(m.body, "Tuesday")
            end)
   end
+
+  test "inbound SMS during takeover is recorded after booking link is booked", %{
+    user: user,
+    business: business,
+    phone: phone,
+    link: link
+  } do
+    assert {:ok, _} = Bookings.mark_booking_link(link, "booked")
+    assert Bookings.active_links_for_client_phone(phone) == []
+
+    :ok = ClientChats.take_over!(user, business.id, phone)
+
+    params = %{
+      "From" => "+18025559876",
+      "Body" => "Henry?",
+      "MessageSid" => "SM_takeover_booked_test"
+    }
+
+    assert {:ok, :human_takeover_silent} = CustomerBookingProcessor.deliver_from_twilio(params)
+
+    msgs = SmsConversations.list_client_thread_messages(business.id, phone)
+    assert Enum.any?(msgs, &(&1.direction == "inbound" and &1.body == "Henry?"))
+  end
 end

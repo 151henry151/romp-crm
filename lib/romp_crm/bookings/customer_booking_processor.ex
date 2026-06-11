@@ -40,12 +40,30 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
     from = (params["From"] || "") |> to_string()
     phone_norm = Phone.normalize_us(from)
 
-    case phone_norm != "" && Bookings.active_links_for_client_phone(phone_norm) do
-      links when is_list(links) and links != [] ->
-        process(phone_norm, body, links, params)
-
-      _ ->
+    cond do
+      phone_norm == "" ->
         :ignore
+
+      true ->
+        links = Bookings.active_links_for_client_phone(phone_norm)
+
+        cond do
+          links != [] ->
+            process(phone_norm, body, links, params)
+
+          ClientChats.taken_over_anywhere?(phone_norm) ->
+            message_sid = (params["MessageSid"] || "") |> to_string()
+
+            Logger.info(
+              "Client booking inbound during human takeover (no pending link): sid=#{message_sid} phone=#{phone_norm}"
+            )
+
+            ClientChats.record_inbound_while_taken_over(phone_norm, body)
+            {:ok, :human_takeover_silent}
+
+          true ->
+            :ignore
+        end
     end
   end
 
@@ -56,18 +74,16 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "Client booking inbound: sid=#{message_sid} phone=#{phone_norm} candidate_links=#{length(links)}"
     )
 
-    if human_takeover_active?(links, phone_norm) do
-      ClientChats.record_inbound_while_taken_over(links, phone_norm, body)
+    if human_takeover_active?(phone_norm) do
+      ClientChats.record_inbound_while_taken_over(phone_norm, body)
       {:ok, :human_takeover_silent}
     else
       process_with_agent(phone_norm, body, links, params, message_sid)
     end
   end
 
-  defp human_takeover_active?(links, phone_norm) do
-    Enum.any?(links, fn %BookingLink{business_id: bid} ->
-      ClientChats.taken_over?(bid, phone_norm)
-    end)
+  defp human_takeover_active?(phone_norm) do
+    ClientChats.taken_over_anywhere?(phone_norm)
   end
 
   defp process_with_agent(phone_norm, body, links, params, message_sid) do
