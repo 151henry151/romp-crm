@@ -10,7 +10,7 @@
   content_width={:wide}
   viewport_fill={not is_nil(@current_business_id)}
 >
-  <div class="chats-page">
+  <div class={["chats-page", @mobile_view == :thread && "chats-page--thread"]}>
     <div class={[@mobile_view == :thread && "max-md:hidden", "chats-thread-static"]}>
       <.header>
         Chats

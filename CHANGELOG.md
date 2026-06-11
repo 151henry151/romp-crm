@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.9] - 2026-06-11
+
+### Changed
+
+- **Chats mobile thread**: remove outer rounded card border and bleed content closer to screen edges; drop inner message panel border on small screens
+
 ## [0.12.8] - 2026-06-11
 
 ### Fixed
