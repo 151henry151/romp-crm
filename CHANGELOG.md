@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.6] - 2026-06-11
+
+### Fixed
+
+- **Chats mobile thread**: pin active conversation to viewport height with message list scrolling inside `#chats-panel`; remove nested scroll on `chat_thread`
+
 ## [0.12.5] - 2026-06-11
 
 ### Changed

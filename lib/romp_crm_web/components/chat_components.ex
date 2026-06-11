@@ -9,7 +9,7 @@ defmodule RompCrmWeb.ChatComponents do
 
   def chat_thread(assigns) do
     ~H"""
-    <div id={@id} class="flex flex-col gap-2 overflow-y-auto px-0.5 py-1">
+    <div id={@id} class="flex flex-col gap-2 px-0.5 py-1">
       <%= for row <- @rows do %>
         <.chat_bubble row={row} />
       <% end %>
