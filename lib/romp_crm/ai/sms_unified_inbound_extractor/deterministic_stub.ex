@@ -250,7 +250,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
     end
   end
 
-  defp stub_json(json) do
+  defp stub_json(rest) do
+    json = json_from_stub_rest(rest)
+
     case Jason.decode(json) do
       {:ok, %{} = map} ->
         map =
@@ -270,6 +272,13 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
   end
 
   defp lift_legacy_actions_key(%{"job_actions" => _} = m), do: m
+
+  defp json_from_stub_rest(rest) do
+    case :binary.match(rest, "{") do
+      {pos, _} -> rest |> String.slice(pos..-1//1) |> String.trim()
+      :nomatch -> String.trim(rest)
+    end
+  end
 
   defp lift_legacy_actions_key(%{"actions" => actions} = m) when is_list(actions) do
     Map.put(m, "job_actions", actions)

@@ -11,6 +11,7 @@ defmodule RompCrm.Bookings.Orchestrator do
   require Logger
 
   alias RompCrm.Bookings
+  alias RompCrm.Bookings.OpeningsPreview
   alias RompCrm.Businesses
   alias RompCrm.Clients
   alias RompCrm.SmsConversations
@@ -199,48 +200,7 @@ defmodule RompCrm.Bookings.Orchestrator do
   # " We have openings Tuesday afternoon or Wednesday morning." — first two
   # distinct day/part-of-day openings over the next week, empty when none.
   defp openings_phrase(link, ctx) do
-    tz = technician_timezone(ctx)
-    today = DateTime.utc_now() |> DateTime.shift_zone!(tz) |> DateTime.to_date()
-    prefs = technician_prefs(ctx)
-
-    {:ok, busy} =
-      RompCrm.Scheduling.combined_busy_blocks(
-        ctx.business_id,
-        ctx.user_id,
-        {today, Date.add(today, 6)},
-        tz
-      )
-
-    duration = link.duration_max_minutes || 60
-
-    busy
-    |> RompCrm.Scheduling.AvailabilityEngine.available_slots(today, Date.add(today, 6), prefs, duration)
-    |> Enum.reject(&(DateTime.compare(&1.start, DateTime.utc_now()) == :lt))
-    |> Enum.map(fn slot ->
-      local = DateTime.shift_zone!(slot.start, tz)
-      {Calendar.strftime(local, "%A"), day_period(local.hour)}
-    end)
-    |> Enum.uniq()
-    |> Enum.take(2)
-    |> case do
-      [] -> ""
-      pairs -> " We have openings " <> Enum.map_join(pairs, " or ", fn {day, period} -> "#{day} #{period}" end) <> "."
-    end
-  rescue
-    e ->
-      Logger.warning("Booking openings preview failed: #{Exception.message(e)}")
-      ""
-  end
-
-  defp day_period(hour) when hour < 12, do: "morning"
-  defp day_period(hour) when hour < 17, do: "afternoon"
-  defp day_period(_), do: "evening"
-
-  defp technician_prefs(ctx) do
-    case RompCrm.Repo.get(RompCrm.Accounts.User, ctx.user_id) do
-      nil -> RompCrm.Scheduling.Prefs.default()
-      user -> RompCrm.Scheduling.Prefs.decode(user.scheduling_prefs_json)
-    end
+    OpeningsPreview.phrase(ctx.business_id, ctx.user_id, link.duration_max_minutes || 120)
   end
 
   defp deliver_client_sms(e164, body, phone_norm, ctx) do

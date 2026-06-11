@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.5] - 2026-06-11
+
+### Added
+
+- **Pending booking proposals** (`sms_pending_booking_proposals`): when a contractor adds a lead with customer phone and no visit date, store a proposed customer scheduling text until they reply YES (or similar); apply via `SmsPendingBookingProposals`
+- **`SmsBookingConsent`**: block same-turn `booking_initiate` with new job creates unless the contractor explicitly asked to text/schedule; skip outreach when the create carries a `scheduled_on` or timed work item
+- **`Bookings.OpeningsPreview`**: shared openings phrase for contractor ask-SMS and first customer booking SMS
+
+### Changed
+
+- **Contractor SMS booking flow**: ask before texting customers to schedule; suggest calendar openings in the ask; only send the customer SMS after confirmation (or explicit same-message consent)
+- **Unified extractor prompt**: use `proposed_booking_initiates` instead of auto-`booking_actions` on new leads; do not offer scheduling when the contractor already stated a visit date/time
+- **Removed** server-side `SmsBookingInitiateInference` auto-initiate on job create
+
 ## [0.10.4] - 2026-06-11
 
 ### Added

@@ -19,7 +19,9 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.SmsMms
-  alias RompCrm.SmsBookingInitiateInference
+  alias RompCrm.Bookings.OpeningsPreview
+  alias RompCrm.SmsBookingConsent
+  alias RompCrm.SmsPendingBookingProposals
   alias RompCrm.SmsPendingJobProposals
   alias RompCrm.TimeTracking
   alias RompCrm.Twilio.MmsImageDownload
@@ -199,7 +201,7 @@ defmodule RompCrm.SmsInboundProcessor do
         done
 
       :continue_escalation ->
-        if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
+        if phone_norm != "" and pending_confirmation_message?(body_text) do
           handle_pending_proposals(
             ctx,
             from,
@@ -272,36 +274,57 @@ defmodule RompCrm.SmsInboundProcessor do
          recent_deleted_jobs,
          clients_snapshot
        ) do
-    if phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) do
-      case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
-        {:ok, results} ->
-          reply =
-            SmsReplyBuilder.compose(nil, results)
-            |> case do
-              "" -> "Confirmed—created the proposed job(s) in Romp CRM."
-              r -> r
-            end
+    cond do
+      phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) ->
+        case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
+          {:ok, results} ->
+            reply =
+              SmsReplyBuilder.compose(nil, results)
+              |> case do
+                "" -> "Confirmed—created the proposed job(s) in Romp CRM."
+                r -> r
+              end
 
-          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-            message_sid: message_sid,
-            outcome: "pending_proposals_confirmed",
-            results: results
-          })
+            sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+              message_sid: message_sid,
+              outcome: "pending_proposals_confirmed",
+              results: results
+            })
 
-        :none ->
-          :continue_extract
+          :none ->
+            apply_pending_booking_or_continue(
+              ctx,
+              from,
+              user,
+              business_id,
+              phone_norm,
+              body_stored,
+              message_sid
+            )
 
-        {:error, :wrong_user} ->
-          reply = "Couldn't apply pending jobs for this account."
+          {:error, :wrong_user} ->
+            reply = "Couldn't apply pending jobs for this account."
 
-          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-            message_sid: message_sid,
-            outcome: "pending_proposals_wrong_user",
-            results: []
-          })
-      end
-    else
-      :continue_extract
+            sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+              message_sid: message_sid,
+              outcome: "pending_proposals_wrong_user",
+              results: []
+            })
+        end
+
+      phone_norm != "" and SmsPendingBookingProposals.confirmation_message?(body_text) ->
+        apply_pending_booking_or_continue(
+          ctx,
+          from,
+          user,
+          business_id,
+          phone_norm,
+          body_stored,
+          message_sid
+        )
+
+      true ->
+        :continue_extract
     end
     |> case do
       {:ok, _} = done ->
@@ -389,6 +412,7 @@ defmodule RompCrm.SmsInboundProcessor do
          reminder_operations: rem_ops_raw,
          booking_operations: booking_ops_raw,
          proposed_job_creates: proposed_raw,
+         proposed_booking_initiates: proposed_booking_raw,
          image_kind: image_kind
        }} ->
         proposed = fill_proposal_media_urls(proposed_raw, mms_urls)
@@ -436,6 +460,7 @@ defmodule RompCrm.SmsInboundProcessor do
             emp_ops_raw,
             rem_ops_raw,
             booking_ops_raw,
+            proposed_booking_raw,
             ctx.params
           )
         end
@@ -478,6 +503,7 @@ defmodule RompCrm.SmsInboundProcessor do
          emp_ops_raw,
          rem_ops_raw,
          booking_ops_raw,
+         proposed_booking_raw,
          body_params
        ) do
     caps = EmployeePermissions.for(user, business_id)
@@ -491,9 +517,13 @@ defmodule RompCrm.SmsInboundProcessor do
         caps
       )
 
-    booking_ops_raw =
-      booking_ops_raw ++
-        SmsBookingInitiateInference.supplement(booking_ops_raw, job_ops_raw, body_text)
+    {job_ops, booking_ops_raw, pending_booking_proposals} =
+      SmsBookingConsent.guard_operations(
+        job_ops,
+        booking_ops_raw,
+        body_text,
+        proposed_booking_raw
+      )
 
     # Booking conversations create clients/links, so gate on job-edit capability.
     booking_ops = if EmployeePermissions.can_edit_jobs?(caps), do: booking_ops_raw, else: []
@@ -627,8 +657,24 @@ defmodule RompCrm.SmsInboundProcessor do
                 jobs_snapshot
               )
 
+            store_pending_booking_proposals!(
+              business_id,
+              user.id,
+              phone_norm,
+              pending_booking_proposals,
+              all_results
+            )
+
             combined_assistant = first_nonempty([assistant])
-            reply = SmsReplyBuilder.compose(combined_assistant, all_results)
+
+            reply =
+              all_results
+              |> then(&SmsReplyBuilder.compose(combined_assistant, &1))
+              |> maybe_append_booking_ask(
+                pending_booking_proposals,
+                business_id,
+                user.id
+              )
 
             record_sms_db_audits(business_id, user.id, %{
               twilio_message_sid: message_sid,
@@ -640,6 +686,131 @@ defmodule RompCrm.SmsInboundProcessor do
               Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
             )
         end
+    end
+  end
+
+  defp pending_confirmation_message?(body) do
+    SmsPendingJobProposals.confirmation_message?(body) or
+      SmsPendingBookingProposals.confirmation_message?(body)
+  end
+
+  defp apply_pending_booking_or_continue(
+         ctx,
+         from,
+         user,
+         business_id,
+         phone_norm,
+         body_stored,
+         message_sid
+       ) do
+    case SmsPendingBookingProposals.apply_pending(
+           business_id,
+           user.id,
+           phone_norm,
+           message_sid
+         ) do
+      {:ok, results} ->
+        reply =
+          SmsReplyBuilder.compose(nil, results)
+          |> case do
+            "" -> "Sent the customer a scheduling text."
+            r -> r
+          end
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "pending_booking_confirmed",
+          results: results
+        })
+
+      :none ->
+        :continue_extract
+
+      {:error, :wrong_user} ->
+        reply = "Couldn't send the pending booking text for this account."
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "pending_booking_wrong_user",
+          results: []
+        })
+    end
+  end
+
+  defp store_pending_booking_proposals!(_bid, _uid, "", _proposals, _results), do: :ok
+
+  defp store_pending_booking_proposals!(
+         business_id,
+         user_id,
+         phone_norm,
+         proposals,
+         results
+       )
+       when is_list(proposals) and is_list(results) do
+    created_jobs = for({:created, %Job{} = job, _} <- results, do: job)
+
+    Enum.each(proposals, fn proposal ->
+      job = match_created_job_for_proposal(created_jobs, proposal)
+
+      attrs =
+        proposal
+        |> Map.new(fn {k, v} -> {to_string(k), v} end)
+        |> then(fn m -> if job, do: Map.put(m, "job_id", job.id), else: m end)
+
+      SmsPendingBookingProposals.store!(business_id, user_id, phone_norm, attrs)
+    end)
+  end
+
+  defp match_created_job_for_proposal(jobs, proposal) when is_list(jobs) and is_map(proposal) do
+    phone_norm = Phone.normalize_us(proposal["phone"] || proposal[:phone] || "")
+
+    Enum.find(jobs, fn job ->
+      job_phone = Phone.normalize_us(job.phone || "")
+
+      cond do
+        phone_norm != "" and job_phone != "" -> phone_norm == job_phone
+        true ->
+          same_client_name?(job.client_name, proposal["client_name"] || proposal[:client_name])
+      end
+    end)
+  end
+
+  defp same_client_name?(a, b) when is_binary(a) and is_binary(b) do
+    norm = fn s -> s |> String.downcase() |> String.trim() end
+    norm.(a) != "" and norm.(a) == norm.(b)
+  end
+
+  defp same_client_name?(_, _), do: false
+
+  defp maybe_append_booking_ask(reply, [], _business_id, _user_id), do: reply
+
+  defp maybe_append_booking_ask(reply, [proposal | _], business_id, user_id) do
+    openings =
+      OpeningsPreview.phrase(
+        business_id,
+        user_id,
+        Map.get(proposal, "duration_max_minutes") ||
+          Map.get(proposal, :duration_max_minutes) || 120
+      )
+
+    name =
+      (proposal["client_name"] || proposal[:client_name] || "the customer")
+      |> to_string()
+      |> String.split(" ")
+      |> List.first()
+
+    work = proposal["job_type_label"] || proposal[:job_type_label] || "the job"
+    base = reply || "Lead saved."
+
+    cond do
+      String.match?(base, ~r/\?/i) and openings != "" and not String.contains?(base, "openings") ->
+        String.trim_trailing(base, ".") <> "." <> openings <> " Reply YES to text them."
+
+      String.match?(base, ~r/\?/i) ->
+        if String.match?(base, ~r/\b(yes|reply)\b/i), do: base, else: base <> " Reply YES to text them."
+
+      true ->
+        "#{base} Should I text #{name} to schedule the #{work}?#{openings} Reply YES to send the scheduling text."
     end
   end
 

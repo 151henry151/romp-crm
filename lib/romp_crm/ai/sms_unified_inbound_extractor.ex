@@ -89,6 +89,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
     proposed = RompCrm.Ai.SmsProposedCreates.parse_list(proposed_raw)
     image_kind = RompCrm.Ai.SmsProposedCreates.parse_image_kind(Map.get(map, "image_kind"))
 
+    proposed_booking_raw = Map.get(map, "proposed_booking_initiates")
+    proposed_booking_initiates = if is_list(proposed_booking_raw), do: proposed_booking_raw, else: []
+
     with {:ok, job_ops} <- SmsJobExtractor.parse_actions_list(job_actions),
          {:ok, time_ops} <- SmsTimeExtractor.parse_actions_list(time_actions),
          {:ok, emp_ops} <- SmsEmployeeTimeExtractor.parse_actions_list(employee_actions),
@@ -113,6 +116,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
          reminder_operations: rem_ops,
          booking_operations: booking_ops,
          proposed_job_creates: proposed,
+         proposed_booking_initiates: proposed_booking_initiates,
          image_kind: image_kind
        }}
     end

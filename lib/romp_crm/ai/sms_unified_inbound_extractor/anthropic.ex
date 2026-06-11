@@ -313,7 +313,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       "time_actions": [ ... ],
       "employee_actions": [ ... ],
       "reminder_actions": [ ... ],
-      "booking_actions": [ ... ]
+      "booking_actions": [ ... ],
+      "proposed_booking_initiates": [ ... ]
     }
 
     Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
@@ -406,7 +407,11 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Phone is **required** — if the contractor gave no phone and no clients-snapshot match has one, ask for it in **`assistant_sms`** with empty `booking_actions`. If the stated phone is **not a valid US number** (10 digits, or 11 starting with 1 — e.g. only 9 digits), do **not** emit `initiate`; ask the contractor to re-send the correct number in **`assistant_sms`** (you may still emit the `job_actions` create).
     The server sends the customer an SMS with a self-scheduling web link and an invitation to reply by text; do **not** draft that message yourself. Confirm in **`assistant_sms`** what you set up (job type + duration estimate).
 
-    **Create + schedule in one message:** When the contractor gives a **customer name, phone, and work to do**, default to **both** a `job_actions` create **and** a `booking_actions` initiate — the server texts the customer to schedule unless the contractor clearly only wants a CRM lead saved (`"just add a lead"`, `"don't text them"`, `"save for later"`). Examples that need **both** ops: "Jasmine Blair wants me to fix her camping sink, her number is 802-734-9389"; "Bob Smith 802-530-0293 kitchen sink replacement — schedule with him"; "Maria needs a faucet replaced, 555-123-4567". On the initiate, omit `job_id`/`client_id` for the just-created lead — the server links the booking to the job and client created by this same message (matched by phone), never duplicating the client.
+    **New lead + optional customer scheduling text (confirmation required):**
+    - When the contractor gives **customer name, phone, and work** but **no appointment date/time** for the visit, emit **`job_actions` create only** — **never** `booking_actions` initiate in the same message. Add a matching entry to **`proposed_booking_initiates`** (same phone/name, `job_type_label` from the work, duration estimate) and set **`assistant_sms`** to ask: *"Should I text [name] to schedule the [work]? I can offer [day/part-of-day openings from your scheduling context]."* Mention **two concrete openings** you infer from the technician's calendar snapshot when possible. The server waits for the contractor to reply **YES** (or similar) before texting the customer.
+    - When the contractor **explicitly asks you to text/schedule/contact** the customer in the same message ("text Bob to schedule", "reach out to Maria", "send her a booking link"), emit **`booking_actions` initiate** (you may also create the lead in the same message if needed).
+    - When the contractor states a **specific visit date or time** for the job ("Thursday afternoon", "tomorrow at 3", "6/12 at 10am"), set **`scheduled_on`** and/or **`work_items`** times on the create, keep **`proposed_booking_initiates`** empty, and **do not** ask to text the customer to schedule — they already have a time in mind.
+    - **`proposed_booking_initiates`** shape: `{ "client_name", "phone", "job_type_label", "duration_min_minutes", "duration_max_minutes" }` — one per customer; use `[]` when not proposing outreach.
 
     **Edit a duration estimate:** `{ "intent": "update_duration", "booking_link_id": <int from active_booking_links>, "duration_min_minutes": <int>, "duration_max_minutes": <int> }`
 
@@ -414,7 +419,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     **Cancel:** `{ "intent": "cancel", "booking_id": <int from upcoming_bookings>, "reason": "<optional short reason>" }`
 
-    Return `[]` only when the message has **no** customer-scheduling intent **and** the contractor did **not** just supply name + phone + work for a new customer (see create + schedule default above).
+    Return `[]` when the message has no booking intent (no initiate, update, confirm, or cancel). Use **`proposed_booking_initiates`** (not `booking_actions`) when you only want to *offer* texting the customer after a new lead.
 
     ---
 
