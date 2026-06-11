@@ -57,6 +57,10 @@ defmodule RompCrmWeb.Layouts do
     default: false,
     doc: "when true, main fills the viewport between header and footer (for full-height chat UIs)"
 
+  attr :viewport_fill_compact, :boolean,
+    default: false,
+    doc: "when true with viewport_fill, use tighter horizontal padding on small screens (mobile chat thread)"
+
   slot :inner_block, required: true
   slot :header_extras
 
@@ -68,7 +72,7 @@ defmodule RompCrmWeb.Layouts do
       |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
 
     ~H"""
-    <div class={[@viewport_fill && "flex h-dvh max-h-dvh flex-col overflow-hidden"]}>
+    <div class={[@viewport_fill && "flex h-svh max-h-svh flex-col overflow-hidden"]}>
     <header class="shrink-0 border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
       <div class={["mx-auto w-full", @app_shell_class]}>
         <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -154,6 +158,7 @@ defmodule RompCrmWeb.Layouts do
     <main
       class={[
         "px-4 sm:px-6 lg:px-8",
+        @viewport_fill_compact && "max-md:!px-2",
         @viewport_fill && "flex min-h-0 flex-1 flex-col overflow-hidden !py-2 sm:!py-3",
         !@viewport_fill && @main_py_class
       ]}
@@ -181,7 +186,7 @@ defmodule RompCrmWeb.Layouts do
 
     <.legal_footer
       current_scope={@current_scope}
-      class={@viewport_fill && "shrink-0 py-4 max-md:py-2"}
+      class={@viewport_fill && "shrink-0 py-3 max-md:py-2 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))]"}
     />
 
     <.flash_group flash={@flash} />

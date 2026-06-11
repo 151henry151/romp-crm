@@ -9,6 +9,7 @@
   is_business_owner={@is_business_owner}
   content_width={:wide}
   viewport_fill={not is_nil(@current_business_id)}
+  viewport_fill_compact={@mobile_view == :thread}
 >
   <div class={["chats-page", @mobile_view == :thread && "chats-page--thread"]}>
     <div class={[@mobile_view == :thread && "max-md:hidden", "chats-thread-static"]}>

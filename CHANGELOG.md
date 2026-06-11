@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.10] - 2026-06-11
+
+### Fixed
+
+- **Chats mobile thread**: remove negative-margin bleed that clipped content under `overflow-hidden` parents; use compact main padding instead; use `svh` viewport and safe-area footer inset
+
 ## [0.12.9] - 2026-06-11
 
 ### Changed
