@@ -70,12 +70,13 @@ defmodule RompCrmWeb.ChatComponents do
   attr :form_id, :string, default: "chat-compose-form"
   attr :placeholder, :string, default: "Message the RompCRM agent…"
   attr :disabled, :boolean, default: false
+  attr :submit_event, :string, default: "chat_send"
 
   def chat_compose(assigns) do
     ~H"""
     <form
       id={@form_id}
-      phx-submit="chat_send"
+      phx-submit={@submit_event}
       phx-reset
       phx-hook="ChatCompose"
       class="flex items-end gap-2 border-t border-base-300 pt-3"
@@ -97,12 +98,13 @@ defmodule RompCrmWeb.ChatComponents do
   end
 
   attr :id, :string, default: "chat-typing-indicator"
+  attr :label, :string, default: "RompCRM agent"
 
   def chat_typing_indicator(assigns) do
     ~H"""
-    <div id={@id} class="mt-2 flex w-full flex-col items-start" aria-live="polite" aria-label="RompCRM agent is typing">
+    <div id={@id} class="mt-2 flex w-full flex-col items-start" aria-live="polite" aria-label={"#{@label} is typing"}>
       <div class="mb-0.5 px-1 text-[10px] font-medium tracking-wide text-base-content/55">
-        RompCRM agent
+        {@label}
       </div>
       <div class={[
         "max-w-[min(85%,20rem)] px-3 py-2 text-sm leading-snug text-base-content/70",

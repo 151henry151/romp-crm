@@ -180,6 +180,7 @@ defmodule RompCrmWeb.Router do
       live "/reminders", RemindersLive, :index
       live "/bookings", BookingsLive, :index
       live "/chat", AgentChatLive, :index
+      live "/scheduling-agent-test", SchedulingAgentTestLive, :index
     end
 
     live_session :authenticated_employees_owner,

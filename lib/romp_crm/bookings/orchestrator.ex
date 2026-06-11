@@ -11,7 +11,7 @@ defmodule RompCrm.Bookings.Orchestrator do
   require Logger
 
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.OpeningsPreview
+  alias RompCrm.Bookings.ClientInvitationSms
   alias RompCrm.Businesses
   alias RompCrm.Clients
   alias RompCrm.SmsConversations
@@ -57,7 +57,7 @@ defmodule RompCrm.Bookings.Orchestrator do
                  duration_max_minutes: attrs.duration_max_minutes,
                  client_phone_normalized: phone_norm
                }) do
-          first_sms = compose_first_sms(client, link, ctx)
+          first_sms = ClientInvitationSms.compose(client.client_name, link, ctx.business_id, ctx.user_id)
           deliver_client_sms(e164, first_sms, phone_norm, ctx)
 
           {:booking_done,
@@ -185,23 +185,6 @@ defmodule RompCrm.Bookings.Orchestrator do
   end
 
   # ── SMS composition / delivery ─────────────────────────────────────────────
-
-  defp compose_first_sms(client, link, ctx) do
-    business = Businesses.get_business!(ctx.business_id)
-    first_name = client.client_name |> to_string() |> String.split(" ") |> List.first()
-    greeting = if first_name in [nil, ""], do: "Hi,", else: "Hi #{first_name},"
-
-    "#{greeting} this is the scheduling assistant for #{business.name} reaching out about " <>
-      "your #{label_or_job(link)} (typically #{duration_phrase(link)}).#{openings_phrase(link, ctx)} " <>
-      "Pick a time here: #{booking_url(link.token)} — or just reply to this message with your " <>
-      "general availability and we'll work around your schedule."
-  end
-
-  # " We have openings Tuesday afternoon or Wednesday morning." — first two
-  # distinct day/part-of-day openings over the next week, empty when none.
-  defp openings_phrase(link, ctx) do
-    OpeningsPreview.phrase(ctx.business_id, ctx.user_id, link.duration_max_minutes || 120)
-  end
 
   defp deliver_client_sms(e164, body, phone_norm, ctx) do
     _ = Messages.send_sms(e164, body)

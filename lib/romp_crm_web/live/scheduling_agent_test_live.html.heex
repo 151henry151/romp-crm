@@ -1,0 +1,101 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  socket={@socket}
+  show_sms_assistant_intro_modal={@show_sms_assistant_intro_modal}
+  show_workspace_nav={true}
+  current_business_id={@current_business_id}
+  my_businesses={@my_businesses}
+  is_business_owner={@is_business_owner}
+  content_width={:wide}
+>
+  <div class="mx-auto flex max-w-6xl flex-col">
+    <.header>
+      Test scheduling agent
+      <:subtitle>
+        Sandbox preview — uses your real scheduling settings and memories, but does not create real jobs, clients, or customer texts.
+      </:subtitle>
+      <:actions>
+        <button
+          type="button"
+          phx-click="reset_test"
+          class="btn btn-ghost btn-sm"
+          data-confirm="Clear this test workspace and start over?"
+        >
+          Reset test
+        </button>
+      </:actions>
+    </.header>
+
+    <div class="mt-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-base-content/80">
+      <p class="font-medium text-base-content">Test workspace only</p>
+      <p class="mt-1">
+        Nothing here updates your live job list or contacts real customers. The left pane is you texting your RompCRM agent; the right pane shows what a test customer would see once you start a scheduling conversation.
+      </p>
+    </div>
+
+    <%= if is_nil(@current_business_id) do %>
+      <p class="mt-4 text-sm text-base-content/70">Pick a workspace to open the test sandbox.</p>
+    <% else %>
+      <div class="mt-4 grid min-h-[min(72vh,40rem)] grid-cols-1 gap-4 lg:grid-cols-2">
+        <section class="flex min-h-[22rem] flex-col rounded-xl border border-base-300 bg-base-100/80 p-3 shadow-sm">
+          <h2 class="mb-1 text-sm font-semibold text-base-content">You → RompCRM agent</h2>
+          <p class="mb-2 text-xs text-base-content/60">Contractor side — same agent as Chat and SMS.</p>
+
+          <div
+            id="scheduling-test-contractor-panel"
+            phx-hook="AgentChatScroll"
+            data-chat-pane="contractor"
+            class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-base-300/60 bg-base-200/20 p-2"
+          >
+            <.chat_thread rows={@contractor_rows} id="scheduling-test-contractor-thread" />
+            <%= if @contractor_typing? do %>
+              <.chat_typing_indicator id="scheduling-test-contractor-typing" label="RompCRM agent" />
+            <% end %>
+          </div>
+
+          <.chat_compose
+            form_id="scheduling-test-contractor-compose"
+            submit_event="contractor_send"
+            placeholder="Message your RompCRM agent…"
+            disabled={@contractor_sending?}
+          />
+        </section>
+
+        <section class="flex min-h-[22rem] flex-col rounded-xl border border-base-300 bg-base-100/80 p-3 shadow-sm">
+          <h2 class="mb-1 text-sm font-semibold text-base-content">Test customer → Scheduling assistant</h2>
+          <p class="mb-2 text-xs text-base-content/60">Client side — what your customer receives by text.</p>
+
+          <div
+            id="scheduling-test-client-panel"
+            phx-hook="AgentChatScroll"
+            data-chat-pane="client"
+            class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-base-300/60 bg-base-200/20 p-2"
+          >
+            <%= if @client_rows == [] and not @client_typing? do %>
+              <p class="text-sm text-base-content/60">
+                Empty until you start outreach from the contractor pane. Try:
+                <span class="italic">
+                  "I got a call from Sally Pendleton, her number is 802-555-1234 — reach out to schedule a sink repair."
+                </span>
+                Then reply here as Sally.
+              </p>
+            <% else %>
+              <.chat_thread rows={@client_rows} id="scheduling-test-client-thread" />
+              <%= if @client_typing? do %>
+                <.chat_typing_indicator id="scheduling-test-client-typing" label="Scheduling assistant" />
+              <% end %>
+            <% end %>
+          </div>
+
+          <.chat_compose
+            form_id="scheduling-test-client-compose"
+            submit_event="client_send"
+            placeholder={if @client_pane_active?, do: "Reply as the test customer…", else: "Start a conversation from the contractor pane first…"}
+            disabled={@client_sending? or not @client_pane_active?}
+          />
+        </section>
+      </div>
+    <% end %>
+  </div>
+</Layouts.app>

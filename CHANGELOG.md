@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0] - 2026-06-11
+
+### Added
+
+- **Scheduling agent test workspace** (`/scheduling-agent-test`): two-pane sandbox from Settings to preview contractor ↔ agent and client ↔ scheduling assistant without creating real jobs, clients, or SMS; session stored in `scheduling_agent_test_sessions`
+- **`Bookings.ClientInvitationSms`**: shared first-customer scheduling SMS composer used by production orchestrator and the test sandbox
+
+### Changed
+
+- **Settings → Scheduling & calendars**: add link and explainer to open the scheduling agent test workspace
+- **`ChatComponents`**: optional `submit_event` on compose forms and configurable typing-indicator label
+- **Booking orchestrator**: delegate first-customer SMS text to `ClientInvitationSms`
+
 ## [0.10.6] - 2026-06-11
 
 ### Added
