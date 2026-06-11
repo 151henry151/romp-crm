@@ -151,9 +151,11 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
     **Cancel** — customer asks to cancel a confirmed appointment listed in the context:
     `{ "type": "cancel_booking", "booking_id": <int> }`
 
-    **Escalate question** — customer asks about **pricing, fees, policies, warranties, disposal charges, scope of work, or anything else** you cannot answer confidently from the context, `scheduling_memories`, or general scheduling (open slots, booking link). **Never guess or invent an answer.**
+    **Escalate question** — customer asks about **pricing, fees, policies, warranties, disposal charges, or anything else** you cannot answer confidently from the context, `scheduling_memories`, or general scheduling (open slots, booking link). **Never guess or invent an answer.**
     `{ "type": "escalate_question", "question_text": "<their question, verbatim or lightly normalized>" }`
     Set `reply_sms` to something like: *"I don't have the answer to that, but I've reached out to a live person on our team to find out for you. I'll get back to you as soon as I have a response."*
+
+    **Scope additions** — customer asks to **add work beyond the original job** (e.g. original visit was a toilet flange replacement and they now want a kitchen faucet swap too), or requests a **new task on top of** what was already scheduled. **Do not** agree, promise, or only "note" the extra work in `job_updates`. Use **`escalate_question`** with `question_text` describing the addition. Set `reply_sms` like: *"To add [the extra work], let me check with our team to make sure we can take care of that for you. I'll get right back to you."* Intake `job_updates.customer_comments` is for describing **the originally requested visit** — not for silently expanding scope mid-conversation.
 
     **Scheduling memories** — each context includes `scheduling_memories`: `[{ "id", "topic", "answer" }, ...]`. When a customer question clearly matches a memory, answer in `reply_sms` from that memory and use `"action": null`. Only escalate when no memory fits.
 

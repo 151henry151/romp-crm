@@ -34,6 +34,8 @@ defmodule RompCrm.SchedulingAgentTest.Sandbox do
       "bookings" => [],
       "booking_requests" => [],
       "pending_booking_proposal" => nil,
+      "pending_escalations" => [],
+      "next_escalation_id" => 1,
       "contractor_turns" => [%{"role" => "assistant", "text" => String.trim(@welcome)}],
       "client_turns" => []
     }
@@ -43,8 +45,13 @@ defmodule RompCrm.SchedulingAgentTest.Sandbox do
 
   def decode(json) when is_binary(json) do
     case Jason.decode(json) do
-      {:ok, %{} = map} -> map
-      _ -> fresh_state()
+      {:ok, %{} = map} ->
+        map
+        |> Map.put_new("pending_escalations", [])
+        |> Map.put_new("next_escalation_id", 1)
+
+      _ ->
+        fresh_state()
     end
   end
 
@@ -368,12 +375,67 @@ defmodule RompCrm.SchedulingAgentTest.Sandbox do
     Map.put(state, "pending_booking_proposal", nil)
   end
 
-  def sync_job_from_booking(state, link_id, starts_at) do
+  def apply_job_updates(state, link, updates) when is_map(updates) do
+    updates = stringify_keys(updates)
+    job_id = link["job_id"]
+
+    if job_id && map_size(updates) > 0 do
+      jobs =
+        Enum.map(state["jobs"] || [], fn job ->
+          if job["id"] == job_id, do: patch_job(job, updates), else: job
+        end)
+
+      Map.put(state, "jobs", jobs)
+    else
+      state
+    end
+  end
+
+  def job_for_link(state, link) do
+    Enum.find(state["jobs"] || [], &(&1["id"] == link["job_id"]))
+  end
+
+  def client_for_link(state, link) do
+    Enum.find(state["clients"] || [], &(&1["id"] == link["client_id"]))
+  end
+
+  def service_address_for_job(job) when is_map(job) do
+    cond do
+      is_binary(job["address"]) and job["address"] != "" -> job["address"]
+      job["address_line1"] not in [nil, ""] ->
+        [job["address_line1"], job["city"], job["state"], job["postal_code"]]
+        |> Enum.filter(&(is_binary(&1) and &1 != ""))
+        |> Enum.join(", ")
+
+      true ->
+        ""
+    end
+  end
+
+  defp patch_job(job, updates) do
+    job
+    |> maybe_put("customer_comments", updates["customer_comments"])
+    |> maybe_put("client_email", updates["client_email"] || updates["email"])
+    |> maybe_put("address", updates["address"] || updates["service_address"])
+    |> maybe_put("work_description", updates["work_description"])
+  end
+
+  defp maybe_put(job, key, val) when is_binary(val) and val != "" do
+    Map.put(job, key, val)
+  end
+
+  defp maybe_put(job, _key, _val), do: job
+
+  defp stringify_keys(map) do
+    Map.new(map, fn {k, v} -> {to_string(k), v} end)
+  end
+
+  def sync_job_from_booking(state, link_id, starts_at, user_id) do
     link = Enum.find(state["booking_links"] || [], &(&1["id"] == link_id))
     job_id = link && link["job_id"]
 
     if is_integer(job_id) do
-      tz = "America/New_York"
+      tz = technician_prefs(user_id).timezone
       local = DateTime.shift_zone!(starts_at, tz)
       date_iso = local |> DateTime.to_date() |> Date.to_iso8601()
       time_hhmm = format_hhmm(local)

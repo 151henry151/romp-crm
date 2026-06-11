@@ -119,6 +119,93 @@ defmodule RompCrm.SchedulingAgentTestTest do
     assert Enum.at(state["client_turns"], 1)["text"] == "Tuesday morning works for me."
   end
 
+  test "client scope question escalates to contractor pane", %{user: user, business: business} do
+    {:ok, state, _link, _client} =
+      Sandbox.create_booking_link(Sandbox.fresh_state(), %{
+        "client_name" => "Peter",
+        "phone" => "18025551234",
+        "job_type_label" => "toilet flange replacement",
+        "duration_min_minutes" => 90,
+        "duration_max_minutes" => 120
+      })
+
+    SchedulingAgentTest.save_session(user, business.id, state)
+
+    json =
+      Jason.encode!(%{
+        "reply_sms" =>
+          "To add a kitchen sink faucet swap, let me check with our team to make sure we can take care of that for you. I'll get right back to you.",
+        "action" => %{
+          "type" => "escalate_question",
+          "question_text" => "Can you also swap my kitchen sink faucet while you're there?"
+        }
+      })
+
+    assert {:ok, _} =
+             SchedulingAgentTest.send_client(user, business.id, "STUB_CLARIFY #{json}")
+
+    state = SchedulingAgentTest.get_or_create_session(user, business.id)
+
+    assert Enum.any?(state["contractor_turns"], fn turn ->
+             turn["role"] == "assistant" and
+               String.contains?(turn["text"], "kitchen sink faucet")
+           end)
+  end
+
+  test "confirmed booking notifies contractor pane", %{user: user, business: business} do
+    {:ok, state, link, _client} =
+      Sandbox.create_booking_link(Sandbox.fresh_state(), %{
+        "client_name" => "Peter",
+        "phone" => "18025551234",
+        "job_type_label" => "toilet flange replacement",
+        "duration_min_minutes" => 90,
+        "duration_max_minutes" => 120,
+        "job_id" => nil
+      })
+
+    {:ok, state, job} =
+      Sandbox.create_job(state, %{
+        "client_name" => "Peter",
+        "work_description" => "toilet flange replacement",
+        "status" => "lead"
+      })
+
+    link = Map.put(link, "job_id", job["id"])
+
+    links =
+      Enum.map(state["booking_links"], fn l ->
+        if l["id"] == link["id"], do: link, else: l
+      end)
+
+    state = state |> Map.put("booking_links", links)
+    SchedulingAgentTest.save_session(user, business.id, state)
+
+    starts =
+      DateTime.utc_now()
+      |> DateTime.add(5, :day)
+      |> DateTime.truncate(:second)
+
+    ends = DateTime.add(starts, 90, :minute)
+
+    json =
+      Jason.encode!(%{
+        "reply_sms" => "You're all set!",
+        "action" => %{
+          "type" => "hard_booking",
+          "starts_at" => DateTime.to_iso8601(starts),
+          "ends_at" => DateTime.to_iso8601(ends)
+        }
+      })
+
+    assert {:ok, _} = SchedulingAgentTest.send_client(user, business.id, "STUB_BOOK #{json}")
+
+    state = SchedulingAgentTest.get_or_create_session(user, business.id)
+
+    assert Enum.any?(state["contractor_turns"], fn turn ->
+             turn["role"] == "assistant" and String.contains?(turn["text"], "we've scheduled")
+           end)
+  end
+
   test "reset clears sandbox state", %{user: user, business: business} do
     json =
       Jason.encode!(%{

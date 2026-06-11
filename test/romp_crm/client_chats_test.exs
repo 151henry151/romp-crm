@@ -21,6 +21,22 @@ defmodule RompCrm.ClientChatsTest do
     assert Enum.any?(msgs, &(&1.channel == "sms_human" and &1.direction == "outbound"))
   end
 
+  test "list_thread_summaries includes takeover user id after take_over", %{
+    user: user,
+    business: business,
+    phone: phone
+  } do
+    assert {:ok, _} =
+             SmsConversations.record_client_message(business.id, user.id, phone, "inbound", "Hello")
+
+    :ok = ClientChats.take_over!(user, business.id, phone)
+
+    [summary] = Enum.filter(ClientChats.list_thread_summaries(business.id), &(&1.phone_normalized == phone))
+
+    assert summary.taken_over?
+    assert summary.taken_over_by_user_id == user.id
+  end
+
   test "hand_off clears takeover and records notice SMS", %{user: user, business: business, phone: phone} do
     :ok = ClientChats.take_over!(user, business.id, phone)
     assert :ok = ClientChats.hand_off!(user, business.id, phone)

@@ -7,7 +7,7 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
   alias RompCrm.Bookings.ClientInvitationSms
   alias RompCrm.Bookings.OpeningsPreview
   alias RompCrm.Reminders
-  alias RompCrm.SchedulingAgentTest.Sandbox
+  alias RompCrm.SchedulingAgentTest.{Escalations, Sandbox}
   alias RompCrm.SmsBookingConsent
   alias RompCrm.SmsPendingBookingProposals
   alias RompCrm.Twilio.Phone
@@ -21,6 +21,30 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
     body = String.trim(body)
     state = Sandbox.append_contractor_turn(state, body)
 
+    case Escalations.handle_contractor_reply(state, user, business_id, body) do
+      {:handled, state, reply, client_sms} ->
+        state =
+          if client_sms do
+            Sandbox.append_client_turn(state, "scheduling_assistant", client_sms)
+          else
+            state
+          end
+
+        {:ok, state, %{contractor_reply: reply, client_outreach: client_sms}}
+
+      :continue ->
+        :continue_escalation
+    end
+    |> case do
+      {:ok, _} = done ->
+        done
+
+      :continue_escalation ->
+        continue_contractor(state, user, business_id, body)
+    end
+  end
+
+  defp continue_contractor(state, user, business_id, body) do
     case maybe_apply_pending_booking(state, user, business_id, body) do
       {:applied, state, reply, client_sms} ->
         {:ok, state, %{contractor_reply: reply, client_outreach: client_sms}}

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.1] - 2026-06-11
+
+### Fixed
+
+- **Scheduling agent test sandbox**: escalate client scope questions to the contractor pane; notify contractor on confirmed bookings and soft availability (mirrors production `EscalationCoordinator` / technician booking SMS)
+- **Customer booking AI prompt**: treat added work beyond the original job as `escalate_question`, not silent `job_updates`
+- **Chats takeover**: fix 500 after confirming takeover when reloading sidebar (`get_in` on `Takeover` struct)
+- **Twilio webhook**: match `{:ok, :human_takeover_silent}` before generic `{:ok, _reply}` clause
+
 ## [0.12.0] - 2026-06-11
 
 ### Added

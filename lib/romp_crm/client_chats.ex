@@ -49,7 +49,7 @@ defmodule RompCrm.ClientChats do
         last_preview: preview_body(last_msg && last_msg.body),
         last_at: row.last_at,
         taken_over?: Map.has_key?(takeovers, row.phone_normalized),
-        taken_over_by_user_id: get_in(takeovers, [row.phone_normalized, :taken_over_by_user_id]),
+        taken_over_by_user_id: takeover_user_id(takeovers, row.phone_normalized),
         booking_link_id: link && link.id
       }
     end)
@@ -230,6 +230,13 @@ defmodule RompCrm.ClientChats do
   defp takeover_map(business_id) do
     Repo.all(from t in Takeover, where: t.business_id == ^business_id)
     |> Map.new(fn t -> {t.phone_normalized, t} end)
+  end
+
+  defp takeover_user_id(takeovers, phone_normalized) do
+    case Map.get(takeovers, phone_normalized) do
+      %Takeover{taken_over_by_user_id: user_id} -> user_id
+      _ -> nil
+    end
   end
 
   defp broadcast(business_id, phone_normalized, event) do

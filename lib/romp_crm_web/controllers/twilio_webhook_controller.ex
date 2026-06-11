@@ -136,14 +136,14 @@ defmodule RompCrmWeb.TwilioWebhookController do
     case SmsInboundRoleRouter.route(conn.body_params) do
       {:client, params} ->
         case CustomerBookingProcessor.deliver_from_twilio(params) do
-          {:ok, _reply} ->
-            Logger.info(
-              "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
-            )
-
           {:ok, :human_takeover_silent} ->
             Logger.info(
               "Twilio SMS: client message recorded during human takeover from=#{inspect(from)} sid=#{message_sid}"
+            )
+
+          {:ok, _reply} ->
+            Logger.info(
+              "Twilio SMS: handled as client booking message from=#{inspect(from)} sid=#{message_sid}"
             )
 
           :ignore ->

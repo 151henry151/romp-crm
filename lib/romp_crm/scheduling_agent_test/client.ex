@@ -8,7 +8,7 @@ defmodule RompCrm.SchedulingAgentTest.Client do
   alias RompCrm.Scheduling
   alias RompCrm.Scheduling.AvailabilityEngine
   alias RompCrm.Scheduling.Prefs
-  alias RompCrm.SchedulingAgentTest.Sandbox
+  alias RompCrm.SchedulingAgentTest.{Escalations, Notifications, Sandbox}
 
   @doc """
   Processes a test-customer message. Returns `{:ok, state, reply}` or `{:error, :no_active_link}`.
@@ -27,6 +27,9 @@ defmodule RompCrm.SchedulingAgentTest.Client do
 
         case CustomerBookingExtractor.extract(body, contexts, prior) do
           {:ok, result} ->
+            state = Sandbox.apply_job_updates(state, link, result.job_updates || %{})
+            link = refreshed_link(state, link)
+
             {state, reply} = apply_result(state, link, result, user, business_id)
             state = Sandbox.append_client_turn(state, "scheduling_assistant", reply)
             {:ok, state, reply}
@@ -36,10 +39,13 @@ defmodule RompCrm.SchedulingAgentTest.Client do
               "Sorry, we couldn't process that just now in the test workspace. (#{inspect(reason)})"
 
             state = Sandbox.append_client_turn(state, "scheduling_assistant", reply)
-
             {:ok, state, reply}
         end
     end
+  end
+
+  defp refreshed_link(state, link) do
+    Enum.find(state["booking_links"] || [], &(&1["id"] == link["id"])) || link
   end
 
   defp apply_result(state, _link, %{action: nil} = result, _user, _bid) do
@@ -70,9 +76,13 @@ defmodule RompCrm.SchedulingAgentTest.Client do
           |> Map.update!("bookings", &(&1 ++ [booking]))
           |> Map.put("next_booking_id", id + 1)
           |> Sandbox.mark_link_booked(link["id"])
-          |> Sandbox.sync_job_from_booking(link["id"], action.starts_at)
+          |> Sandbox.sync_job_from_booking(link["id"], action.starts_at, user.id)
 
         reply = nonempty_reply(result.reply_sms) || "You're all set — see you then!"
+
+        state =
+          notify_contractor_of_booking(state, link, booking, business_id, user.id)
+
         {state, reply}
 
       _ ->
@@ -80,7 +90,7 @@ defmodule RompCrm.SchedulingAgentTest.Client do
     end
   end
 
-  defp apply_result(state, link, %{action: %{type: :soft_availability} = action} = result, _user, _bid) do
+  defp apply_result(state, link, %{action: %{type: :soft_availability} = action} = result, user, business_id) do
     id = state["next_request_id"]
 
     windows_json =
@@ -106,15 +116,18 @@ defmodule RompCrm.SchedulingAgentTest.Client do
       |> Map.put("next_request_id", id + 1)
 
     reply = nonempty_reply(result.reply_sms) || "Got it — we'll confirm a time shortly."
+
+    client_name = client_name(state, link)
+
+    contractor_msg =
+      Notifications.availability_received_message(link, action.availability_text, business_id, client_name)
+
+    state = Sandbox.append_contractor_assistant(state, contractor_msg)
     {state, reply}
   end
 
-  defp apply_result(state, _link, %{action: %{type: :escalate_question}} = result, _user, _bid) do
-    reply =
-      nonempty_reply(result.reply_sms) ||
-        "I don't have the answer to that, but I've noted your question for the team."
-
-    {state, reply}
+  defp apply_result(state, link, %{action: %{type: :escalate_question, question_text: question}} = result, _user, _bid) do
+    Escalations.escalate_from_client(state, link, question, result)
   end
 
   defp apply_result(state, _link, %{action: %{type: :cancel_booking, booking_id: booking_id}} = result, _user, _bid) do
@@ -131,6 +144,31 @@ defmodule RompCrm.SchedulingAgentTest.Client do
   defp apply_result(state, _link, %{action: _other} = result, _user, _bid) do
     reply = nonempty_reply(result.reply_sms) || "Thanks — we'll be in touch."
     {state, reply}
+  end
+
+  defp notify_contractor_of_booking(state, link, booking, business_id, user_id) do
+    client_name = client_name(state, link)
+    job = Sandbox.job_for_link(state, link)
+    address = if(job, do: Sandbox.service_address_for_job(job), else: "")
+
+    msg =
+      Notifications.booking_confirmed_message(
+        link,
+        booking,
+        business_id,
+        user_id,
+        client_name,
+        address
+      )
+
+    Sandbox.append_contractor_assistant(state, msg)
+  end
+
+  defp client_name(state, link) do
+    case Sandbox.client_for_link(state, link) do
+      %{"client_name" => name} when is_binary(name) and name != "" -> name
+      _ -> "A client"
+    end
   end
 
   defp conflict_status(_link, window, duration_minutes, user_id, business_id) do
