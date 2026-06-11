@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.8] - 2026-06-11
+
+### Fixed
+
+- **Chats thread scroll on mobile**: cap app shell at `h-dvh` instead of `min-h-dvh`; give thread card `flex-1` on all breakpoints; use flex column with `flex-1 basis-0` message panel
+- **Chat compose**: disable textarea resize so it cannot expand the thread layout
+
 ## [0.12.7] - 2026-06-11
 
 ### Fixed

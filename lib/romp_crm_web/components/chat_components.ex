@@ -88,7 +88,7 @@ defmodule RompCrmWeb.ChatComponents do
         rows="2"
         placeholder={@placeholder}
         disabled={@disabled}
-        class="textarea textarea-bordered min-h-[2.75rem] flex-1 resize-y text-sm"
+        class="textarea textarea-bordered min-h-[2.75rem] max-h-32 flex-1 resize-none text-sm"
       ></textarea>
       <button type="submit" class="btn btn-primary btn-sm shrink-0" disabled={@disabled}>
         Send

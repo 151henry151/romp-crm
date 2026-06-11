@@ -11,7 +11,7 @@
   viewport_fill={not is_nil(@current_business_id)}
 >
   <div class="chats-page">
-    <div class={[@mobile_view == :thread && "max-md:hidden", "shrink-0"]}>
+    <div class={[@mobile_view == :thread && "max-md:hidden", "chats-thread-static"]}>
       <.header>
         Chats
         <:subtitle>
@@ -23,7 +23,13 @@
     <%= if is_nil(@current_business_id) do %>
       <p class="mt-4 text-sm text-base-content/70">Pick a workspace to view chats.</p>
     <% else %>
-      <div class="chats-workspace mt-3 min-h-0 md:mt-3">
+      <div
+        class={[
+          "chats-workspace min-h-0 flex-1",
+          @mobile_view == :list && "mt-3 md:mt-3",
+          @mobile_view == :thread && "max-md:mt-0"
+        ]}
+      >
         <nav
           class={[
             "chats-sidebar",
@@ -51,14 +57,9 @@
           <% end %>
         </nav>
 
-        <div
-          class={[
-            if(@thread_kind == :client, do: "chats-thread-card chats-thread-card--client", else: "chats-thread-card chats-thread-card--agent"),
-            @mobile_view == :list && "max-md:hidden"
-          ]}
-        >
+        <div class={["chats-thread-card", @mobile_view == :list && "max-md:hidden"]}>
           <%= if @thread_kind == :client do %>
-            <div class="flex flex-wrap items-center gap-2 border-b border-base-300 pb-2">
+            <div class="chats-thread-static flex flex-wrap items-center gap-2 border-b border-base-300 pb-2">
               <.link
                 patch={~p"/chats"}
                 class="btn btn-ghost btn-xs gap-0.5 px-2 md:hidden"
@@ -90,16 +91,16 @@
             </div>
 
             <%= if @client_taken_over? do %>
-              <p class="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-base-content/80">
+              <p class="chats-thread-static rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs text-base-content/80">
                 You are replying live by SMS. The scheduling agent is paused for this customer.
               </p>
             <% else %>
-              <p class="rounded-lg border border-base-300 bg-base-200/40 px-3 py-2 text-xs text-base-content/70">
+              <p class="chats-thread-static rounded-lg border border-base-300 bg-base-200/40 px-3 py-2 text-xs text-base-content/70">
                 The scheduling assistant is handling this thread. Take over to reply as a live person.
               </p>
             <% end %>
           <% else %>
-            <div class="flex items-center gap-2 border-b border-base-300 pb-2">
+            <div class="chats-thread-static flex items-center gap-2 border-b border-base-300 pb-2">
               <.link
                 patch={~p"/chats"}
                 class="btn btn-ghost btn-xs gap-0.5 px-2 md:hidden"
@@ -129,7 +130,7 @@
             <% end %>
           </div>
 
-          <div class="min-h-0 pt-1">
+          <div class="chats-thread-static pt-1">
             <.chat_compose
               form_id="chats-compose"
               placeholder={compose_placeholder(@thread_kind, @client_taken_over?)}

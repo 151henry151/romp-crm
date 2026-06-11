@@ -68,7 +68,7 @@ defmodule RompCrmWeb.Layouts do
       |> assign(:main_py_class, main_vertical_padding(assigns.content_width))
 
     ~H"""
-    <div class={[@viewport_fill && "flex min-h-dvh flex-col"]}>
+    <div class={[@viewport_fill && "flex h-dvh max-h-dvh flex-col overflow-hidden"]}>
     <header class="shrink-0 border-b border-base-300 bg-base-100 px-4 sm:px-6 py-2 sm:py-3">
       <div class={["mx-auto w-full", @app_shell_class]}>
         <div class="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -179,7 +179,10 @@ defmodule RompCrmWeb.Layouts do
       />
     <% end %>
 
-    <.legal_footer current_scope={@current_scope} class={@viewport_fill && "shrink-0"} />
+    <.legal_footer
+      current_scope={@current_scope}
+      class={@viewport_fill && "shrink-0 py-4 max-md:py-2"}
+    />
 
     <.flash_group flash={@flash} />
     </div>
