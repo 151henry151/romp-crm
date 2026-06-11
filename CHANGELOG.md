@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.5] - 2026-06-11
+
+### Changed
+
+- **Chats mobile layout**: show full-width conversation list or full-width active thread (with back button); keep side-by-side sidebar on `md` and wider
+
 ## [0.12.4] - 2026-06-11
 
 ### Fixed

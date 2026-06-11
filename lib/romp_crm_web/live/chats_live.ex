@@ -32,6 +32,7 @@ defmodule RompCrmWeb.ChatsLive do
       |> assign(:chat_agent_typing?, false)
       |> assign(:client_taken_over?, false)
       |> assign(:show_takeover_confirm?, false)
+      |> assign(:mobile_view, :list)
 
     {:ok, socket}
   end
@@ -193,8 +194,15 @@ defmodule RompCrmWeb.ChatsLive do
 
   def active_thread?(thread, kind, phone) do
     case thread.kind do
-      :agent -> kind == :agent
+      :agent -> kind == :agent and is_nil(phone)
       :client -> kind == :client and thread.phone_normalized == phone
+    end
+  end
+
+  def thread_patch(thread) do
+    case thread.kind do
+      :agent -> ~p"/chats?thread=agent"
+      :client -> ~p"/chats?phone=#{thread.phone_normalized}"
     end
   end
 
@@ -263,19 +271,46 @@ defmodule RompCrmWeb.ChatsLive do
     end
   end
 
-  defp apply_thread_params(socket, %{"phone" => phone}) when is_binary(phone) and phone != "" do
-    phone = String.trim(phone)
+  defp apply_thread_params(socket, params) do
+    mobile_view = mobile_view_from_params(params)
 
-    socket
-    |> assign(:thread_kind, :client)
-    |> assign(:client_phone, phone)
+    socket =
+      case client_phone_param(params) do
+        phone when is_binary(phone) ->
+          socket
+          |> assign(:thread_kind, :client)
+          |> assign(:client_phone, phone)
+
+        :agent_thread ->
+          socket
+          |> assign(:thread_kind, :agent)
+          |> assign(:client_phone, nil)
+          |> assign(:client_name, nil)
+
+        :default ->
+          socket
+          |> assign(:thread_kind, :agent)
+          |> assign(:client_phone, nil)
+          |> assign(:client_name, nil)
+      end
+
+    assign(socket, :mobile_view, mobile_view)
   end
 
-  defp apply_thread_params(socket, _params) do
-    socket
-    |> assign(:thread_kind, :agent)
-    |> assign(:client_phone, nil)
-    |> assign(:client_name, nil)
+  defp client_phone_param(%{"phone" => phone}) when is_binary(phone) do
+    phone = String.trim(phone)
+    if phone != "", do: phone, else: :default
+  end
+
+  defp client_phone_param(%{"thread" => "agent"}), do: :agent_thread
+  defp client_phone_param(_), do: :default
+
+  defp mobile_view_from_params(params) do
+    case client_phone_param(params) do
+      phone when is_binary(phone) -> :thread
+      :agent_thread -> :thread
+      :default -> :list
+    end
   end
 
   defp load_sidebar(socket) do
