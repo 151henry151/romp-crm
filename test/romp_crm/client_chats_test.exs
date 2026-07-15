@@ -59,4 +59,23 @@ defmodule RompCrm.ClientChatsTest do
     msgs = SmsConversations.list_client_thread_messages(business.id, phone)
     assert Enum.count(msgs, &(&1.channel == "sms_human" and &1.body == "Hi there")) == 1
   end
+
+  test "send_human_message with media_urls allows empty caption and stores URL suffix", %{
+    user: user,
+    business: business,
+    phone: phone
+  } do
+    :ok = ClientChats.take_over!(user, business.id, phone)
+
+    url = "https://rompcrm.com/romp-crm/uploads/chat-media/#{business.id}/test.jpg"
+
+    assert {:ok, stored} =
+             ClientChats.send_human_message!(user, business.id, phone, "", media_urls: [url])
+
+    assert stored =~ url
+    assert stored =~ "[MMS attachments"
+
+    msgs = SmsConversations.list_client_thread_messages(business.id, phone)
+    assert Enum.any?(msgs, &(&1.channel == "sms_human" and String.contains?(&1.body, url)))
+  end
 end

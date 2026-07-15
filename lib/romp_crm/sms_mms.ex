@@ -9,7 +9,7 @@ defmodule RompCrm.SmsMms do
   alias RompCrm.Repo
   alias RompCrm.SmsConversations.Message
 
-  @twilio_url_pattern ~r/https:\/\/[^\s\]]+/i
+  @media_url_pattern ~r/https?:\/\/[^\s\]]+/i
 
   @doc """
   Body text stored on inbound rows — never blank (MMS includes attachment URLs for later turns).
@@ -196,19 +196,40 @@ defmodule RompCrm.SmsMms do
   end
 
   def extract_twilio_media_urls(text) when is_binary(text) do
-    @twilio_url_pattern
-    |> Regex.scan(text)
-    |> Enum.map(fn [u] -> u end)
-    |> Enum.filter(&twilio_media_url?/1)
-    |> Enum.uniq()
+    extract_media_urls(text)
   end
 
   def extract_twilio_media_urls(_), do: []
+
+  @doc """
+  HTTPS media URLs embedded in stored SMS bodies — Twilio CDN and our
+  `/uploads/chat-media/` outbound chat attachments.
+  """
+  def extract_media_urls(text) when is_binary(text) do
+    @media_url_pattern
+    |> Regex.scan(text)
+    |> Enum.map(fn [u] -> u end)
+    |> Enum.filter(&displayable_media_url?/1)
+    |> Enum.uniq()
+  end
+
+  def extract_media_urls(_), do: []
+
+  defp displayable_media_url?(url) do
+    twilio_media_url?(url) or chat_media_url?(url)
+  end
 
   defp twilio_media_url?(url) do
     uri = URI.parse(url)
 
     uri.scheme == "https" and uri.host in twilio_media_hosts()
+  end
+
+  defp chat_media_url?(url) do
+    uri = URI.parse(url)
+    path = uri.path || ""
+
+    uri.scheme in ["http", "https"] and String.contains?(path, "/uploads/chat-media/")
   end
 
   defp twilio_media_hosts do

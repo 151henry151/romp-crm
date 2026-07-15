@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.13.3] - 2026-07-15
+
+### Added
+
+- Chats compose: attach image button on the **agent** thread and on taken-over client threads; upload to `uploads/chat-media/`
+- Agent chat MMS: pass attached images through the same vision pipeline as inbound SMS
+- Client chat MMS: send attached images via Twilio (`MediaUrl`)
+- **`Messages.send_mms/3`**: outbound MMS with optional caption and media URLs
+- **`ChatMedia`**: store chat attachment bytes and build public HTTPS URLs
+
+### Changed
+
+- **`AgentChat.send_message/4`**: accept optional `media_urls`; allow photo-only sends
+- **`ClientChats.send_human_message!/5`**: accept optional `media_urls`; allow photo-only sends
+- **`SmsMms.extract_media_urls/1`**: include `/uploads/chat-media/` URLs in chat bubble photo thumbnails
+- **`MmsImageDownload`**: read local chat-media files for vision (no Twilio round-trip)
+
 ## [0.13.2] - 2026-07-15
 
 ### Fixed

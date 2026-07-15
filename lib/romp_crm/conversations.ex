@@ -107,7 +107,7 @@ defmodule RompCrm.Conversations do
   defp display_text(_), do: nil
 
   defp photo_urls(body) when is_binary(body) do
-    SmsMms.extract_twilio_media_urls(body)
+    SmsMms.extract_media_urls(body)
   end
 
   defp photo_urls(_), do: []

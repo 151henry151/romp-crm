@@ -146,6 +146,8 @@ defmodule RompCrmWeb.Router do
     get "/jobs/:job_id/photos/download", JobPhotoController, :download_all
     get "/jobs/:job_id/photos/:photo_id/download", JobPhotoController, :download
 
+    post "/chats/media", ChatMediaController, :create
+
     live_session :authenticated_business_pages,
       on_mount: [
         {RompCrmWeb.UserAuth, :require_authenticated},

@@ -1,6 +1,6 @@
 defmodule RompCrm.Twilio.Messages do
   @moduledoc """
-  Outbound SMS via Twilio REST API (`POST .../Messages.json`).
+  Outbound SMS/MMS via Twilio REST API (`POST .../Messages.json`).
 
   Requires **`TWILIO_ACCOUNT_SID`**, **`TWILIO_AUTH_TOKEN`**, and **`TWILIO_MESSAGING_FROM`**
   (E.164, e.g. `+18022780965`).
@@ -9,6 +9,7 @@ defmodule RompCrm.Twilio.Messages do
   require Logger
 
   @messages_path "/2010-04-01/Accounts"
+  @max_media 10
 
   @doc """
   Sends an SMS from the configured Twilio number to `to_e164`.
@@ -17,11 +18,37 @@ defmodule RompCrm.Twilio.Messages do
   """
   def send_sms(to_e164, body)
       when is_binary(to_e164) and is_binary(body) do
-    unless sms_outbound_enabled?() do
-      Logger.info("Twilio outbound skipped (disabled or incomplete config) to=#{to_e164}")
-      {:ok, :skipped}
-    else
-      do_send(to_e164, body)
+    send_mms(to_e164, body, [])
+  end
+
+  @doc """
+  Sends an SMS or MMS. `media_urls` are public HTTPS URLs Twilio will fetch
+  (`MediaUrl` form fields). Body may be empty when at least one media URL is present.
+  """
+  def send_mms(to_e164, body, media_urls)
+      when is_binary(to_e164) and is_binary(body) and is_list(media_urls) do
+    media =
+      media_urls
+      |> Enum.map(&to_string/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.take(@max_media)
+
+    safe_body = body |> String.trim() |> String.slice(0, 1600)
+
+    cond do
+      safe_body == "" and media == [] ->
+        {:error, :empty}
+
+      not sms_outbound_enabled?() ->
+        Logger.info(
+          "Twilio outbound skipped (disabled or incomplete config) to=#{to_e164} media=#{length(media)}"
+        )
+
+        {:ok, :skipped}
+
+      true ->
+        do_send(to_e164, safe_body, media)
     end
   end
 
@@ -32,15 +59,17 @@ defmodule RompCrm.Twilio.Messages do
       from_number() not in [nil, ""]
   end
 
-  defp do_send(to_e164, body) do
+  defp do_send(to_e164, safe_body, media) do
     url = "https://api.twilio.com#{@messages_path}/#{account_sid()}/Messages.json"
 
-    # SMS body max 1600 chars per Twilio; keep defensive trim
-    safe_body = body |> String.trim() |> String.slice(0, 1600)
+    form =
+      [To: to_e164, From: from_number()]
+      |> maybe_put_body(safe_body)
+      |> Kernel.++(Enum.map(media, &{:MediaUrl, &1}))
 
     case Req.post(url,
            auth: {:basic, "#{account_sid()}:#{auth_token()}"},
-           form: [To: to_e164, From: from_number(), Body: safe_body],
+           form: form,
            redirect: false,
            receive_timeout: 30_000
          ) do
@@ -59,6 +88,9 @@ defmodule RompCrm.Twilio.Messages do
         {:error, {:request, reason}}
     end
   end
+
+  defp maybe_put_body(form, ""), do: form
+  defp maybe_put_body(form, body), do: form ++ [Body: body]
 
   defp account_sid, do: Application.get_env(:romp_crm, :twilio_account_sid)
   defp auth_token, do: Application.get_env(:romp_crm, :twilio_auth_token)

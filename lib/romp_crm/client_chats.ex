@@ -122,27 +122,65 @@ defmodule RompCrm.ClientChats do
     end
   end
 
-  @doc "Send a live human SMS in an taken-over client thread."
-  def send_human_message!(user, business_id, phone_normalized, body)
-      when is_integer(business_id) and is_binary(body) do
+  @doc "Send a live human SMS/MMS in a taken-over client thread."
+  def send_human_message!(user, business_id, phone_normalized, body, opts \\ [])
+      when is_integer(business_id) and is_binary(body) and is_list(opts) do
     body = String.trim(body)
 
-    if body == "" do
-      {:error, :empty}
-    else
-      unless taken_over?(business_id, phone_normalized) do
+    media_urls =
+      opts
+      |> Keyword.get(:media_urls, [])
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.take(RompCrm.ChatMedia.max_images())
+
+    cond do
+      body == "" and media_urls == [] ->
+        {:error, :empty}
+
+      not taken_over?(business_id, phone_normalized) ->
         {:error, :not_taken_over}
-      else
+
+      true ->
         link = primary_link_for_phone(business_id, phone_normalized)
         tech_id = (link && link.technician_user_id) || user.id
+        stored_body = body_with_media_suffix(body, media_urls)
 
         with {:ok, e164} <- client_e164(phone_normalized),
-             :ok <- send_and_record(tech_id, business_id, phone_normalized, e164, body, "sms_human") do
+             :ok <-
+               send_and_record(
+                 tech_id,
+                 business_id,
+                 phone_normalized,
+                 e164,
+                 stored_body,
+                 "sms_human",
+                 media_urls
+               ) do
           broadcast(business_id, phone_normalized, :message)
-          {:ok, body}
+          {:ok, stored_body}
         end
-      end
     end
+  end
+
+  defp body_with_media_suffix(body, []), do: body
+
+  defp body_with_media_suffix(body, media_urls) do
+    base =
+      if body == "" do
+        "(Outbound MMS.)"
+      else
+        body
+      end
+
+    lines =
+      media_urls
+      |> Enum.with_index(1)
+      |> Enum.map_join("", fn {u, ix} -> "\n#{ix}. #{u}" end)
+
+    base <> "\n\n[MMS attachments — #{length(media_urls)} URL(s) stored for follow-up:]" <> lines
   end
 
   @doc """
@@ -183,8 +221,15 @@ defmodule RompCrm.ClientChats do
     "client_chat:#{business_id}:#{phone_normalized}"
   end
 
-  defp send_and_record(tech_user_id, business_id, phone_norm, e164, body, channel) do
-    case Messages.send_sms(e164, body) do
+  defp send_and_record(tech_user_id, business_id, phone_norm, e164, body, channel, media_urls \\ []) do
+    twilio_result =
+      if media_urls == [] do
+        Messages.send_sms(e164, body_for_twilio(body))
+      else
+        Messages.send_mms(e164, body_for_twilio(body), media_urls)
+      end
+
+    case twilio_result do
       {:ok, _} ->
         _ =
           SmsConversations.record_client_message(
@@ -203,6 +248,17 @@ defmodule RompCrm.ClientChats do
     end
   end
 
+  # Twilio gets caption only — not the stored MMS URL suffix used for the web UI.
+  defp body_for_twilio(body) when is_binary(body) do
+    body
+    |> String.split(~r/\n\n\[MMS attachments/i)
+    |> hd()
+    |> String.trim()
+    |> case do
+      "(Outbound MMS.)" -> ""
+      other -> other
+    end
+  end
   defp client_e164(phone_normalized) do
     case Phone.to_e164(phone_normalized) do
       e164 when is_binary(e164) -> {:ok, e164}

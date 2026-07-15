@@ -71,6 +71,9 @@ defmodule RompCrmWeb.ChatComponents do
   attr :placeholder, :string, default: "Message the RompCRM agent…"
   attr :disabled, :boolean, default: false
   attr :submit_event, :string, default: "chat_send"
+  attr :attach_enabled, :boolean, default: false
+  attr :upload_url, :string, default: nil
+  attr :pending_photos, :list, default: []
 
   def chat_compose(assigns) do
     ~H"""
@@ -79,20 +82,65 @@ defmodule RompCrmWeb.ChatComponents do
       phx-submit={@submit_event}
       phx-reset
       phx-hook="ChatCompose"
-      class="flex items-end gap-2 border-t border-base-300 pt-3"
+      data-upload-url={@upload_url}
+      data-attach-enabled={to_string(@attach_enabled)}
+      class="flex flex-col gap-2 border-t border-base-300 pt-3"
     >
-      <label class="sr-only" for={"#{@form_id}-input"}>Message</label>
-      <textarea
-        id={"#{@form_id}-input"}
-        name="message"
-        rows="2"
-        placeholder={@placeholder}
-        disabled={@disabled}
-        class="textarea textarea-bordered min-h-[2.75rem] max-h-32 flex-1 resize-none text-sm"
-      ></textarea>
-      <button type="submit" class="btn btn-primary btn-sm shrink-0" disabled={@disabled}>
-        Send
-      </button>
+      <%= if @pending_photos != [] do %>
+        <div class="flex flex-wrap gap-2 px-0.5" data-role="pending-photos">
+          <%= for {url, idx} <- Enum.with_index(@pending_photos) do %>
+            <div class="relative">
+              <img src={url} alt="Pending attachment" class="h-16 w-16 rounded-lg object-cover ring-1 ring-base-300" />
+              <button
+                type="button"
+                phx-click="chat_remove_pending_photo"
+                phx-value-index={idx}
+                class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-base-100 text-xs font-bold text-base-content shadow ring-1 ring-base-300"
+                aria-label="Remove photo"
+              >
+                ×
+              </button>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+      <div class="flex items-end gap-2">
+        <%= if @attach_enabled and is_binary(@upload_url) do %>
+          <label class={[
+            "btn btn-ghost btn-sm btn-square shrink-0",
+            @disabled && "btn-disabled pointer-events-none opacity-50"
+          ]}>
+            <span class="sr-only">Attach image</span>
+            <input
+              type="file"
+              accept="image/*"
+              class="hidden"
+              data-role="chat-attach-input"
+              disabled={@disabled}
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.003.003-.003.002a2.25 2.25 0 0 1-3.18-3.182l.002-.003.003-.002L15.75 5.25"
+              />
+            </svg>
+          </label>
+        <% end %>
+        <label class="sr-only" for={"#{@form_id}-input"}>Message</label>
+        <textarea
+          id={"#{@form_id}-input"}
+          name="message"
+          rows="2"
+          placeholder={@placeholder}
+          disabled={@disabled}
+          class="textarea textarea-bordered min-h-[2.75rem] max-h-32 flex-1 resize-none text-sm"
+        ></textarea>
+        <button type="submit" class="btn btn-primary btn-sm shrink-0" disabled={@disabled}>
+          Send
+        </button>
+      </div>
+      <p data-role="chat-attach-status" class="min-h-[1rem] px-0.5 text-xs text-base-content/60"></p>
     </form>
     """
   end

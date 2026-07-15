@@ -136,6 +136,9 @@
               form_id="chats-compose"
               placeholder={compose_placeholder(@thread_kind, @client_taken_over?)}
               disabled={compose_disabled?(@thread_kind, @client_taken_over?, @chat_sending?)}
+              attach_enabled={compose_attach_enabled?(@thread_kind, @client_taken_over?)}
+              upload_url={chat_media_upload_url(@thread_kind, @client_taken_over?, @client_phone)}
+              pending_photos={@pending_chat_photos}
             />
           </div>
         </div>

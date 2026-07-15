@@ -28,35 +28,73 @@ defmodule RompCrm.Twilio.MmsImageDownload do
   end
 
   defp fetch_one(url) when is_binary(url) do
-    account_sid = Application.get_env(:romp_crm, :twilio_account_sid)
-    token = Application.get_env(:romp_crm, :twilio_auth_token)
+    url = String.trim(url)
 
-    if is_nil(account_sid) or account_sid == "" or is_nil(token) or token == "" do
-      nil
-    else
-      auth = Base.encode64("#{account_sid}:#{token}")
-
-      case Req.get(String.trim(url),
-             headers: [{"authorization", "Basic #{auth}"}],
-             receive_timeout: 60_000
-           ) do
-        {:ok, %{status: 200, body: body, headers: h}} when is_binary(body) ->
-          if byte_size(body) <= @max_bytes do
-            %{
-              media_type: media_type_for_body(body, content_type_from_headers(h)),
-              data: Base.encode64(body)
-            }
-          else
-            nil
-          end
-
-        _ ->
+    case read_local_chat_media(url) do
+      {:ok, body, media_type} ->
+        if byte_size(body) <= @max_bytes do
+          %{media_type: media_type, data: Base.encode64(body)}
+        else
           nil
-      end
+        end
+
+      :not_local ->
+        fetch_remote(url)
     end
   end
 
   defp fetch_one(_), do: nil
+
+  defp read_local_chat_media(url) do
+    path =
+      case URI.parse(url) do
+        %URI{path: path} when is_binary(path) -> path
+        _ -> url
+      end
+
+    case Regex.run(~r{/uploads/chat-media/(.+)$}, path) do
+      [_, rest] ->
+        rel = "uploads/chat-media/" <> rest
+        abs = RompCrm.JobUploads.absolute_path(rel)
+
+        if File.regular?(abs) do
+          body = File.read!(abs)
+          {:ok, body, media_type_for_body(body, "application/octet-stream")}
+        else
+          :not_local
+        end
+
+      _ ->
+        :not_local
+    end
+  end
+
+  defp fetch_remote(url) do
+    account_sid = Application.get_env(:romp_crm, :twilio_account_sid)
+    token = Application.get_env(:romp_crm, :twilio_auth_token)
+
+    headers =
+      if account_sid not in [nil, ""] and token not in [nil, ""] do
+        [{"authorization", "Basic #{Base.encode64("#{account_sid}:#{token}")}"}]
+      else
+        []
+      end
+
+    case Req.get(url, headers: headers, receive_timeout: 60_000) do
+      {:ok, %{status: 200, body: body, headers: h}} when is_binary(body) ->
+        if byte_size(body) <= @max_bytes do
+          %{
+            media_type: media_type_for_body(body, content_type_from_headers(h)),
+            data: Base.encode64(body)
+          }
+        else
+          nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp content_type_from_headers(headers) do
     headers

@@ -32,6 +32,7 @@ defmodule RompCrmWeb.ChatsLive do
       |> assign(:chat_agent_typing?, false)
       |> assign(:client_taken_over?, false)
       |> assign(:show_takeover_confirm?, false)
+      |> assign(:pending_chat_photos, [])
       |> assign(:mobile_view, :list)
 
     {:ok, socket}
@@ -54,6 +55,34 @@ defmodule RompCrmWeb.ChatsLive do
     case socket.assigns.thread_kind do
       :agent -> deliver_agent(socket, body)
       :client -> deliver_client(socket, body)
+    end
+  end
+
+  @impl true
+  def handle_event("chat_media_uploaded", %{"url" => url}, socket) do
+    url = url |> to_string() |> String.trim()
+
+    cond do
+      url == "" ->
+        {:noreply, socket}
+
+      length(socket.assigns.pending_chat_photos) >= RompCrm.ChatMedia.max_images() ->
+        {:noreply, put_flash(socket, :error, "You can attach up to #{RompCrm.ChatMedia.max_images()} photos.")}
+
+      true ->
+        {:noreply, update(socket, :pending_chat_photos, &(&1 ++ [url]))}
+    end
+  end
+
+  @impl true
+  def handle_event("chat_remove_pending_photo", %{"index" => idx}, socket) do
+    case Integer.parse(to_string(idx)) do
+      {i, _} ->
+        photos = List.delete_at(socket.assigns.pending_chat_photos, i)
+        {:noreply, assign(socket, :pending_chat_photos, photos)}
+
+      :error ->
+        {:noreply, socket}
     end
   end
 
@@ -108,11 +137,11 @@ defmodule RompCrmWeb.ChatsLive do
   end
 
   @impl true
-  def handle_info({:chat_deliver, body}, socket) do
+  def handle_info({:chat_deliver, body, media_urls}, socket) do
     user = socket.assigns.current_scope.user
     bid = socket.assigns.current_business_id
 
-    result = AgentChat.send_message(user, bid, body)
+    result = AgentChat.send_message(user, bid, body, media_urls: media_urls)
 
     socket =
       socket
@@ -123,6 +152,7 @@ defmodule RompCrmWeb.ChatsLive do
       {:ok, _reply} ->
         {:noreply,
          socket
+         |> assign(:pending_chat_photos, [])
          |> load_active_thread()
          |> push_event("chat-scroll-bottom", %{})}
 
@@ -138,17 +168,18 @@ defmodule RompCrmWeb.ChatsLive do
   end
 
   @impl true
-  def handle_info({:client_deliver, body}, socket) do
+  def handle_info({:client_deliver, body, media_urls}, socket) do
     user = socket.assigns.current_scope.user
     bid = socket.assigns.current_business_id
     phone = socket.assigns.client_phone
 
     socket = assign(socket, :chat_sending?, false)
 
-    case ClientChats.send_human_message!(user, bid, phone, body) do
+    case ClientChats.send_human_message!(user, bid, phone, body, media_urls: media_urls) do
       {:ok, _} ->
         {:noreply,
          socket
+         |> assign(:pending_chat_photos, [])
          |> load_active_thread()
          |> push_event("chat-scroll-bottom", %{})}
 
@@ -216,28 +247,41 @@ defmodule RompCrmWeb.ChatsLive do
   def compose_disabled?(:client, false, _), do: true
   def compose_disabled?(_kind, _taken_over, sending?), do: sending?
 
+  def chat_media_upload_url(:agent, _, _), do: ~p"/chats/media"
+
+  def chat_media_upload_url(:client, true, phone) when is_binary(phone) and phone != "" do
+    ~p"/chats/media?#{[phone: phone]}"
+  end
+
+  def chat_media_upload_url(_, _, _), do: nil
+
+  def compose_attach_enabled?(:agent, _), do: true
+  def compose_attach_enabled?(:client, true), do: true
+  def compose_attach_enabled?(_, _), do: false
+
   defp deliver_agent(socket, body) do
     bid = socket.assigns.current_business_id
     body = body |> to_string() |> String.trim()
+    media_urls = socket.assigns.pending_chat_photos || []
 
     cond do
       is_nil(bid) ->
         {:noreply, put_flash(socket, :error, "Pick a workspace first.")}
 
-      body == "" ->
+      body == "" and media_urls == [] ->
         {:noreply, socket}
 
       socket.assigns.chat_sending? ->
         {:noreply, socket}
 
       true ->
-        send(self(), {:chat_deliver, body})
+        send(self(), {:chat_deliver, body, media_urls})
 
         {:noreply,
          socket
          |> assign(:chat_sending?, true)
          |> assign(:chat_agent_typing?, true)
-         |> update(:chat_rows, &(&1 ++ [optimistic_self_row(body)]))
+         |> update(:chat_rows, &(&1 ++ [optimistic_self_row(body, media_urls)]))
          |> push_event("chat-scroll-bottom", %{})}
     end
   end
@@ -246,6 +290,7 @@ defmodule RompCrmWeb.ChatsLive do
     bid = socket.assigns.current_business_id
     phone = socket.assigns.client_phone
     body = body |> to_string() |> String.trim()
+    media_urls = socket.assigns.pending_chat_photos || []
 
     cond do
       is_nil(bid) or is_nil(phone) ->
@@ -254,25 +299,27 @@ defmodule RompCrmWeb.ChatsLive do
       not socket.assigns.client_taken_over? ->
         {:noreply, put_flash(socket, :error, "Take over the chat before sending a live reply.")}
 
-      body == "" ->
+      body == "" and media_urls == [] ->
         {:noreply, socket}
 
       socket.assigns.chat_sending? ->
         {:noreply, socket}
 
       true ->
-        send(self(), {:client_deliver, body})
+        send(self(), {:client_deliver, body, media_urls})
 
         {:noreply,
          socket
          |> assign(:chat_sending?, true)
-         |> update(:chat_rows, &(&1 ++ [optimistic_human_row(body)]))
+         |> update(:chat_rows, &(&1 ++ [optimistic_human_row(body, media_urls)]))
          |> push_event("chat-scroll-bottom", %{})}
     end
   end
 
   defp apply_thread_params(socket, params) do
     mobile_view = mobile_view_from_params(params)
+    prev_phone = socket.assigns[:client_phone]
+    prev_kind = socket.assigns[:thread_kind]
 
     socket =
       case client_phone_param(params) do
@@ -292,6 +339,13 @@ defmodule RompCrmWeb.ChatsLive do
           |> assign(:thread_kind, :agent)
           |> assign(:client_phone, nil)
           |> assign(:client_name, nil)
+      end
+
+    socket =
+      if socket.assigns.thread_kind != prev_kind or socket.assigns.client_phone != prev_phone do
+        assign(socket, :pending_chat_photos, [])
+      else
+        socket
       end
 
     assign(socket, :mobile_view, mobile_view)
@@ -418,28 +472,28 @@ defmodule RompCrmWeb.ChatsLive do
     socket
   end
 
-  defp optimistic_self_row(body) do
+  defp optimistic_self_row(body, media_urls) do
     %{
       id: "pending-#{System.unique_integer([:positive])}",
       label: "You",
       role: :self,
       side: :right,
-      text: body,
-      photos: [],
+      text: if(body == "", do: nil, else: body),
+      photos: media_urls,
       inserted_at: DateTime.utc_now(),
       channel: "in_app",
       pending: true
     }
   end
 
-  defp optimistic_human_row(body) do
+  defp optimistic_human_row(body, media_urls) do
     %{
       id: "pending-#{System.unique_integer([:positive])}",
       label: "You (live)",
       role: :self,
       side: :right,
-      text: body,
-      photos: [],
+      text: if(body == "", do: nil, else: body),
+      photos: media_urls,
       inserted_at: DateTime.utc_now(),
       channel: "sms_human",
       pending: true
