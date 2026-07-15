@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.2] - 2026-07-15
+
+### Fixed
+
+- Detect MMS image media type from file magic bytes before sending to Anthropic so mislabeled Twilio Content-Type headers (e.g. JPEG labeled as PNG) no longer return HTTP 400
+
 ## [0.13.1] - 2026-07-15
 
 ### Changed
