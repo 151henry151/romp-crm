@@ -7,7 +7,7 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Repo
   alias RompCrm.Ai.SmsUnifiedInboundExtractor
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.Escalations
+  alias RompCrm.Bookings.{CustomerSchedulingSms, Escalations, OpeningsPreview}
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.BusinessAuditLogs.Detail
   alias RompCrm.Clients
@@ -20,7 +20,6 @@ defmodule RompCrm.SmsInboundProcessor do
   alias RompCrm.Reminders.Reminder
   alias RompCrm.SmsConversations
   alias RompCrm.SmsMms
-  alias RompCrm.Bookings.OpeningsPreview
   alias RompCrm.SmsBookingConsent
   alias RompCrm.SmsPendingBookingProposals
   alias RompCrm.SmsPendingJobProposals
@@ -594,6 +593,9 @@ defmodule RompCrm.SmsInboundProcessor do
         pending_booking_proposals
       )
 
+    {booking_ops, pending_booking_proposals, disabled_reply} =
+      maybe_disable_customer_scheduling_sms(booking_ops, pending_booking_proposals)
+
     had_extracted_ops =
       job_ops_raw != [] or time_ops_raw != [] or emp_ops_raw != [] or rem_ops_raw != [] or
         booking_ops_raw != []
@@ -651,7 +653,7 @@ defmodule RompCrm.SmsInboundProcessor do
             Map.merge(log_base, %{outcome: "operations_applied", results: results})
           )
         else
-          msg = first_nonempty([assistant])
+          msg = first_nonempty([disabled_reply, assistant])
 
           reply =
             msg ||
@@ -746,6 +748,7 @@ defmodule RompCrm.SmsInboundProcessor do
                 business_id,
                 user.id
               )
+              |> maybe_append_disabled_scheduling_note(disabled_reply)
 
             record_sms_db_audits(business_id, user.id, %{
               twilio_message_sid: message_sid,
@@ -757,6 +760,16 @@ defmodule RompCrm.SmsInboundProcessor do
               Map.merge(log_base, %{outcome: "operations_applied", results: all_results})
             )
         end
+    end
+  end
+
+  defp maybe_append_disabled_scheduling_note(reply, nil), do: reply
+
+  defp maybe_append_disabled_scheduling_note(reply, note) when is_binary(note) do
+    if is_binary(reply) and String.trim(reply) != "" do
+      String.trim(reply) <> " " <> note
+    else
+      note
     end
   end
 
@@ -797,6 +810,42 @@ defmodule RompCrm.SmsInboundProcessor do
   end
 
   defp do_apply_pending_booking(
+         ctx,
+         from,
+         user,
+         business_id,
+         phone_norm,
+         body_stored,
+         message_sid
+       ) do
+    unless CustomerSchedulingSms.enabled?() do
+      case SmsPendingBookingProposals.get(business_id, phone_norm) do
+        nil -> :ok
+        row -> Repo.delete!(row)
+      end
+
+      reply =
+        "Customer scheduling texts are temporarily turned off — I won't text clients to schedule until that's re-enabled."
+
+      sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+        message_sid: message_sid,
+        outcome: "pending_booking_disabled",
+        results: []
+      })
+    else
+      do_apply_pending_booking_enabled(
+        ctx,
+        from,
+        user,
+        business_id,
+        phone_norm,
+        body_stored,
+        message_sid
+      )
+    end
+  end
+
+  defp do_apply_pending_booking_enabled(
          ctx,
          from,
          user,
@@ -1831,6 +1880,23 @@ defmodule RompCrm.SmsInboundProcessor do
       "playbook" => playbook,
       "setup_completed" => not is_nil(user.scheduling_setup_completed_at)
     }
+  end
+
+  defp maybe_disable_customer_scheduling_sms(booking_ops, pending_proposals)
+       when is_list(booking_ops) and is_list(pending_proposals) do
+    if CustomerSchedulingSms.enabled?() do
+      {booking_ops, pending_proposals, nil}
+    else
+      had_initiate? = Enum.any?(booking_ops, &match?({:booking_initiate, _}, &1))
+      rest = Enum.reject(booking_ops, &match?({:booking_initiate, _}, &1))
+
+      reply =
+        if had_initiate? or pending_proposals != [] do
+          "Customer scheduling texts are temporarily turned off — I won't text clients to schedule until that's re-enabled."
+        end
+
+      {rest, [], reply}
+    end
   end
 
   defp maybe_gate_scheduling_setup(user, business_id, phone_norm, booking_ops, pending_proposals) do

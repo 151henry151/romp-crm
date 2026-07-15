@@ -10,7 +10,7 @@ defmodule RompCrmWeb.PublicBookingLive do
 
   alias RompCrm.Accounts.User
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.BookingLink
+  alias RompCrm.Bookings.{BookingLink, CustomerSchedulingSms}
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
@@ -221,16 +221,20 @@ defmodule RompCrmWeb.PublicBookingLive do
       body =
         "You're confirmed with #{business.name} for #{window}. Reply to this message if anything changes."
 
-      _ = Messages.send_sms(e164, body)
+      case CustomerSchedulingSms.send_sms(e164, body) do
+        {:ok, :feature_disabled} ->
+          :ok
 
-      _ =
-        SmsConversations.record_client_message(
-          link.business_id,
-          link.technician_user_id,
-          link.client_phone_normalized,
-          "outbound",
-          body
-        )
+        _ ->
+          _ =
+            SmsConversations.record_client_message(
+              link.business_id,
+              link.technician_user_id,
+              link.client_phone_normalized,
+              "outbound",
+              body
+            )
+      end
     end
 
     # Heads-up SMS to the technician

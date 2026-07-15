@@ -7,6 +7,7 @@ defmodule RompCrm.Scheduling.SlotApprovals do
   import Ecto.Query
 
   alias RompCrm.Bookings.BookingLink
+  alias RompCrm.Bookings.CustomerSchedulingSms
   alias RompCrm.Repo
   alias RompCrm.Scheduling.SlotApproval
   alias RompCrm.Twilio.Messages
@@ -128,7 +129,7 @@ defmodule RompCrm.Scheduling.SlotApprovals do
       build_customer_offer_message(link, offerings, approval.customer_pending_reply)
 
     if phone_e164 do
-      _ = Messages.send_sms(phone_e164, customer_msg)
+      _ = CustomerSchedulingSms.send_sms(phone_e164, customer_msg)
     end
 
     {:approved, "Offered #{format_times(offerings)} to #{client_label(link)}."}

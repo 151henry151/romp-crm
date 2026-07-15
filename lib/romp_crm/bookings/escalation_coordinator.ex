@@ -8,7 +8,7 @@ defmodule RompCrm.Bookings.EscalationCoordinator do
 
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.BookingEscalationExtractor
-  alias RompCrm.Bookings.{BookingLink, Escalation, Escalations}
+  alias RompCrm.Bookings.{BookingLink, CustomerSchedulingSms, Escalation, Escalations}
   alias RompCrm.ContactInfo
   alias RompCrm.Repo
   alias RompCrm.SmsConversations
@@ -198,15 +198,17 @@ defmodule RompCrm.Bookings.EscalationCoordinator do
     phone_norm = escalation.client_phone_normalized
 
     with e164 when is_binary(e164) <- Phone.to_e164(phone_norm),
-         {:ok, _} <- Messages.send_sms(e164, body) do
-      _ =
-        SmsConversations.record_client_message(
-          escalation.business_id,
-          escalation.technician_user_id,
-          phone_norm,
-          "outbound",
-          body
-        )
+         {:ok, result} <- CustomerSchedulingSms.send_sms(e164, body) do
+      if result != :feature_disabled do
+        _ =
+          SmsConversations.record_client_message(
+            escalation.business_id,
+            escalation.technician_user_id,
+            phone_norm,
+            "outbound",
+            body
+          )
+      end
 
       {:ok, body}
     else

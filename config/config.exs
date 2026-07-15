@@ -26,6 +26,9 @@ config :romp_crm,
   paypal_trial_days: 0,
   signup_trial_days: 30,
   admin_emails: ["151henry151@gmail.com"],
+  # Off until customer scheduling SMS is production-ready. Set true (or
+  # CUSTOMER_SCHEDULING_SMS_ENABLED=true in prod) to allow the agent to text clients.
+  customer_scheduling_sms_enabled: false,
   # Transactional HTML email branding (absolute https URLs)
   email_logo_url: "https://rompcrm.com/media/romp-crm-logo-main-dark.png",
   email_brand_base_url: "https://rompcrm.com"
@@ -84,7 +87,7 @@ config :swoosh, :finch_name, RompCrm.Finch
 
 config :romp_crm,
   sms_job_extractor_adapter: RompCrm.Ai.SmsJobExtractor.Anthropic,
-  anthropic_model: "claude-sonnet-4-20250514",
+  anthropic_model: "claude-sonnet-4-6",
   skip_twilio_signature_validation: false,
   twilio_voice_webhook_public_url: nil,
   twilio_voice_forward_e164: "+18024587299"

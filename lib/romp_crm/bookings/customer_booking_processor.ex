@@ -15,14 +15,13 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
   alias RompCrm.Accounts.User
   alias RompCrm.Ai.CustomerBookingExtractor
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.{AvailabilitySummary, BookingLink, EscalationCoordinator, Escalations, Intake, JobScheduleSync, Orchestrator}
+  alias RompCrm.Bookings.{AvailabilitySummary, BookingLink, CustomerSchedulingSms, EscalationCoordinator, Escalations, Intake, JobScheduleSync, Orchestrator}
   alias RompCrm.ClientChats
   alias RompCrm.Businesses
   alias RompCrm.Repo
   alias RompCrm.Scheduling
   alias RompCrm.Scheduling.{AvailabilityEngine, Playbook, Prefs, SlotApprovals}
   alias RompCrm.SmsConversations
-  alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
 
   @slot_preview_days 14
@@ -74,11 +73,20 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       "Client booking inbound: sid=#{message_sid} phone=#{phone_norm} candidate_links=#{length(links)}"
     )
 
-    if human_takeover_active?(phone_norm) do
-      ClientChats.record_inbound_while_taken_over(phone_norm, body)
-      {:ok, :human_takeover_silent}
-    else
-      process_with_agent(phone_norm, body, links, params, message_sid)
+    cond do
+      human_takeover_active?(phone_norm) ->
+        ClientChats.record_inbound_while_taken_over(phone_norm, body)
+        {:ok, :human_takeover_silent}
+
+      not CustomerSchedulingSms.enabled?() ->
+        Logger.info(
+          "Client booking inbound ignored: customer scheduling SMS disabled sid=#{message_sid} phone=#{phone_norm}"
+        )
+
+        {:ok, :customer_scheduling_sms_disabled}
+
+      true ->
+        process_with_agent(phone_norm, body, links, params, message_sid)
     end
   end
 
@@ -105,7 +113,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
         {reply, recorded_links} = handle_result(result, resolved, links, phone_norm)
 
         record_exchange(recorded_links, phone_norm, body, reply)
-        _ = Messages.send_sms(Phone.to_e164(phone_norm), reply)
+        _ = CustomerSchedulingSms.send_sms(Phone.to_e164(phone_norm), reply)
         {:ok, reply}
 
       {:error, reason} ->
@@ -117,7 +125,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
           "Sorry, we couldn't process that just now. You can pick a time at your booking link, or try again in a few minutes."
 
         record_exchange(links, phone_norm, body, reply)
-        _ = Messages.send_sms(Phone.to_e164(phone_norm), reply)
+        _ = CustomerSchedulingSms.send_sms(Phone.to_e164(phone_norm), reply)
         {:ok, reply}
     end
   end
@@ -453,7 +461,7 @@ defmodule RompCrm.Bookings.CustomerBookingProcessor do
       client_name = (link.client && link.client.client_name) || "A client"
       tz = Prefs.decode(tech.scheduling_prefs_json).timezone
 
-      _ = Messages.send_sms(e164, compose_fun.(business, client_name, tz))
+      _ = RompCrm.Twilio.Messages.send_sms(e164, compose_fun.(business, client_name, tz))
       :ok
     else
       _ -> :ok

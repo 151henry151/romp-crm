@@ -172,6 +172,10 @@ if config_env() == :prod do
   twilio_sms_replies_enabled =
     System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false"
 
+  # Default off: agent must not text customers until explicitly enabled.
+  customer_scheduling_sms_enabled =
+    System.get_env("CUSTOMER_SCHEDULING_SMS_ENABLED") == "true"
+
   subscription_paywall_enabled =
     System.get_env("SUBSCRIPTION_PAYWALL_ENABLED") == "true"
 
@@ -319,8 +323,9 @@ if config_env() == :prod do
     twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
     twilio_messaging_from_number: twilio_messaging_from_raw,
     twilio_sms_replies_enabled: twilio_sms_replies_enabled,
+    customer_scheduling_sms_enabled: customer_scheduling_sms_enabled,
     anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
-    anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
+    anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-6",
     twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
     twilio_voice_webhook_public_url: System.get_env("TWILIO_VOICE_WEBHOOK_PUBLIC_URL"),
     twilio_voice_forward_e164: twilio_voice_forward_e164,

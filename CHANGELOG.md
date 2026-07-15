@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.1] - 2026-07-15
+
+### Changed
+
+- Disable customer scheduling SMS by default (`customer_scheduling_sms_enabled` / `CUSTOMER_SCHEDULING_SMS_ENABLED`); gate booking initiate, client booking replies, escalation relays, slot offers, and web booking confirmation texts until explicitly re-enabled
+
 ## [0.13.0] - 2026-06-11
 
 ### Added

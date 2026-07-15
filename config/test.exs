@@ -57,6 +57,7 @@ config :romp_crm,
   twilio_voice_forward_e164: "+18024587299",
   data_export_scheduler_enabled: false,
   reminder_scheduler_enabled: false,
+  customer_scheduling_sms_enabled: true,
   signup_notify_emails: []
 
 config :romp_crm, RompCrm.Mailer, adapter: Swoosh.Adapters.Test

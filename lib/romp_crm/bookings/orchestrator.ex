@@ -11,11 +11,10 @@ defmodule RompCrm.Bookings.Orchestrator do
   require Logger
 
   alias RompCrm.Bookings
-  alias RompCrm.Bookings.ClientInvitationSms
+  alias RompCrm.Bookings.{ClientInvitationSms, CustomerSchedulingSms}
   alias RompCrm.Businesses
   alias RompCrm.Clients
   alias RompCrm.SmsConversations
-  alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
 
   @doc """
@@ -34,6 +33,13 @@ defmodule RompCrm.Bookings.Orchestrator do
     e164 = Phone.to_e164(phone_norm)
 
     cond do
+      not CustomerSchedulingSms.enabled?() ->
+        Logger.info(
+          "Booking initiate skipped: sid=#{ctx.message_sid} business_id=#{ctx.business_id} reason=:customer_scheduling_sms_disabled"
+        )
+
+        {:skipped, :customer_scheduling_sms_disabled}
+
       is_nil(e164) ->
         Logger.info(
           "Booking initiate skipped: sid=#{ctx.message_sid} business_id=#{ctx.business_id} reason=:invalid_phone phone=#{inspect(attrs.phone)}"
@@ -187,18 +193,22 @@ defmodule RompCrm.Bookings.Orchestrator do
   # ── SMS composition / delivery ─────────────────────────────────────────────
 
   defp deliver_client_sms(e164, body, phone_norm, ctx) do
-    _ = Messages.send_sms(e164, body)
+    case CustomerSchedulingSms.send_sms(e164, body) do
+      {:ok, :feature_disabled} ->
+        :ok
 
-    _ =
-      SmsConversations.record_client_message(
-        ctx.business_id,
-        ctx.user_id,
-        phone_norm,
-        "outbound",
-        body
-      )
+      _ ->
+        _ =
+          SmsConversations.record_client_message(
+            ctx.business_id,
+            ctx.user_id,
+            phone_norm,
+            "outbound",
+            body
+          )
 
-    :ok
+        :ok
+    end
   end
 
   defp notify_client_of_confirmation(request, booking, ctx) do
