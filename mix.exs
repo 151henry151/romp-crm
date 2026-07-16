@@ -4,7 +4,7 @@ defmodule RompCrm.MixProject do
   def project do
     [
       app: :romp_crm,
-      version: "0.13.3",
+      version: "0.14.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -82,7 +82,8 @@ defmodule RompCrm.MixProject do
       {:gen_smtp, "~> 1.2"},
       {:finch, "~> 0.13"},
       {:req, "~> 0.5"},
-      {:tzdata, "~> 1.1"}
+      {:tzdata, "~> 1.1"},
+      {:chromic_pdf, "~> 1.17"}
     ]
   end
 

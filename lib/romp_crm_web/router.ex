@@ -132,6 +132,7 @@ defmodule RompCrmWeb.Router do
     get "/users/settings", UserSettingsController, :edit
     put "/users/settings", UserSettingsController, :update
     get "/users/settings/confirm-email/:token", UserSettingsController, :confirm_email
+    post "/users/settings/reports", PrintReportsController, :download
 
     put "/users/settings/scheduling", CalendarSettingsController, :update_scheduling
     post "/users/settings/scheduling/playbook/:id/deactivate", CalendarSettingsController, :deactivate_playbook_rule

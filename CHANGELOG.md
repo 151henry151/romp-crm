@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.0] - 2026-07-15
+
+### Added
+
+- Settings **Print reports (PDF)**: download Activity or Customer list as a real PDF attachment (ChromicPDF + system Chromium)
+- **`RompCrm.PrintReports`**: activity report over a date range (job hours, clock punches, new leads, jobs worked on) plus open non-completed leads/jobs; full customer list with contact and address fields
+- **`POST /users/settings/reports`**: owner-workspace-scoped PDF download
+
+### Changed
+
+- Start ChromicPDF in the application supervision tree when `chromic_pdf_enabled` is true (disabled in test; stub PDF adapter used there)
+
 ## [0.13.3] - 2026-07-15
 
 ### Added

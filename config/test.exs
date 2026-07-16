@@ -58,6 +58,8 @@ config :romp_crm,
   data_export_scheduler_enabled: false,
   reminder_scheduler_enabled: false,
   customer_scheduling_sms_enabled: true,
-  signup_notify_emails: []
+  signup_notify_emails: [],
+  print_reports_pdf_adapter: RompCrm.PrintReports.Pdf.Stub,
+  chromic_pdf_enabled: false
 
 config :romp_crm, RompCrm.Mailer, adapter: Swoosh.Adapters.Test

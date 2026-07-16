@@ -404,6 +404,97 @@
   </div>
   </section>
 
+  <section class="space-y-6" id="print-reports">
+  <h2 class="text-lg font-semibold text-base-content mb-1">Print reports (PDF)</h2>
+  <p class="text-sm text-base-content/70 mb-4">
+    Download a PDF for an activity report (date range) or a full customer list.
+    Owner workspaces only—same selection rules as CSV export. Works on phone and desktop;
+    no print dialog required.
+  </p>
+
+  <form
+    action={~p"/users/settings/reports"}
+    method="post"
+    id="print_reports"
+    class="mt-4 space-y-3"
+  >
+    <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Workspaces to include</legend>
+      <%= if @owned_businesses_for_export == [] do %>
+        <p class="text-sm text-base-content/70">
+          No owned workspace yet—create one under Jobs first.
+        </p>
+      <% else %>
+        <%= for biz <- @owned_businesses_for_export do %>
+          <label class="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="export_business_ids[]"
+              value={biz.id}
+              checked={biz.id in @export_selected_business_ids}
+              class="checkbox checkbox-sm mt-0.5"
+            />
+            <span class="font-medium">{biz.name}</span>
+          </label>
+        <% end %>
+      <% end %>
+    </fieldset>
+
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Report type</legend>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input
+          type="radio"
+          name="report_type"
+          value="activity"
+          checked
+          class="radio radio-sm mt-0.5"
+        />
+        <span>
+          <span class="font-medium">Activity report</span>
+          — job hours, clock punches, new leads, jobs worked on, plus all open (not completed) leads and jobs
+        </span>
+      </label>
+      <label class="flex cursor-pointer items-start gap-2 text-sm">
+        <input type="radio" name="report_type" value="customers" class="radio radio-sm mt-0.5" />
+        <span>
+          <span class="font-medium">Customer list</span>
+          — name, phone, email, addresses, notes, linked job count
+        </span>
+      </label>
+    </fieldset>
+
+    <fieldset class="rounded-lg border border-base-300 bg-base-200/30 p-3 space-y-2">
+      <legend class="text-sm font-medium text-base-content px-1">Date range (activity report)</legend>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="form-control w-auto">
+          <span class="label py-0"><span class="label-text text-xs">From</span></span>
+          <input
+            type="date"
+            name="from_date"
+            value={Date.utc_today() |> then(&%{&1 | day: 1}) |> Date.to_iso8601()}
+            class="input input-bordered input-sm bg-base-100"
+          />
+        </label>
+        <label class="form-control w-auto">
+          <span class="label py-0"><span class="label-text text-xs">To</span></span>
+          <input
+            type="date"
+            name="to_date"
+            value={Date.to_iso8601(Date.utc_today())}
+            class="input input-bordered input-sm bg-base-100"
+          />
+        </label>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary btn-sm" disabled={@owned_businesses_for_export == []}>
+      Download PDF
+    </button>
+  </form>
+  </section>
+
   <section class="space-y-6">
   <h2 class="text-lg font-semibold text-base-content mb-1">Data export (CSV)</h2>
   <p class="text-sm text-base-content/70 mb-4">

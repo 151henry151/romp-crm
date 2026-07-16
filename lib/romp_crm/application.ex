@@ -17,7 +17,10 @@ defmodule RompCrm.Application do
         {Phoenix.PubSub, name: RompCrm.PubSub},
         {Finch, name: RompCrm.Finch},
         RompCrmWeb.Endpoint
-      ] ++ data_export_scheduler_child() ++ reminder_scheduler_child()
+      ] ++
+        chromic_pdf_child() ++
+        data_export_scheduler_child() ++
+        reminder_scheduler_child()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -36,6 +39,17 @@ defmodule RompCrm.Application do
   defp skip_migrations?() do
     # By default, sqlite migrations are run when using a release
     System.get_env("RELEASE_NAME") == nil
+  end
+
+  defp chromic_pdf_child do
+    if Application.get_env(:romp_crm, :chromic_pdf_enabled, true) do
+      chrome =
+        Application.get_env(:romp_crm, :chromic_pdf_chrome_path, "/usr/bin/chromium")
+
+      [{ChromicPDF, [chrome_executable: chrome]}]
+    else
+      []
+    end
   end
 
   defp data_export_scheduler_child do

@@ -31,7 +31,11 @@ config :romp_crm,
   customer_scheduling_sms_enabled: false,
   # Transactional HTML email branding (absolute https URLs)
   email_logo_url: "https://rompcrm.com/media/romp-crm-logo-main-dark.png",
-  email_brand_base_url: "https://rompcrm.com"
+  email_brand_base_url: "https://rompcrm.com",
+  # Print Reports PDF (ChromicPDF + system Chromium). Tests use Pdf.Stub.
+  print_reports_pdf_adapter: RompCrm.PrintReports.Pdf.Chromic,
+  chromic_pdf_enabled: true,
+  chromic_pdf_chrome_path: "/usr/bin/chromium"
 
 # URL prefix for mounting the app (e.g. `/romp-crm` on hromp.com). Dev/test use `/`.
 config :romp_crm, :path_prefix, "/"
