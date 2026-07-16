@@ -52,7 +52,8 @@ defmodule RompCrm.PrintReports do
   @doc """
   Activity report for owned business ids over an inclusive date range.
 
-  Includes open (non-done) pipeline jobs regardless of date.
+  The jobs list includes all open (non-done) jobs, plus jobs marked done whose
+  `updated_at` falls in the range (proxy for completed during the window).
   """
   def build_activity_report(business_ids, %Date{} = from_date, %Date{} = to_date)
       when is_list(business_ids) do
@@ -62,9 +63,7 @@ defmodule RompCrm.PrintReports do
 
     job_entries = load_job_time_entries(business_ids, range_start, range_end_exclusive)
     clock_punches = load_clock_punches(business_ids, range_start, range_end_exclusive)
-    new_leads = load_new_leads(business_ids, utc_start, utc_end_exclusive)
-    jobs_worked_on = jobs_from_entries(job_entries)
-    open_jobs = load_open_jobs(business_ids)
+    jobs = load_jobs_for_report(business_ids, utc_start, utc_end_exclusive)
     job_hours = group_job_hours(job_entries)
 
     %{
@@ -74,15 +73,11 @@ defmodule RompCrm.PrintReports do
       summary: %{
         job_minutes: Enum.reduce(job_hours, 0, fn row, acc -> acc + row.minutes end),
         employee_worked_minutes:
-          Enum.reduce(clock_punches, 0, fn row, acc -> acc + (row.worked_minutes || 0) end),
-        new_leads_count: length(new_leads),
-        jobs_worked_on_count: length(jobs_worked_on)
+          Enum.reduce(clock_punches, 0, fn row, acc -> acc + (row.worked_minutes || 0) end)
       },
       job_hours: job_hours,
       clock_punches: clock_punches,
-      new_leads: new_leads,
-      jobs_worked_on: jobs_worked_on,
-      open_jobs: open_jobs
+      jobs: jobs
     }
   end
 
@@ -242,39 +237,20 @@ defmodule RompCrm.PrintReports do
     end
   end
 
-  defp load_new_leads(business_ids, utc_start, utc_end_exclusive) do
+  defp load_jobs_for_report(business_ids, utc_start, utc_end_exclusive) do
     if business_ids == [] do
       []
     else
       Repo.all(
         from j in Job,
           where: j.business_id in ^business_ids,
-          where: j.status == :lead,
-          where: j.inserted_at >= ^utc_start and j.inserted_at < ^utc_end_exclusive,
-          order_by: [asc: j.business_id, desc: j.inserted_at, asc: j.id]
-      )
-    end
-  end
-
-  defp load_open_jobs(business_ids) do
-    if business_ids == [] do
-      []
-    else
-      Repo.all(
-        from j in Job,
-          where: j.business_id in ^business_ids,
-          where: j.status in [:lead, :pending, :in_progress],
+          where:
+            j.status in [:lead, :pending, :in_progress] or
+              (j.status == :done and j.updated_at >= ^utc_start and
+                 j.updated_at < ^utc_end_exclusive),
           order_by: [asc: j.business_id, asc: j.status, asc: j.scheduled_on, asc: j.id]
       )
     end
-  end
-
-  defp jobs_from_entries(entries) do
-    entries
-    |> Enum.map(& &1.job)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq_by(& &1.id)
-    |> Enum.sort_by(&{&1.business_id, &1.client_name || "", &1.id})
   end
 
   defp group_job_hours(entries) do

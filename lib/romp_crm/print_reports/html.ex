@@ -2,51 +2,39 @@ defmodule RompCrm.PrintReports.Html do
   @moduledoc false
 
   @doc "Full HTML document for the activity PDF."
-  def activity_document(report, from_date, to_date, %DateTime{} = generated_at) do
-    biz_label = business_label(report.businesses)
+  def activity_document(report, from_date, to_date, _generated_at) do
     range = "#{format_date(from_date)} – #{format_date(to_date)}"
+    headline = "Report for #{range}"
 
     body = """
     <header class="masthead">
-      <div class="brand">Romp CRM</div>
-      <h1>Activity report</h1>
-      <p class="meta">#{esc(biz_label)} · #{esc(range)}</p>
-      <p class="meta subtle">Generated #{esc(format_dt(generated_at))} UTC</p>
+      <h1>#{esc(headline)}</h1>
     </header>
 
     <section class="summary">
       <div class="stat"><span class="num">#{format_minutes(report.summary.job_minutes)}</span><span class="lbl">Job hours</span></div>
       <div class="stat"><span class="num">#{format_minutes(report.summary.employee_worked_minutes)}</span><span class="lbl">Clocked work</span></div>
-      <div class="stat"><span class="num">#{report.summary.new_leads_count}</span><span class="lbl">New leads</span></div>
-      <div class="stat"><span class="num">#{report.summary.jobs_worked_on_count}</span><span class="lbl">Jobs worked</span></div>
     </section>
 
     #{section("Job hours", job_hours_table(report.job_hours))}
     #{section("Clock punches", clock_table(report.clock_punches))}
-    #{section("New leads", jobs_simple_table(report.new_leads, include_schedule: false))}
-    #{section("Jobs worked on", jobs_simple_table(report.jobs_worked_on, include_schedule: true))}
-    #{section("Open leads and jobs (not completed)", jobs_simple_table(report.open_jobs, include_schedule: true))}
+    #{section("Jobs", jobs_simple_table(report.jobs, include_schedule: true))}
     """
 
-    wrap("Activity report — #{biz_label}", body)
+    wrap(headline, body)
   end
 
   @doc "Full HTML document for the customer list PDF."
-  def customers_document(report, %DateTime{} = generated_at) do
-    biz_label = business_label(report.businesses)
-
+  def customers_document(report, _generated_at) do
     body = """
     <header class="masthead">
-      <div class="brand">Romp CRM</div>
       <h1>Customer list</h1>
-      <p class="meta">#{esc(biz_label)} · #{length(report.customers)} customers</p>
-      <p class="meta subtle">Generated #{esc(format_dt(generated_at))} UTC</p>
     </header>
 
     #{customers_table(report.customers)}
     """
 
-    wrap("Customer list — #{biz_label}", body)
+    wrap("Customer list", body)
   end
 
   defp wrap(title, body) do
@@ -77,18 +65,9 @@ defmodule RompCrm.PrintReports.Html do
       line-height: 1.45;
       background: #fff;
     }
-    .brand {
-      font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
-      font-size: 11pt;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #0b3d5c;
-      margin-bottom: 0.35rem;
-    }
     h1 {
       margin: 0 0 0.35rem;
-      font-size: 22pt;
+      font-size: 18pt;
       font-weight: 700;
       letter-spacing: -0.02em;
       color: #0b1c2c;
@@ -104,8 +83,6 @@ defmodule RompCrm.PrintReports.Html do
       border-bottom: 1.5pt solid #0b3d5c;
       padding-bottom: 0.25rem;
     }
-    .meta { margin: 0.15rem 0; color: #334155; }
-    .subtle { color: #64748b; font-size: 9pt; }
     .summary {
       display: flex;
       gap: 0.75rem;
@@ -278,7 +255,7 @@ defmodule RompCrm.PrintReports.Html do
     """
   end
 
-  defp customers_table([]), do: ~s(<p class="empty">No customers in the selected workspaces.</p>)
+  defp customers_table([]), do: ~s(<p class="empty">No customers.</p>)
 
   defp customers_table(rows) do
     Enum.map_join(rows, "\n", fn c ->
@@ -286,7 +263,6 @@ defmodule RompCrm.PrintReports.Html do
       <article class="customer">
         <h3>#{esc(c.client_name)}</h3>
         <dl>
-          <dt>Workspace</dt><dd>#{esc(c.business_name)}</dd>
           <dt>Phone</dt><dd>#{esc(dash(c.phone))}</dd>
           <dt>Email</dt><dd>#{esc(dash(c.client_email))}</dd>
           <dt>Service address</dt><dd>#{esc(dash(c.address))}</dd>
@@ -298,10 +274,6 @@ defmodule RompCrm.PrintReports.Html do
       """
     end)
   end
-
-  defp business_label([]), do: "No workspaces"
-  defp business_label([b]), do: b.name
-  defp business_label(list), do: Enum.map_join(list, ", ", & &1.name)
 
   defp format_minutes(nil), do: "—"
 

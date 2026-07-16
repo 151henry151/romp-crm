@@ -49,7 +49,7 @@ defmodule RompCrm.PrintReportsTest do
       %{business: business, owner: owner}
     end
 
-    test "includes job hours and jobs worked on in range", %{business: business} do
+    test "includes job hours in range", %{business: business} do
       job =
         JobsFixtures.job_fixture(%{
           business_id: business.id,
@@ -76,11 +76,9 @@ defmodule RompCrm.PrintReportsTest do
         PrintReports.build_activity_report([business.id], ~D[2026-07-01], ~D[2026-07-31])
 
       assert report.summary.job_minutes == 120
-      assert report.summary.jobs_worked_on_count == 1
       assert length(report.job_hours) == 1
       assert hd(report.job_hours).client_name == "Acme"
       assert hd(report.job_hours).minutes == 120
-      assert Enum.any?(report.jobs_worked_on, &(&1.id == job.id))
     end
 
     test "includes clock punches overlapping the range", %{business: business} do
@@ -106,7 +104,7 @@ defmodule RompCrm.PrintReportsTest do
       assert hd(report.clock_punches).worked_minutes == 450
     end
 
-    test "includes new leads by inserted_at and open non-done jobs", %{business: business} do
+    test "includes open jobs and done jobs updated in range", %{business: business} do
       lead =
         JobsFixtures.job_fixture(%{
           business_id: business.id,
@@ -122,31 +120,45 @@ defmodule RompCrm.PrintReportsTest do
           scheduled_on: ~D[2026-08-01]
         })
 
-      _done =
+      done_in_range =
         JobsFixtures.job_fixture(%{
           business_id: business.id,
-          client_name: "Done Job",
+          client_name: "Done In Range",
           status: :done
         })
 
-      # Backdate lead inserted_at into range
+      done_outside =
+        JobsFixtures.job_fixture(%{
+          business_id: business.id,
+          client_name: "Done Outside",
+          status: :done
+        })
+
       now = DateTime.utc_now() |> DateTime.truncate(:second)
-      in_range = DateTime.new!(~D[2026-07-05], ~T[12:00:00], "Etc/UTC")
+      in_range = DateTime.new!(~D[2026-07-10], ~T[15:00:00], "Etc/UTC")
+      outside = DateTime.new!(~D[2026-06-01], ~T[15:00:00], "Etc/UTC")
 
       RompCrm.Repo.update_all(
-        from(j in RompCrm.Jobs.Job, where: j.id == ^lead.id),
-        set: [inserted_at: in_range, updated_at: now]
+        from(j in RompCrm.Jobs.Job, where: j.id == ^done_in_range.id),
+        set: [updated_at: in_range]
       )
+
+      RompCrm.Repo.update_all(
+        from(j in RompCrm.Jobs.Job, where: j.id == ^done_outside.id),
+        set: [updated_at: outside, inserted_at: outside]
+      )
+
+      # Touch unrelated fields should not matter; keep lead current
+      _ = now
 
       report =
         PrintReports.build_activity_report([business.id], ~D[2026-07-01], ~D[2026-07-31])
 
-      assert report.summary.new_leads_count == 1
-      assert Enum.any?(report.new_leads, &(&1.id == lead.id))
-      open_ids = Enum.map(report.open_jobs, & &1.id)
-      assert lead.id in open_ids
-      assert pending.id in open_ids
-      refute Enum.any?(report.open_jobs, &(&1.status == :done))
+      job_ids = Enum.map(report.jobs, & &1.id)
+      assert lead.id in job_ids
+      assert pending.id in job_ids
+      assert done_in_range.id in job_ids
+      refute done_outside.id in job_ids
     end
   end
 
@@ -185,20 +197,79 @@ defmodule RompCrm.PrintReportsTest do
     end
   end
 
+  describe "Html.activity_document/4" do
+    test "uses date-range headline without brand, workspace, or generated line" do
+      report = %{
+        summary: %{
+          job_minutes: 0,
+          employee_worked_minutes: 0
+        },
+        job_hours: [],
+        clock_punches: [],
+        jobs: [],
+        businesses: [%{id: 1, name: "Secret Workspace"}]
+      }
+
+      html =
+        RompCrm.PrintReports.Html.activity_document(
+          report,
+          ~D[2026-07-01],
+          ~D[2026-07-16],
+          ~U[2026-07-16 02:09:00Z]
+        )
+
+      assert html =~ "Report for Jul 01, 2026 – Jul 16, 2026"
+      assert html =~ ">Jobs<"
+      refute html =~ "Romp CRM"
+      refute html =~ "ROMP"
+      refute html =~ "Secret Workspace"
+      refute html =~ "Generated"
+      refute html =~ "Activity report"
+      refute html =~ "New leads"
+      refute html =~ "Jobs worked on"
+      refute html =~ "Open leads and jobs"
+    end
+  end
+
+  describe "Html.customers_document/2" do
+    test "omits brand, workspace name, and generated line" do
+      report = %{
+        customers: [
+          %{
+            client_name: "Pat",
+            business_name: "Hidden Co",
+            phone: nil,
+            client_email: nil,
+            address: nil,
+            billing_address: "Same as service",
+            notes: nil,
+            job_count: 0
+          }
+        ],
+        businesses: [%{id: 1, name: "Hidden Co"}]
+      }
+
+      html =
+        RompCrm.PrintReports.Html.customers_document(report, ~U[2026-07-16 02:09:00Z])
+
+      assert html =~ "Customer list"
+      refute html =~ "Romp CRM"
+      refute html =~ "Hidden Co"
+      refute html =~ "Workspace"
+      refute html =~ "Generated"
+    end
+  end
+
   describe "render_pdf/2" do
     test "renders activity pdf bytes via stub adapter" do
       report = %{
         summary: %{
           job_minutes: 0,
-          employee_worked_minutes: 0,
-          new_leads_count: 0,
-          jobs_worked_on_count: 0
+          employee_worked_minutes: 0
         },
         job_hours: [],
         clock_punches: [],
-        new_leads: [],
-        jobs_worked_on: [],
-        open_jobs: [],
+        jobs: [],
         businesses: [%{id: 1, name: "Demo"}]
       }
 

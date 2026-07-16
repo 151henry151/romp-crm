@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.14.1] - 2026-07-15
+
+### Changed
+
+- Print report PDF header: show only `Report for {date range}` (activity) or `Customer list`; omit Romp CRM branding, workspace name, and generated timestamp
+- Customer list PDF: omit workspace name from each customer card
+- Activity PDF: omit New leads and Jobs worked on sections (covered by job hours and open jobs)
+- Activity PDF Jobs section: rename from open-only title; include open jobs plus jobs marked done with `updated_at` in the report range
+
 ## [0.14.0] - 2026-07-15
 
 ### Added
