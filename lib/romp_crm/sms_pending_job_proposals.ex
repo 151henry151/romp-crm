@@ -9,15 +9,24 @@ defmodule RompCrm.SmsPendingJobProposals do
   alias RompCrm.Repo
   alias RompCrm.SmsPendingJobProposals.Pending
 
-  @confirm_re ~r/^(yes|y|confirm|confirmed|ok|okay|create|create them|looks good|go ahead|do it|approve|approved)(\s|$)/i
-
-  @doc "True when the inbound SMS is a short confirmation to apply pending proposals."
+  @doc false
+  @deprecated "Confirmations are classified by SmsUnifiedInboundExtractor turn_intent"
   def confirmation_message?(body) when is_binary(body) do
     t = String.trim(body)
-    t != "" and String.match?(t, @confirm_re)
+
+    t != "" and
+      String.match?(
+        t,
+        ~r/^(yes|y|confirm|confirmed|ok|okay|create|create them|looks good|go ahead|do it|approve|approved)(\s|$)/i
+      )
   end
 
   def confirmation_message?(_), do: false
+
+  def get(business_id, phone_normalized)
+      when is_integer(business_id) and is_binary(phone_normalized) do
+    Repo.get_by(Pending, business_id: business_id, phone_normalized: phone_normalized)
+  end
 
   @doc """
   Replace any pending row for this phone with `proposals` (list of

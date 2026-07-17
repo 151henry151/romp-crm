@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.15.0] - 2026-07-17
+
+### Changed
+
+- Route contractor SMS turn handling through unified extractor `turn_intent` (confirm pending jobs/booking outreach, slot approve/reject, playbook update, scheduling setup reply, or normal CRM ops) instead of regex short-circuits before AI
+- Pass pending-turn context (pending job creates, booking outreach, slot approval, setup session) into the unified SMS extractor prompt
+- Classify dual-role phone routing with `SmsRoleClassifier` (Anthropic) instead of keyword regexes
+- Drop keyword-based booking consent gating; keep AI-emitted `booking_initiate` and build pending proposals from `proposed_booking_initiates` / undated creates
+- Apply slot approvals via AI `turn_intent` (`slot_approve` / `slot_reject`) rather than yes/no regex matching
+
+### Added
+
+- `turn_intent` on unified SMS extraction results
+- `RompCrm.Ai.SmsRoleClassifier` with Anthropic and DeterministicStub adapters
+- `SlotApprovals.handle_contractor_decision/3`
+
 ## [0.14.2] - 2026-07-17
 
 ### Fixed

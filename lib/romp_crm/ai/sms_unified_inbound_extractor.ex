@@ -110,6 +110,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
       {:ok,
        %{
          assistant_sms: assistant,
+         turn_intent: parse_turn_intent(Map.get(map, "turn_intent")),
          job_operations: job_ops,
          time_operations: time_ops,
          emp_operations: emp_ops,
@@ -121,6 +122,23 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
        }}
     end
   end
+
+  @turn_intents ~w(
+    normal
+    confirm_pending_job_creates
+    confirm_pending_booking_outreach
+    slot_approve
+    slot_reject
+    playbook_update
+    scheduling_setup_reply
+  )
+
+  defp parse_turn_intent(intent) when is_binary(intent) do
+    normalized = intent |> String.trim() |> String.downcase()
+    if normalized in @turn_intents, do: normalized, else: "normal"
+  end
+
+  defp parse_turn_intent(_), do: "normal"
 
   defp stringify_keys(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 end

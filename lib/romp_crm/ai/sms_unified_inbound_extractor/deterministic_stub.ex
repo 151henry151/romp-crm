@@ -15,61 +15,102 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
 
   Snapshots and **`prior_turns`** passed into **`extract/5`** are ignored (tests vary snapshots externally).
   """
-  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [], _prior \\ [], _opts \\ [])
+  def extract(raw_message, _jobs \\ [], _open_te \\ [], _emps \\ [], _prior \\ [], opts \\ [])
       when is_binary(raw_message) do
     trimmed = String.trim(raw_message)
+    pending = Keyword.get(opts, :pending_context, %{}) || %{}
 
-    cond do
-      String.starts_with?(trimmed, "STUB_TIME_IN ") ->
-        json = String.trim(String.replace(trimmed, "STUB_TIME_IN ", ""))
-        stub_time_in(json)
+    result =
+      cond do
+        String.starts_with?(trimmed, "STUB_TIME_IN ") ->
+          json = String.trim(String.replace(trimmed, "STUB_TIME_IN ", ""))
+          stub_time_in(json)
 
-      String.starts_with?(trimmed, "STUB_TIME_OUT ") ->
-        json = String.trim(String.replace(trimmed, "STUB_TIME_OUT ", ""))
-        stub_time_out(json)
+        String.starts_with?(trimmed, "STUB_TIME_OUT ") ->
+          json = String.trim(String.replace(trimmed, "STUB_TIME_OUT ", ""))
+          stub_time_out(json)
 
-      String.starts_with?(trimmed, "STUB_EMP_IN ") ->
-        json = String.trim(String.replace(trimmed, "STUB_EMP_IN ", ""))
-        stub_emp_in(json)
+        String.starts_with?(trimmed, "STUB_EMP_IN ") ->
+          json = String.trim(String.replace(trimmed, "STUB_EMP_IN ", ""))
+          stub_emp_in(json)
 
-      String.starts_with?(trimmed, "STUB_EMP_OUT ") ->
-        json = String.trim(String.replace(trimmed, "STUB_EMP_OUT ", ""))
-        stub_emp_out(json)
+        String.starts_with?(trimmed, "STUB_EMP_OUT ") ->
+          json = String.trim(String.replace(trimmed, "STUB_EMP_OUT ", ""))
+          stub_emp_out(json)
 
-      String.starts_with?(trimmed, "STUB_EMP_LUNCH ") ->
-        json = String.trim(String.replace(trimmed, "STUB_EMP_LUNCH ", ""))
-        stub_emp_lunch(json)
+        String.starts_with?(trimmed, "STUB_EMP_LUNCH ") ->
+          json = String.trim(String.replace(trimmed, "STUB_EMP_LUNCH ", ""))
+          stub_emp_lunch(json)
 
-      String.starts_with?(trimmed, "STUB_UPDATE ") ->
-        json = String.trim(String.replace(trimmed, "STUB_UPDATE ", ""))
-        stub_update(json)
+        String.starts_with?(trimmed, "STUB_UPDATE ") ->
+          json = String.trim(String.replace(trimmed, "STUB_UPDATE ", ""))
+          stub_update(json)
 
-      String.starts_with?(trimmed, "STUB_JSON ") ->
-        json = String.trim(String.replace(trimmed, "STUB_JSON ", ""))
-        stub_json(json)
+        String.starts_with?(trimmed, "STUB_JSON ") ->
+          json = String.trim(String.replace(trimmed, "STUB_JSON ", ""))
+          stub_json(json)
 
-      String.starts_with?(trimmed, "STUB_CLARIFY ") ->
-        msg = String.trim(String.replace(trimmed, "STUB_CLARIFY ", ""))
+        String.starts_with?(trimmed, "STUB_CLARIFY ") ->
+          msg = String.trim(String.replace(trimmed, "STUB_CLARIFY ", ""))
 
-        {:ok,
-         %{
-           "assistant_sms" => if(msg != "", do: msg, else: "Which job did you mean?"),
-           "job_actions" => [],
-           "time_actions" => [],
-           "employee_actions" => [],
-           "reminder_actions" => [],
-           "proposed_job_creates" => [],
-           "image_kind" => "none"
-         }}
+          {:ok,
+           %{
+             "assistant_sms" => if(msg != "", do: msg, else: "Which job did you mean?"),
+             "turn_intent" => "normal",
+             "job_actions" => [],
+             "time_actions" => [],
+             "employee_actions" => [],
+             "reminder_actions" => [],
+             "proposed_job_creates" => [],
+             "image_kind" => "none"
+           }}
 
-      String.starts_with?(trimmed, "STUB_PROPOSE ") ->
-        json = String.trim(String.replace(trimmed, "STUB_PROPOSE ", ""))
-        stub_propose(json)
+        String.starts_with?(trimmed, "STUB_PROPOSE ") ->
+          json = String.trim(String.replace(trimmed, "STUB_PROPOSE ", ""))
+          stub_propose(json)
 
-      true ->
-        {:ok, default_create(trimmed)}
+        true ->
+          {:ok, default_create(trimmed)}
+      end
+
+    with {:ok, map} <- result do
+      {:ok, maybe_force_setup_intent(map, pending)}
     end
   end
+
+  # When a setup session is active, free-form stub defaults (default_create) are
+  # treated as setup answers — production Anthropic uses pending_context the same way.
+  defp maybe_force_setup_intent(map, pending) when is_map(map) and is_map(pending) do
+    setup_active? =
+      Map.get(pending, "scheduling_setup_active") == true or
+        Map.get(pending, :scheduling_setup_active) == true
+
+    explicit_intent? =
+      is_binary(Map.get(map, "turn_intent")) and map["turn_intent"] not in ["", "normal"]
+
+    cond do
+      setup_active? and not explicit_intent? and default_create_shape?(map) ->
+        map
+        |> Map.put("turn_intent", "scheduling_setup_reply")
+        |> Map.put("job_actions", [])
+        |> Map.put("booking_actions", [])
+        |> Map.put("time_actions", [])
+        |> Map.put("employee_actions", [])
+        |> Map.put("reminder_actions", [])
+
+      true ->
+        Map.put_new(map, "turn_intent", "normal")
+    end
+  end
+
+  defp maybe_force_setup_intent(map, _), do: Map.put_new(map, "turn_intent", "normal")
+
+  defp default_create_shape?(%{
+         "job_actions" => [%{"intent" => "create", "job" => %{"client_name" => "Test SMS Lead"}}]
+       }),
+       do: true
+
+  defp default_create_shape?(_), do: false
 
   defp stub_time_in(json) do
     case Jason.decode(json) do
@@ -258,6 +299,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
         map =
           map
           |> lift_legacy_actions_key()
+          |> Map.put_new("turn_intent", "normal")
           |> Map.put_new("job_actions", [])
           |> Map.put_new("time_actions", [])
           |> Map.put_new("employee_actions", [])
@@ -289,6 +331,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.DeterministicStub do
   defp default_create(trimmed) do
     %{
       "assistant_sms" => "Added lead from SMS.",
+      "turn_intent" => "normal",
       "job_actions" => [
         %{
           "intent" => "create",

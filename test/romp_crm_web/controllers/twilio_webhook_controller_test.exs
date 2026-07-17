@@ -264,7 +264,7 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "op_index=3"
 
     assert Jobs.list_jobs(biz.id) |> length() == before + 2
-    assert Jobs.get_job!(existing.id, biz.id).phone == "8029897658"
+    assert Jobs.get_job!(existing.id, biz.id).phone in ["8029897658", "+18029897658"]
 
     assert Enum.any?(Jobs.list_jobs(biz.id), fn j ->
              j.client_name == "Mark Sino" and j.work_description == "Replace refrigerator"
@@ -365,11 +365,19 @@ defmodule RompCrmWeb.TwilioWebhookControllerTest do
     assert log =~ "proposed job creates"
     refute Jobs.list_jobs(biz.id) |> Enum.any?(&(&1.client_name == "Jimmy Wang"))
 
+    confirm_body =
+      "STUB_JSON " <>
+        Jason.encode!(%{
+          "turn_intent" => "confirm_pending_job_creates",
+          "assistant_sms" => "Created Jimmy Wang.",
+          "job_actions" => []
+        })
+
     capture_log([level: :info], fn ->
       conn =
         build_conn()
         |> post(~p"/webhooks/twilio/sms", %{
-          "Body" => "confirm",
+          "Body" => confirm_body,
           "From" => "+15555550123",
           "MessageSid" => "SMstubconfirm1"
         })

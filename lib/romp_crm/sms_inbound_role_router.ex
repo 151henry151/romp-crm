@@ -3,14 +3,14 @@ defmodule RompCrm.SmsInboundRoleRouter do
   Chooses contractor CRM SMS vs client booking SMS when the sender's phone may
   match both a registered user and an active booking conversation.
 
-  Default while a booking conversation is open: treat inbound as **client**
-  scheduling unless the message clearly targets contractor CRM work — then ask
-  which context they mean and remember the reply.
+  Dual-role intent is classified by **`RompCrm.Ai.SmsRoleClassifier`** (Anthropic
+  in production), not keyword regexes.
   """
 
   require Logger
 
   alias RompCrm.Accounts
+  alias RompCrm.Ai.SmsRoleClassifier
   alias RompCrm.Bookings
   alias RompCrm.Bookings.BookingLink
   alias RompCrm.Businesses
@@ -18,11 +18,6 @@ defmodule RompCrm.SmsInboundRoleRouter do
   alias RompCrm.SmsInboundRolePrompts
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
-
-  @contractor_intent_re ~r/\b(create\s+(a\s+)?(new\s+)?job|add\s+(a\s+)?(new\s+)?lead|delete\s+(all\s+)?(my\s+)?jobs?|clock\s+(in|out)|my\s+jobs?\b|my\s+clients?\b|remind\s+me\b|time\s+entr|employee\s+hours?|workspace\b|romp\s*crm\b)\b/i
-
-  @scheduling_choice_re ~r/\b(schedul|appointment|booking|customer|client|service\s+call|the\s+job\s+with)\b/i
-  @contractor_choice_re ~r/\b(romp\s*crm|my\s+jobs?\b|my\s+clients?\b|contractor|account|workspace|managing\s+jobs)\b/i
 
   @type route ::
           {:contractor, Accounts.User.t()}
@@ -68,37 +63,74 @@ defmodule RompCrm.SmsInboundRoleRouter do
         resolve_pending_choice(norm, body, params, user, pending)
 
       nil ->
-        if contractor_intent?(body) do
-          ask_disambiguation(norm, user, links)
-        else
-          Logger.info(
-            "SmsInboundRoleRouter: dual-role phone #{norm} defaulting to client booking (#{length(links)} active link(s))"
-          )
+        context = %{
+          dual_role: true,
+          pending_prompt: false,
+          business_names: Enum.map(links, &business_name_for_link/1) |> Enum.reject(&(&1 == "")),
+          has_active_booking_links: true,
+          has_contractor_user: true
+        }
 
-          {:client, params}
+        case SmsRoleClassifier.classify(body, context) do
+          {:ok, :contractor} ->
+            ask_disambiguation(norm, user, links)
+
+          {:ok, :ask} ->
+            ask_disambiguation(norm, user, links)
+
+          {:ok, :client} ->
+            Logger.info(
+              "SmsInboundRoleRouter: dual-role phone #{norm} classified as client booking (#{length(links)} active link(s))"
+            )
+
+            {:client, params}
+
+          {:error, reason} ->
+            Logger.warning(
+              "SmsInboundRoleRouter: role classify failed phone=#{norm} reason=#{inspect(reason)}; defaulting to client"
+            )
+
+            {:client, params}
         end
     end
   end
 
   defp resolve_pending_choice(norm, body, params, user, pending) do
-    trimmed = String.trim(body)
+    names = SmsInboundRolePrompts.business_names(pending)
 
-    cond do
-      scheduling_choice?(trimmed, pending) ->
+    context = %{
+      dual_role: true,
+      pending_prompt: true,
+      business_names: names,
+      has_active_booking_links: true,
+      has_contractor_user: true
+    }
+
+    case SmsRoleClassifier.classify(body, context) do
+      {:ok, :client} ->
         SmsInboundRolePrompts.clear(norm)
         {:client, params}
 
-      contractor_choice?(trimmed) ->
+      {:ok, :contractor} ->
         SmsInboundRolePrompts.clear(norm)
         {:contractor, user}
 
-      true ->
-        names = SmsInboundRolePrompts.business_names(pending) |> format_business_phrase()
-        reply = "Sorry—please reply with either scheduling (#{names}) or Romp CRM (your jobs and clients)."
+      {:ok, :ask} ->
+        reask_disambiguation(norm, names)
 
-        _ = Messages.send_sms(Phone.to_e164(norm), reply)
-        {:asked_disambiguation, reply}
+      {:error, _} ->
+        reask_disambiguation(norm, names)
     end
+  end
+
+  defp reask_disambiguation(norm, names) do
+    phrase = format_business_phrase(names)
+
+    reply =
+      "Sorry—please reply with either scheduling (#{phrase}) or Romp CRM (your jobs and clients)."
+
+    _ = Messages.send_sms(Phone.to_e164(norm), reply)
+    {:asked_disambiguation, reply}
   end
 
   defp ask_disambiguation(norm, user, links) do
@@ -119,22 +151,6 @@ defmodule RompCrm.SmsInboundRoleRouter do
     Logger.info("SmsInboundRoleRouter: asked dual-role disambiguation phone=#{norm} user_id=#{user.id}")
 
     {:asked_disambiguation, reply}
-  end
-
-  defp contractor_intent?(body) when is_binary(body) do
-    t = String.trim(body)
-    t != "" and String.match?(t, @contractor_intent_re)
-  end
-
-  defp scheduling_choice?(body, pending) do
-    String.match?(body, @scheduling_choice_re) or
-      Enum.any?(SmsInboundRolePrompts.business_names(pending), fn name ->
-        name != "" and String.contains?(String.downcase(body), String.downcase(name))
-      end)
-  end
-
-  defp contractor_choice?(body) do
-    String.match?(body, @contractor_choice_re)
   end
 
   defp business_name_for_link(%BookingLink{business_id: bid}) do

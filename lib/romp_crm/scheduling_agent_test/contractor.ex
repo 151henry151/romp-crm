@@ -9,7 +9,6 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
   alias RompCrm.Reminders
   alias RompCrm.SchedulingAgentTest.{ErrorReply, Escalations, Sandbox}
   alias RompCrm.SmsBookingConsent
-  alias RompCrm.SmsPendingBookingProposals
   alias RompCrm.Twilio.Phone
   alias RompCrm.Twilio.SmsReplyBuilder
 
@@ -38,46 +37,36 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
   end
 
   defp continue_contractor(state, user, business_id, body) do
-    case maybe_apply_pending_booking(state, user, business_id, body) do
-      {:applied, state, reply, client_sms} ->
-        {:ok, state, %{contractor_reply: reply, client_outreach: client_sms}}
-
-      :continue ->
-        extract_and_apply(state, user, business_id, body)
-    end
+    extract_and_apply(state, user, business_id, body)
   end
 
-  defp maybe_apply_pending_booking(state, user, business_id, body) do
-    if SmsPendingBookingProposals.confirmation_message?(body) and state["pending_booking_proposal"] do
-      proposal = state["pending_booking_proposal"]
-      attrs = proposal_to_initiate(proposal, state)
+  defp maybe_apply_pending_booking(state, user, business_id) do
+    proposal = state["pending_booking_proposal"]
+    attrs = proposal_to_initiate(proposal, state)
 
-      case Sandbox.create_booking_link(state, attrs) do
-        {:ok, state, link, client} ->
-          client_sms =
-            ClientInvitationSms.compose(
-              client["client_name"],
-              link,
-              business_id,
-              user.id
-            )
+    case Sandbox.create_booking_link(state, attrs) do
+      {:ok, state, link, client} ->
+        client_sms =
+          ClientInvitationSms.compose(
+            client["client_name"],
+            link,
+            business_id,
+            user.id
+          )
 
-          reply =
-            "Sent #{client["client_name"]} a test scheduling text for the #{link["job_type_label"]} (sandbox only — no real SMS)."
+        reply =
+          "Sent #{client["client_name"]} a test scheduling text for the #{link["job_type_label"]} (sandbox only — no real SMS)."
 
-          state =
-            state
-            |> Sandbox.clear_pending_booking()
-            |> Sandbox.append_contractor_assistant(reply)
-            |> Sandbox.append_client_turn("scheduling_assistant", client_sms)
+        state =
+          state
+          |> Sandbox.clear_pending_booking()
+          |> Sandbox.append_contractor_assistant(reply)
+          |> Sandbox.append_client_turn("scheduling_assistant", client_sms)
 
-          {:applied, state, reply, client_sms}
+        {:ok, state, %{contractor_reply: reply, client_outreach: client_sms}}
 
-        _ ->
-          :continue
-      end
-    else
-      :continue
+      _ ->
+        nil
     end
   end
 
@@ -99,10 +88,22 @@ defmodule RompCrm.SchedulingAgentTest.Contractor do
            mms_image_blocks: [],
            recent_deleted_jobs: [],
            clients_snapshot: Sandbox.clients_snapshot(state),
-           bookings_snapshot: Sandbox.bookings_snapshot(state)
+           bookings_snapshot: Sandbox.bookings_snapshot(state),
+           pending_context: %{
+             "pending_booking_outreach" => not is_nil(state["pending_booking_proposal"]),
+             "pending_job_creates" => false,
+             "pending_slot_approval" => false,
+             "scheduling_setup_active" => false
+           }
          ) do
       {:ok, extracted} ->
-        apply_extracted(state, user, business_id, body, extracted)
+        if Map.get(extracted, :turn_intent) == "confirm_pending_booking_outreach" and
+             state["pending_booking_proposal"] do
+          maybe_apply_pending_booking(state, user, business_id) ||
+            apply_extracted(state, user, business_id, body, extracted)
+        else
+          apply_extracted(state, user, business_id, body, extracted)
+        end
 
       {:error, reason} ->
         reply = ErrorReply.for_reason(reason)

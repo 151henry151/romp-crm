@@ -88,7 +88,16 @@ defmodule RompCrm.SchedulingAgentTestTest do
     assert state["pending_booking_proposal"] != nil
     assert state["client_turns"] == []
 
-    assert {:ok, _} = SchedulingAgentTest.send_contractor(user, business.id, "YES")
+    confirm =
+      Jason.encode!(%{
+        "turn_intent" => "confirm_pending_booking_outreach",
+        "assistant_sms" => "Sending Sally a scheduling text.",
+        "job_actions" => [],
+        "booking_actions" => []
+      })
+
+    assert {:ok, _} =
+             SchedulingAgentTest.send_contractor(user, business.id, "STUB_JSON #{confirm}")
 
     state = SchedulingAgentTest.get_or_create_session(user, business.id)
     assert state["pending_booking_proposal"] == nil

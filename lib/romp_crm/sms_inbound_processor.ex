@@ -196,196 +196,6 @@ defmodule RompCrm.SmsInboundProcessor do
         })
 
       :continue ->
-        :continue_escalation
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_escalation ->
-        cond do
-          phone_norm != "" and Setup.active_session?(business_id, phone_norm) ->
-            handle_scheduling_setup_inbound(
-              ctx,
-              from,
-              user,
-              business_id,
-              phone_norm,
-              body_stored,
-              message_sid,
-              body_text
-            )
-
-          SlotApprovals.pending_for_technician?(business_id, user.id) ->
-            handle_slot_approval_reply(
-              ctx,
-              from,
-              user,
-              business_id,
-              phone_norm,
-              body_stored,
-              message_sid,
-              body_text
-            )
-
-          playbook_preference_message?(body_text) ->
-            handle_playbook_preference_update(
-              ctx,
-              from,
-              user,
-              business_id,
-              phone_norm,
-              body_stored,
-              message_sid,
-              body_text
-            )
-
-          true ->
-            :continue_after_scheduling_hooks
-        end
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_after_scheduling_hooks ->
-        :continue_after_scheduling_hooks
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_after_scheduling_hooks ->
-        if phone_norm != "" and pending_confirmation_message?(body_text) do
-          handle_pending_proposals(
-            ctx,
-            from,
-            user,
-            business_id,
-            phone_norm,
-            body_text,
-            body_stored,
-            message_sid,
-            body_for_ai,
-            jobs_snapshot,
-            allowed_job_ids,
-            open_time_entries,
-            employees_snapshot,
-            allowed_employee_ids,
-            prior_turns,
-            reminder_wall_tz,
-            recent_deleted_jobs,
-            clients_snapshot
-          )
-        else
-          :continue_extract
-        end
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_extract ->
-        handle_pending_proposals(
-          ctx,
-          from,
-          user,
-          business_id,
-          phone_norm,
-          body_text,
-          body_stored,
-          message_sid,
-          body_for_ai,
-          jobs_snapshot,
-          allowed_job_ids,
-          open_time_entries,
-          employees_snapshot,
-          allowed_employee_ids,
-          prior_turns,
-          reminder_wall_tz,
-          recent_deleted_jobs,
-          clients_snapshot
-        )
-    end
-  end
-
-  defp handle_pending_proposals(
-         ctx,
-         from,
-         user,
-         business_id,
-         phone_norm,
-         body_text,
-         body_stored,
-         message_sid,
-         body_for_ai,
-         jobs_snapshot,
-         allowed_job_ids,
-         open_time_entries,
-         employees_snapshot,
-         allowed_employee_ids,
-         prior_turns,
-         reminder_wall_tz,
-         recent_deleted_jobs,
-         clients_snapshot
-       ) do
-    cond do
-      phone_norm != "" and SmsPendingJobProposals.confirmation_message?(body_text) ->
-        case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
-          {:ok, results} ->
-            reply =
-              SmsReplyBuilder.compose(nil, results)
-              |> case do
-                "" -> "Confirmed—created the proposed job(s) in Romp CRM."
-                r -> r
-              end
-
-            sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-              message_sid: message_sid,
-              outcome: "pending_proposals_confirmed",
-              results: results
-            })
-
-          :none ->
-            apply_pending_booking_or_continue(
-              ctx,
-              from,
-              user,
-              business_id,
-              phone_norm,
-              body_stored,
-              message_sid
-            )
-
-          {:error, :wrong_user} ->
-            reply = "Couldn't apply pending jobs for this account."
-
-            sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-              message_sid: message_sid,
-              outcome: "pending_proposals_wrong_user",
-              results: []
-            })
-        end
-
-      phone_norm != "" and SmsPendingBookingProposals.confirmation_message?(body_text) ->
-        apply_pending_booking_or_continue(
-          ctx,
-          from,
-          user,
-          business_id,
-          phone_norm,
-          body_stored,
-          message_sid
-        )
-
-      true ->
-        :continue_extract
-    end
-    |> case do
-      {:ok, _} = done ->
-        done
-
-      :continue_extract ->
         mms_urls = SmsMms.media_urls_from_params(ctx.params)
 
         mms_image_blocks =
@@ -398,6 +208,8 @@ defmodule RompCrm.SmsInboundProcessor do
               )
             end
           end)
+
+        pending_context = build_pending_context(business_id, user.id, phone_norm)
 
         extract_and_deliver_sms_ops(
           ctx,
@@ -419,9 +231,26 @@ defmodule RompCrm.SmsInboundProcessor do
           mms_urls,
           mms_image_blocks,
           recent_deleted_jobs,
-          clients_snapshot
+          clients_snapshot,
+          pending_context
         )
     end
+  end
+
+  defp build_pending_context(business_id, user_id, phone_norm) do
+    pending_jobs =
+      if phone_norm != "", do: SmsPendingJobProposals.get(business_id, phone_norm), else: nil
+
+    pending_booking =
+      if phone_norm != "", do: SmsPendingBookingProposals.get(business_id, phone_norm), else: nil
+
+    %{
+      "pending_job_creates" => not is_nil(pending_jobs),
+      "pending_booking_outreach" => not is_nil(pending_booking),
+      "pending_slot_approval" => SlotApprovals.pending_for_technician?(business_id, user_id),
+      "scheduling_setup_active" =>
+        phone_norm != "" and Setup.active_session?(business_id, phone_norm)
+    }
   end
 
   defp extract_and_deliver_sms_ops(
@@ -444,7 +273,8 @@ defmodule RompCrm.SmsInboundProcessor do
          mms_urls,
          mms_image_blocks,
          recent_deleted_jobs,
-         clients_snapshot
+         clients_snapshot,
+         pending_context
        ) do
     case SmsUnifiedInboundExtractor.extract(
            body_for_ai,
@@ -457,69 +287,25 @@ defmodule RompCrm.SmsInboundProcessor do
            recent_deleted_jobs: recent_deleted_jobs,
            clients_snapshot: clients_snapshot,
            bookings_snapshot: Bookings.snapshot_for_sms_ai(business_id),
-           scheduling_snapshot: scheduling_snapshot_for_ai(business_id, user)
+           scheduling_snapshot: scheduling_snapshot_for_ai(business_id, user),
+           pending_context: pending_context
          ) do
-      {:ok,
-       %{
-         assistant_sms: assistant,
-         job_operations: job_ops_raw,
-         time_operations: time_ops_raw,
-         emp_operations: emp_ops_raw,
-         reminder_operations: rem_ops_raw,
-         booking_operations: booking_ops_raw,
-         proposed_job_creates: proposed_raw,
-         proposed_booking_initiates: proposed_booking_raw,
-         image_kind: image_kind
-       }} ->
-        proposed = fill_proposal_media_urls(proposed_raw, mms_urls)
-
-        if proposed != [] do
-          SmsPendingJobProposals.store!(
-            business_id,
-            user.id,
-            phone_norm,
-            image_kind,
-            proposed
-          )
-
-          Logger.info(
-            "Twilio SMS proposed job creates: sid=#{message_sid} business_id=#{business_id} count=#{length(proposed)} image_kind=#{inspect(image_kind)}"
-          )
-
-          reply =
-            first_nonempty([assistant]) ||
-              default_proposal_reply(proposed)
-
-          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-            message_sid: message_sid,
-            outcome: "proposed_job_creates",
-            proposed_count: length(proposed),
-            image_kind: image_kind,
-            results: []
-          })
-        else
-          deliver_extracted_sms_ops(
-            ctx,
-            user,
-            business_id,
-            from,
-            phone_norm,
-            body_text,
-            body_stored,
-            message_sid,
-            jobs_snapshot,
-            allowed_job_ids,
-            allowed_employee_ids,
-            assistant,
-            job_ops_raw,
-            time_ops_raw,
-            emp_ops_raw,
-            rem_ops_raw,
-            booking_ops_raw,
-            proposed_booking_raw,
-            ctx.params
-          )
-        end
+      {:ok, extracted} ->
+        dispatch_turn_intent(
+          ctx,
+          user,
+          business_id,
+          from,
+          phone_norm,
+          body_text,
+          body_stored,
+          message_sid,
+          jobs_snapshot,
+          allowed_job_ids,
+          allowed_employee_ids,
+          mms_urls,
+          extracted
+        )
 
       {:error, reason} ->
         Logger.warning(
@@ -536,6 +322,237 @@ defmodule RompCrm.SmsInboundProcessor do
           planned_emp_ops: [],
           planned_reminder_ops: [],
           extraction_error: inspect(reason),
+          results: []
+        })
+    end
+  end
+
+  defp dispatch_turn_intent(
+         ctx,
+         user,
+         business_id,
+         from,
+         phone_norm,
+         body_text,
+         body_stored,
+         message_sid,
+         jobs_snapshot,
+         allowed_job_ids,
+         allowed_employee_ids,
+         mms_urls,
+         extracted
+       ) do
+    turn_intent = Map.get(extracted, :turn_intent, "normal")
+
+    case turn_intent do
+      "confirm_pending_job_creates" ->
+        case apply_pending_job_creates(ctx, from, user, business_id, phone_norm, body_stored, message_sid) do
+          {:ok, _} = done -> done
+          :continue_normal -> deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      "confirm_pending_booking_outreach" ->
+        case apply_pending_booking_or_continue(
+               ctx,
+               from,
+               user,
+               business_id,
+               phone_norm,
+               body_stored,
+               message_sid
+             ) do
+          {:ok, _} = done -> done
+          :continue_extract ->
+            deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      "slot_approve" ->
+        case handle_slot_decision(ctx, from, user, business_id, phone_norm, body_stored, message_sid, :approve) do
+          {:ok, _} = done -> done
+          :continue_normal -> deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      "slot_reject" ->
+        case handle_slot_decision(ctx, from, user, business_id, phone_norm, body_stored, message_sid, :reject) do
+          {:ok, _} = done -> done
+          :continue_normal -> deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      "playbook_update" ->
+        case handle_playbook_preference_update(
+               ctx,
+               from,
+               user,
+               business_id,
+               phone_norm,
+               body_stored,
+               message_sid,
+               body_text
+             ) do
+          {:ok, _} = done -> done
+          :continue_after_scheduling_hooks ->
+            deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      "scheduling_setup_reply" ->
+        case handle_scheduling_setup_inbound(
+               ctx,
+               from,
+               user,
+               business_id,
+               phone_norm,
+               body_stored,
+               message_sid,
+               body_text
+             ) do
+          {:ok, _} = done -> done
+          :continue_after_scheduling_hooks ->
+            deliver_normal_extracted_ops(ctx, user, business_id, from, phone_norm, body_text, body_stored, message_sid, jobs_snapshot, allowed_job_ids, allowed_employee_ids, mms_urls, extracted)
+        end
+
+      _ ->
+        deliver_normal_extracted_ops(
+          ctx,
+          user,
+          business_id,
+          from,
+          phone_norm,
+          body_text,
+          body_stored,
+          message_sid,
+          jobs_snapshot,
+          allowed_job_ids,
+          allowed_employee_ids,
+          mms_urls,
+          extracted
+        )
+    end
+  end
+
+  defp deliver_normal_extracted_ops(
+         ctx,
+         user,
+         business_id,
+         from,
+         phone_norm,
+         body_text,
+         body_stored,
+         message_sid,
+         jobs_snapshot,
+         allowed_job_ids,
+         allowed_employee_ids,
+         mms_urls,
+         extracted
+       ) do
+    %{
+      assistant_sms: assistant,
+      job_operations: job_ops_raw,
+      time_operations: time_ops_raw,
+      emp_operations: emp_ops_raw,
+      reminder_operations: rem_ops_raw,
+      booking_operations: booking_ops_raw,
+      proposed_job_creates: proposed_raw,
+      proposed_booking_initiates: proposed_booking_raw,
+      image_kind: image_kind
+    } = extracted
+
+    proposed = fill_proposal_media_urls(proposed_raw, mms_urls)
+
+    if proposed != [] do
+      SmsPendingJobProposals.store!(
+        business_id,
+        user.id,
+        phone_norm,
+        image_kind,
+        proposed
+      )
+
+      Logger.info(
+        "Twilio SMS proposed job creates: sid=#{message_sid} business_id=#{business_id} count=#{length(proposed)} image_kind=#{inspect(image_kind)}"
+      )
+
+      reply =
+        first_nonempty([assistant]) ||
+          default_proposal_reply(proposed)
+
+      sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+        message_sid: message_sid,
+        outcome: "proposed_job_creates",
+        proposed_count: length(proposed),
+        image_kind: image_kind,
+        results: []
+      })
+    else
+      deliver_extracted_sms_ops(
+        ctx,
+        user,
+        business_id,
+        from,
+        phone_norm,
+        body_text,
+        body_stored,
+        message_sid,
+        jobs_snapshot,
+        allowed_job_ids,
+        allowed_employee_ids,
+        assistant,
+        job_ops_raw,
+        time_ops_raw,
+        emp_ops_raw,
+        rem_ops_raw,
+        booking_ops_raw,
+        proposed_booking_raw,
+        ctx.params
+      )
+    end
+  end
+
+  defp apply_pending_job_creates(ctx, from, user, business_id, phone_norm, body_stored, message_sid) do
+    case SmsPendingJobProposals.apply_pending(business_id, user.id, phone_norm) do
+      {:ok, results} ->
+        reply =
+          SmsReplyBuilder.compose(nil, results)
+          |> case do
+            "" -> "Confirmed—created the proposed job(s) in Romp CRM."
+            r -> r
+          end
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "pending_proposals_confirmed",
+          results: results
+        })
+
+      :none ->
+        :continue_normal
+
+      {:error, :wrong_user} ->
+        reply = "Couldn't apply pending jobs for this account."
+
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "pending_proposals_wrong_user",
+          results: []
+        })
+    end
+  end
+
+  defp handle_slot_decision(ctx, from, user, business_id, phone_norm, body_stored, message_sid, decision) do
+    case SlotApprovals.handle_contractor_decision(user.id, business_id, decision) do
+      :none ->
+        :continue_normal
+
+      {:approved, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "slot_approval_granted",
+          results: []
+        })
+
+      {:rejected, reply} ->
+        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+          message_sid: message_sid,
+          outcome: "slot_approval_rejected",
           results: []
         })
     end
@@ -771,11 +788,6 @@ defmodule RompCrm.SmsInboundProcessor do
     else
       note
     end
-  end
-
-  defp pending_confirmation_message?(body) do
-    SmsPendingJobProposals.confirmation_message?(body) or
-      SmsPendingBookingProposals.confirmation_message?(body)
   end
 
   defp apply_pending_booking_or_continue(
@@ -1958,27 +1970,6 @@ defmodule RompCrm.SmsInboundProcessor do
     end
   end
 
-  defp handle_slot_approval_reply(ctx, from, user, business_id, phone_norm, body_stored, message_sid, body_text) do
-    case SlotApprovals.handle_contractor_reply(user.id, business_id, body_text) do
-      :none ->
-        :continue_after_scheduling_hooks
-
-      {:approved, reply} ->
-        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-          message_sid: message_sid,
-          outcome: "slot_approval_granted",
-          results: []
-        })
-
-      {:rejected, reply} ->
-        sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-          message_sid: message_sid,
-          outcome: "slot_approval_rejected",
-          results: []
-        })
-    end
-  end
-
   defp handle_playbook_preference_update(ctx, from, user, business_id, phone_norm, body_stored, message_sid, body_text) do
     context = scheduling_snapshot_for_ai(business_id, user)
 
@@ -2001,10 +1992,4 @@ defmodule RompCrm.SmsInboundProcessor do
         :continue_after_scheduling_hooks
     end
   end
-
-  defp playbook_preference_message?(body) when is_binary(body) do
-    Playbook.playbook_update_message?(body)
-  end
-
-  defp playbook_preference_message?(_), do: false
 end

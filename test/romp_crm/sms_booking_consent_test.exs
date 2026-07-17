@@ -3,7 +3,7 @@ defmodule RompCrm.SmsBookingConsentTest do
 
   alias RompCrm.SmsBookingConsent
 
-  test "strips initiate on same turn as create without contractor consent" do
+  test "keeps AI booking_initiate alongside create (no keyword consent gate)" do
     creates = [
       {:create,
        %{
@@ -24,36 +24,30 @@ defmodule RompCrm.SmsBookingConsentTest do
        }}
     ]
 
-    {^creates, [], [pending]} =
-      SmsBookingConsent.guard_operations(creates, booking, "Jasmine Blair 8027349409 sink", [])
-
-    assert pending["phone"] == "8027349409"
+    {^creates, ^booking, []} =
+      SmsBookingConsent.guard_operations(creates, booking, "anything", [])
   end
 
-  test "keeps initiate when contractor explicitly asks to text" do
+  test "builds pending from proposed_booking_initiates without initiate" do
     creates = [
       {:create,
        %{client_name: "Bob", phone: "8025300293", work_description: "faucet"}}
     ]
 
-    booking = [
-      {:booking_initiate,
-       %{
-         client_name: "Bob",
-         phone: "8025300293",
-         job_type_label: "faucet",
-         duration_min_minutes: 90,
-         duration_max_minutes: 120
-       }}
+    proposed = [
+      %{
+        "client_name" => "Bob",
+        "phone" => "8025300293",
+        "job_type_label" => "faucet",
+        "duration_min_minutes" => 90,
+        "duration_max_minutes" => 120
+      }
     ]
 
-    {^creates, ^booking, []} =
-      SmsBookingConsent.guard_operations(
-        creates,
-        booking,
-        "text Bob to schedule the faucet job",
-        []
-      )
+    {^creates, [], [pending]} =
+      SmsBookingConsent.guard_operations(creates, [], "Bob faucet", proposed)
+
+    assert pending["phone"] == "8025300293"
   end
 
   test "does not propose booking when create has scheduled_on" do

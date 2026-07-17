@@ -39,5 +39,18 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractorTest do
 
       assert patch[:address] == "1 Main"
     end
+
+    test "STUB_JSON turn_intent is parsed" do
+      raw =
+        "STUB_JSON " <>
+          Jason.encode!(%{
+            "turn_intent" => "confirm_pending_booking_outreach",
+            "assistant_sms" => "ok",
+            "job_actions" => []
+          })
+
+      assert {:ok, %{turn_intent: "confirm_pending_booking_outreach"}} =
+               SmsUnifiedInboundExtractor.extract(raw, [], [], [])
+    end
   end
 end

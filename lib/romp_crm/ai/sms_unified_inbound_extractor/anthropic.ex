@@ -16,7 +16,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       )
       when is_binary(raw_message) and is_list(prior_turns) and is_list(opts) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
-    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
+    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-6")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}
@@ -26,6 +26,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       clients_snapshot = Keyword.get(opts, :clients_snapshot, [])
       bookings_snapshot = Keyword.get(opts, :bookings_snapshot, %{})
       scheduling_snapshot = Keyword.get(opts, :scheduling_snapshot, %{})
+      pending_context = Keyword.get(opts, :pending_context, %{})
 
       call_claude(
         api_key,
@@ -39,7 +40,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         recent_deleted_jobs,
         clients_snapshot,
         bookings_snapshot,
-        scheduling_snapshot
+        scheduling_snapshot,
+        pending_context
       )
     end
   end
@@ -56,7 +58,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          recent_deleted_jobs,
          clients_snapshot,
          bookings_snapshot,
-         scheduling_snapshot
+         scheduling_snapshot,
+         pending_context
        ) do
     user_blocks =
       build_user_content_blocks(
@@ -69,7 +72,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         recent_deleted_jobs,
         clients_snapshot,
         bookings_snapshot,
-        scheduling_snapshot
+        scheduling_snapshot,
+        pending_context
       )
 
     body = %{
@@ -150,7 +154,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          recent_deleted_jobs,
          clients_snapshot,
          bookings_snapshot,
-         scheduling_snapshot
+         scheduling_snapshot,
+         pending_context
        ) do
     text =
       user_content_text(
@@ -162,7 +167,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
         recent_deleted_jobs,
         clients_snapshot,
         bookings_snapshot,
-        scheduling_snapshot
+        scheduling_snapshot,
+        pending_context
       )
 
     image_blocks =
@@ -189,7 +195,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          recent_deleted_jobs,
          clients_snapshot,
          bookings_snapshot,
-         scheduling_snapshot
+         scheduling_snapshot,
+         pending_context
        ) do
     jobs_json = encode_json(jobs_snapshot)
     clients_json = encode_json(clients_snapshot)
@@ -198,6 +205,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     deleted_json = encode_json(recent_deleted_jobs)
     bookings_json = encode_json(bookings_snapshot)
     scheduling_json = encode_json(scheduling_snapshot)
+    pending_json = encode_json(pending_context || %{})
 
     thread_block = format_prior_turns(prior_turns)
 
@@ -218,6 +226,11 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Parse the **latest** inbound SMS for Romp CRM: job creates/updates, per-job time clock-in/out, and employee clock-in/out/lunch.
 
     #{thread_block}
+
+    **Pending turn context** (server state — use for `turn_intent` only; do not invent pending items):
+    ---
+    #{pending_json}
+    ---
 
     Latest inbound SMS only (extract operations from this message — use the thread above only for resolving references like "that job", "Bob", "those hours", pronouns, or corrections):
 
@@ -319,6 +332,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     ## Output shape (always)
     {
+      "turn_intent": "<see turn_intent below>",
       "assistant_sms": "<short SMS ≤480 chars to send back; past tense confirmations or one clarifying question>",
       "image_kind": "<see MMS images section when photos attached>",
       "proposed_job_creates": [ ... ],
@@ -329,6 +343,18 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       "booking_actions": [ ... ],
       "proposed_booking_initiates": [ ... ]
     }
+
+    ## turn_intent — decide what this message is mainly doing (semantic judgment; not keywords)
+
+    Read **Pending turn context**. Set exactly one:
+    - `"confirm_pending_job_creates"` — contractor is confirming proposed lead(s) from a prior screenshot/note (pending_job_creates true). Empty action arrays.
+    - `"confirm_pending_booking_outreach"` — contractor is approving a pending "text the customer to schedule" offer. Empty action arrays.
+    - `"slot_approve"` / `"slot_reject"` — answering a pending slot-approval ask (pending_slot_approval true).
+    - `"scheduling_setup_reply"` — answering an active first-time scheduling setup questionnaire (scheduling_setup_active true).
+    - `"playbook_update"` — changing ongoing scheduling preferences/playbook ("from now on…"), not a one-off job date.
+    - `"normal"` — default: CRM ops / Q&A / creates / updates. Use this whenever the message is **not** confirming/answering a pending item above (e.g. "Ok don't text them, just schedule Friday" → normal + job update; "Do that yes" about re-applying phones → normal + updates).
+
+    If a pending flag is true but the latest SMS is clearly about something else, use `"normal"` and emit the appropriate actions. Never invent pending confirms when the context flags are false.
 
     Use **empty arrays** for domains that do not apply. If nothing can be applied safely, use empty arrays for all action arrays and set `assistant_sms` to a brief clarifying question (never leave `assistant_sms` null when you need human input).
 

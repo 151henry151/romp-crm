@@ -13,8 +13,6 @@ defmodule RompCrm.Scheduling.SlotApprovals do
   alias RompCrm.Twilio.Messages
   alias RompCrm.Twilio.Phone
 
-  @yes_re ~r/^(yes|y|ok|okay|sure|go ahead|approve|send|do it)\b/i
-
   def pending_for_technician?(business_id, user_id) when is_integer(business_id) do
     Repo.exists?(
       from a in SlotApproval,
@@ -94,20 +92,38 @@ defmodule RompCrm.Scheduling.SlotApprovals do
     approval
   end
 
-  @doc "Contractor replied to a slot approval prompt."
-  def handle_contractor_reply(user_id, business_id, body) do
+  @doc "Apply an AI-classified slot decision (`:approve` | `:reject`)."
+  def handle_contractor_decision(user_id, business_id, decision)
+      when decision in [:approve, :reject] do
     case get_pending(business_id, user_id) do
       nil ->
         :none
 
       %SlotApproval{} = approval ->
-        if String.match?(String.trim(body), @yes_re) do
-          approve_and_notify_customer!(approval)
-        else
-          reject!(approval)
-          {:rejected, "OK — I won't offer those times. Tell me how you'd like to proceed with that customer."}
+        case decision do
+          :approve ->
+            approve_and_notify_customer!(approval)
+
+          :reject ->
+            reject!(approval)
+
+            {:rejected,
+             "OK — I won't offer those times. Tell me how you'd like to proceed with that customer."}
         end
     end
+  end
+
+  @doc false
+  @deprecated "Use handle_contractor_decision/3 with AI turn_intent"
+  def handle_contractor_reply(user_id, business_id, body) when is_binary(body) do
+    decision =
+      if String.match?(String.trim(body), ~r/^(yes|y|ok|okay|sure|go ahead|approve|send|do it)\b/i) do
+        :approve
+      else
+        :reject
+      end
+
+    handle_contractor_decision(user_id, business_id, decision)
   end
 
   defp approve_and_notify_customer!(%SlotApproval{} = approval) do

@@ -107,6 +107,15 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
               "work_description" => "toilet flange"
             }
           }
+        ],
+        "proposed_booking_initiates" => [
+          %{
+            "client_name" => "Bob Smith",
+            "phone" => "8025300293",
+            "job_type_label" => "toilet flange",
+            "duration_min_minutes" => 90,
+            "duration_max_minutes" => 120
+          }
         ]
       })
 
@@ -115,8 +124,16 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
                delivery: :in_app
              )
 
+    confirm =
+      Jason.encode!(%{
+        "turn_intent" => "confirm_pending_booking_outreach",
+        "assistant_sms" => "Sending Bob a scheduling text.",
+        "job_actions" => [],
+        "booking_actions" => []
+      })
+
     assert {:ok, reply} =
-             SmsInboundProcessor.process(user, business.id, "yes text them",
+             SmsInboundProcessor.process(user, business.id, "STUB_JSON " <> confirm,
                delivery: :in_app
              )
 
@@ -232,8 +249,17 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
         "job_id" => nil
       })
 
+    confirm =
+      Jason.encode!(%{
+        "turn_intent" => "confirm_pending_booking_outreach",
+        "assistant_sms" => "",
+        "job_actions" => []
+      })
+
     assert {:ok, reply} =
-             SmsInboundProcessor.process(user, business.id, "yes", delivery: :in_app)
+             SmsInboundProcessor.process(user, business.id, "STUB_JSON " <> confirm,
+               delivery: :in_app
+             )
 
     assert reply =~ "scheduling texts are temporarily turned off"
     assert SmsPendingBookingProposals.get(business.id, user.phone_normalized) == nil
