@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.2] - 2026-07-17
+
+### Fixed
+
+- Continue normal SMS extraction when customer scheduling SMS is disabled and there is no pending booking proposal, instead of always replying that scheduling texts are turned off
+- Treat booking-confirm SMS only as short start-anchored affirmatives so phrases like "do it tomorrow" or "Ok don't text…" do not hijack the confirm path
+- Sync SMS job contact updates (phone, name, address, …) onto the linked client so `merge_client_onto_job` does not blank them on the next read
+
+### Added
+
+- `Clients.update_job_contact_and_sync/2` for job patches that include client contact fields
+
 ## [0.14.1] - 2026-07-15
 
 ### Changed

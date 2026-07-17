@@ -95,6 +95,41 @@ defmodule RompCrm.Clients do
     end
   end
 
+  @doc """
+  Applies a job update patch. Contact fields (phone, name, address, …) on a linked
+  job are written to the **client** and synced onto all linked jobs so
+  `merge_client_onto_job/1` does not blank them on the next read.
+  Non-contact fields are applied to this job only.
+  """
+  def update_job_contact_and_sync(%Job{} = job, attrs) when is_map(attrs) do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    contact_keys = Enum.map(ClientContact.contact_fields(), &Atom.to_string/1)
+    contact_attrs = Map.take(attrs, contact_keys)
+    other_attrs = Map.drop(attrs, contact_keys)
+
+    cond do
+      is_integer(job.client_id) and contact_attrs != %{} ->
+        case get_client(job.client_id, job.business_id) do
+          nil ->
+            Jobs.update_job(job, attrs)
+
+          client ->
+            with {:ok, _client} <- update_client_and_sync_jobs(client, contact_attrs) do
+              job = Jobs.get_job!(job.id, job.business_id)
+
+              if other_attrs == %{} do
+                {:ok, job}
+              else
+                Jobs.update_job(job, other_attrs)
+              end
+            end
+        end
+
+      true ->
+        Jobs.update_job(job, attrs)
+    end
+  end
+
   defp sync_linked_jobs_from_client(%Client{} = client) do
     job_attrs =
       client

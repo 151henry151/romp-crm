@@ -183,6 +183,105 @@ defmodule RompCrm.SmsInboundProcessorBookingTest do
     assert first_sms =~ "openings"
   end
 
+  test "yes with scheduling SMS disabled and no pending continues instead of canned reply", %{
+    user: user,
+    business: business
+  } do
+    prev = Application.get_env(:romp_crm, :customer_scheduling_sms_enabled)
+
+    on_exit(fn ->
+      if is_nil(prev) do
+        Application.delete_env(:romp_crm, :customer_scheduling_sms_enabled)
+      else
+        Application.put_env(:romp_crm, :customer_scheduling_sms_enabled, prev)
+      end
+    end)
+
+    Application.put_env(:romp_crm, :customer_scheduling_sms_enabled, false)
+    refute SmsPendingBookingProposals.get(business.id, user.phone_normalized)
+
+    assert {:ok, reply} =
+             SmsInboundProcessor.process(user, business.id, "yes", delivery: :in_app)
+
+    refute reply =~ "scheduling texts are temporarily turned off"
+  end
+
+  test "yes with pending booking and scheduling SMS disabled explains feature is off", %{
+    user: user,
+    business: business
+  } do
+    prev = Application.get_env(:romp_crm, :customer_scheduling_sms_enabled)
+
+    on_exit(fn ->
+      if is_nil(prev) do
+        Application.delete_env(:romp_crm, :customer_scheduling_sms_enabled)
+      else
+        Application.put_env(:romp_crm, :customer_scheduling_sms_enabled, prev)
+      end
+    end)
+
+    Application.put_env(:romp_crm, :customer_scheduling_sms_enabled, false)
+
+    _ =
+      SmsPendingBookingProposals.store!(business.id, user.id, user.phone_normalized, %{
+        "client_name" => "Pat Pending",
+        "phone" => "8025550188",
+        "job_type_label" => "drain clear",
+        "duration_min_minutes" => 60,
+        "duration_max_minutes" => 90,
+        "job_id" => nil
+      })
+
+    assert {:ok, reply} =
+             SmsInboundProcessor.process(user, business.id, "yes", delivery: :in_app)
+
+    assert reply =~ "scheduling texts are temporarily turned off"
+    assert SmsPendingBookingProposals.get(business.id, user.phone_normalized) == nil
+  end
+
+  test "SMS phone update syncs linked client so merge-on-read keeps the number", %{
+    user: user,
+    business: business
+  } do
+    assert {:ok, client} =
+             RompCrm.Clients.create_client(%{
+               business_id: business.id,
+               client_name: "Carolyn Brewer"
+             })
+
+    job =
+      job_fixture(%{
+        business_id: business.id,
+        client_id: client.id,
+        client_name: "Carolyn Brewer",
+        phone: nil,
+        status: :pending
+      })
+
+    payload =
+      Jason.encode!(%{
+        "assistant_sms" => "Updated Carolyn Brewer's phone number.",
+        "job_actions" => [
+          %{
+            "intent" => "update",
+            "job_id" => job.id,
+            "updates" => %{"phone" => "8023497583"}
+          }
+        ]
+      })
+
+    assert {:ok, reply} =
+             SmsInboundProcessor.process(user, business.id, "STUB_JSON " <> payload,
+               delivery: :in_app
+             )
+
+    assert reply =~ "Carolyn" or reply =~ "phone" or reply =~ "Updated"
+
+    client = RompCrm.Clients.get_client!(client.id, business.id)
+    assert client.phone in ["8023497583", "+18023497583", "18023497583"]
+    assert RompCrm.Jobs.get_job!(job.id, business.id).phone == client.phone
+  end
+
   test "booking confirm_soft via agent converts the pending request", %{
     user: user,
     business: business

@@ -820,18 +820,23 @@ defmodule RompCrm.SmsInboundProcessor do
        ) do
     unless CustomerSchedulingSms.enabled?() do
       case SmsPendingBookingProposals.get(business_id, phone_norm) do
-        nil -> :ok
-        row -> Repo.delete!(row)
+        nil ->
+          # No pending outreach to block — continue into normal extraction
+          # (e.g. "yes" meant something else, or a false-positive confirm phrase).
+          :continue_extract
+
+        row ->
+          Repo.delete!(row)
+
+          reply =
+            "Customer scheduling texts are temporarily turned off — I won't text clients to schedule until that's re-enabled."
+
+          sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
+            message_sid: message_sid,
+            outcome: "pending_booking_disabled",
+            results: []
+          })
       end
-
-      reply =
-        "Customer scheduling texts are temporarily turned off — I won't text clients to schedule until that's re-enabled."
-
-      sms_reply_and_log(ctx, from, user, business_id, phone_norm, body_stored, reply, %{
-        message_sid: message_sid,
-        outcome: "pending_booking_disabled",
-        results: []
-      })
     else
       do_apply_pending_booking_enabled(
         ctx,
@@ -1742,7 +1747,7 @@ defmodule RompCrm.SmsInboundProcessor do
             patch = Enum.into(patch, %{}, fn {k, v} -> {to_string(k), v} end)
             before_snap = Detail.job_snapshot(job)
 
-            case Jobs.update_job(job, patch) do
+            case Clients.update_job_contact_and_sync(job, patch) do
               {:ok, %Job{} = updated_job} ->
                 updated_job = Jobs.get_job!(updated_job.id, business_id)
                 after_snap = Detail.job_snapshot(updated_job)
@@ -1785,7 +1790,7 @@ defmodule RompCrm.SmsInboundProcessor do
       {:ok, job} ->
         before_snap = Detail.job_snapshot(job)
 
-        case Jobs.update_job(job, patch) do
+        case Clients.update_job_contact_and_sync(job, patch) do
           {:ok, %Job{} = updated_job} ->
             updated_job = Jobs.get_job!(updated_job.id, business_id)
             after_snap = Detail.job_snapshot(updated_job)

@@ -8,12 +8,15 @@ defmodule RompCrm.SmsPendingBookingProposals do
   alias RompCrm.SmsPendingBookingProposals.Pending
   alias RompCrm.Twilio.Phone
 
-  @confirm_re ~r/\b(yes|y|confirm|confirmed|ok|okay|go ahead|do it|text (her|him|them)|send (it|the text|them)|send the scheduling)\b/i
+  # Start-anchored (like pending job confirms). Do not match affirmation words buried
+  # in longer contractor messages ("we're going to do it tomorrow", "Ok don't text…").
+  @confirm_re ~r/^(yes|y|confirm|confirmed|ok|okay|go ahead|do it|text (her|him|them)|send (it|the text|them)|send the scheduling)\b/i
 
   @doc "True when the inbound SMS confirms sending a pending customer booking text."
   def confirmation_message?(body) when is_binary(body) do
     t = String.trim(body)
-    t != "" and String.match?(t, @confirm_re)
+    # Cap length so "Ok don't text the client, just mark the job…" is not a confirm.
+    t != "" and String.match?(t, @confirm_re) and String.length(t) <= 48
   end
 
   def confirmation_message?(_), do: false
