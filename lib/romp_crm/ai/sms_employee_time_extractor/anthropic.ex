@@ -6,7 +6,7 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
 
   def extract(raw_message, employees_snapshot \\ []) when is_binary(raw_message) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
-    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
+    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-6")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}

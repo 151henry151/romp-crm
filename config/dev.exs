@@ -96,7 +96,7 @@ config :romp_crm,
      end),
   twilio_sms_replies_enabled: System.get_env("TWILIO_SMS_REPLIES_ENABLED") != "false",
   anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
-  anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-20250514",
+  anthropic_model: System.get_env("ANTHROPIC_MODEL") || "claude-sonnet-4-6",
   twilio_webhook_public_url: System.get_env("TWILIO_WEBHOOK_PUBLIC_URL"),
   twilio_voice_webhook_public_url: System.get_env("TWILIO_VOICE_WEBHOOK_PUBLIC_URL"),
   twilio_voice_forward_e164:

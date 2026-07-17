@@ -7,7 +7,7 @@ defmodule RompCrm.Clients.MatchSuggest.Anthropic do
   def suggest(business_id, contact, clients_snapshot)
       when is_integer(business_id) and is_map(contact) and is_list(clients_snapshot) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
-    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
+    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-6")
 
     body = %{
       model: model,

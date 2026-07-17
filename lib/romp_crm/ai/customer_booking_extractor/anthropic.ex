@@ -7,7 +7,7 @@ defmodule RompCrm.Ai.CustomerBookingExtractor.Anthropic do
   def extract(raw_message, booking_contexts \\ [], prior_turns \\ [], _opts \\ [])
       when is_binary(raw_message) and is_list(booking_contexts) and is_list(prior_turns) do
     api_key = Application.get_env(:romp_crm, :anthropic_api_key)
-    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-20250514")
+    model = Application.get_env(:romp_crm, :anthropic_model, "claude-sonnet-4-6")
 
     if is_nil(api_key) or api_key == "" do
       {:error, :missing_api_key}

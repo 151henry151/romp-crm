@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1] - 2026-07-17
+
+### Changed
+
+- Default Anthropic model fallback strings to `claude-sonnet-4-6` across extractors, dev config, and self-hosting docs
+- Redirect calendar settings actions with verified routes (`~p"/users/settings"`)
+
 ## [0.15.0] - 2026-07-17
 
 ### Changed

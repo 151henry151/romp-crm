@@ -11,8 +11,6 @@ defmodule RompCrmWeb.CalendarSettingsController do
   alias RompCrm.Scheduling.GoogleCalendarSource
   alias RompCrm.Scheduling.{Playbook, Prefs, TimezoneInference}
 
-  @settings_path "/users/settings"
-
   ## Scheduling preferences
 
   def update_scheduling(conn, params) do
@@ -55,12 +53,12 @@ defmodule RompCrmWeb.CalendarSettingsController do
       {:ok, _} ->
         conn
         |> put_flash(:info, "Scheduling preferences saved.")
-        |> redirect(to: @settings_path)
+        |> redirect(to: ~p"/users/settings")
 
       {:error, _} ->
         conn
         |> put_flash(:error, "Could not save scheduling preferences.")
-        |> redirect(to: @settings_path)
+        |> redirect(to: ~p"/users/settings")
     end
   end
 
@@ -75,7 +73,7 @@ defmodule RompCrmWeb.CalendarSettingsController do
     if apple_id == "" or app_password == "" do
       conn
       |> put_flash(:error, "Apple ID and app-specific password are both required.")
-      |> redirect(to: @settings_path)
+      |> redirect(to: ~p"/users/settings")
     else
       case CalendarCredentials.connect(user.id, "apple", %{
              "apple_id" => apple_id,
@@ -87,12 +85,12 @@ defmodule RompCrmWeb.CalendarSettingsController do
             :info,
             "Apple Calendar connected. Free/busy times will be checked on the next availability lookup."
           )
-          |> redirect(to: @settings_path)
+          |> redirect(to: ~p"/users/settings")
 
         {:error, _} ->
           conn
           |> put_flash(:error, "Could not save the Apple Calendar connection.")
-          |> redirect(to: @settings_path)
+          |> redirect(to: ~p"/users/settings")
       end
     end
   end
@@ -105,7 +103,7 @@ defmodule RompCrmWeb.CalendarSettingsController do
 
     conn
     |> put_flash(:info, "#{source_label(source)} disconnected.")
-    |> redirect(to: @settings_path)
+    |> redirect(to: ~p"/users/settings")
   end
 
   ## Google OAuth
@@ -120,7 +118,7 @@ defmodule RompCrmWeb.CalendarSettingsController do
     else
       conn
       |> put_flash(:error, "Google Calendar is not configured on this server yet.")
-      |> redirect(to: @settings_path)
+      |> redirect(to: ~p"/users/settings")
     end
   end
 
@@ -128,7 +126,7 @@ defmodule RompCrmWeb.CalendarSettingsController do
     conn
     |> delete_session(:google_calendar_oauth_state)
     |> put_flash(:info, "Google Calendar connection was cancelled.")
-    |> redirect(to: @settings_path)
+    |> redirect(to: ~p"/users/settings")
   end
 
   def google_callback(conn, %{"code" => code, "state" => state}) do
@@ -141,19 +139,19 @@ defmodule RompCrmWeb.CalendarSettingsController do
          {:ok, _} <- CalendarCredentials.connect(user.id, "google", creds) do
       conn
       |> put_flash(:info, "Google Calendar connected. Busy times now count toward availability.")
-      |> redirect(to: @settings_path)
+      |> redirect(to: ~p"/users/settings")
     else
       _ ->
         conn
         |> put_flash(:error, "Google Calendar connection failed — please try again.")
-        |> redirect(to: @settings_path)
+        |> redirect(to: ~p"/users/settings")
     end
   end
 
   def google_callback(conn, _params) do
     conn
     |> put_flash(:error, "Google Calendar connection failed — please try again.")
-    |> redirect(to: @settings_path)
+    |> redirect(to: ~p"/users/settings")
   end
 
   ## Helpers
@@ -209,12 +207,12 @@ defmodule RompCrmWeb.CalendarSettingsController do
          {:ok, _} <- Playbook.deactivate_rule!(rule_id, bid, user.id) do
       conn
       |> put_flash(:info, "Scheduling rule removed.")
-      |> redirect(to: @settings_path)
+      |> redirect(to: ~p"/users/settings")
     else
       _ ->
         conn
         |> put_flash(:error, "Could not remove that rule.")
-        |> redirect(to: @settings_path)
+        |> redirect(to: ~p"/users/settings")
     end
   end
 end
