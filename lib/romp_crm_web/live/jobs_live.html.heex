@@ -159,6 +159,9 @@
               <% end %>
             </div>
           </button>
+          <div class="flex items-center justify-end border-t border-base-300/70 px-4 py-2">
+            <.job_print_button job={job} />
+          </div>
 
           <%= if mob_expanded? do %>
             <div
@@ -292,9 +295,7 @@
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Status</th>
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Referred By</th>
             <th class="text-left px-4 py-3 font-medium text-base-content/80">Next Action</th>
-            <%= if @can_edit_jobs do %>
-              <th class="px-4 py-3"></th>
-            <% end %>
+            <th class="text-left px-4 py-3 font-medium text-base-content/80">Print</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-base-300">
@@ -344,14 +345,13 @@
               <td class="px-4 py-3 text-base-content/80 max-w-[150px] truncate">
                 {job.next_action}
               </td>
-              <%= if @can_edit_jobs do %>
-                <td class="px-4 py-3 w-10" onclick="event.stopPropagation()">
-                </td>
-              <% end %>
+              <td class="px-4 py-3 whitespace-nowrap" onclick="event.stopPropagation()">
+                <.job_print_button job={job} />
+              </td>
             </tr>
             <%= if job_expanded? do %>
               <tr id={"job-expand-md-#{job.id}"} class="bg-base-200/40">
-                <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-3 text-sm text-base-content">
+                <td colspan="9" class="px-4 py-3 text-sm text-base-content">
                   <div
                     id={"job-expand-md-panel-#{job.id}"}
                     phx-hook="JobExpandEditGuard"
@@ -486,7 +486,7 @@
           <% end %>
           <%= if JobsList.prepare_jobs(@jobs, @filter, @sort_by) == [] do %>
             <tr>
-              <td colspan={if(@can_edit_jobs, do: 9, else: 8)} class="px-4 py-12 text-center text-base-content/60">
+              <td colspan="9" class="px-4 py-12 text-center text-base-content/60">
                 No jobs found.
               </td>
             </tr>

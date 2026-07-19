@@ -146,6 +146,7 @@ defmodule RompCrmWeb.Router do
     post "/jobs/:job_id/photos", JobPhotoController, :create
     get "/jobs/:job_id/photos/download", JobPhotoController, :download_all
     get "/jobs/:job_id/photos/:photo_id/download", JobPhotoController, :download
+    get "/jobs/:job_id/print", JobPrintController, :download
 
     post "/chats/media", ChatMediaController, :create
 

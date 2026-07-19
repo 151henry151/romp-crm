@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0] - 2026-07-18
+
+### Added
+
+- Per-job "Print job" PDF download on the jobs list (`GET /jobs/:job_id/print`) with contact, schedule, status, work items, materials, hours logged, notes, and embedded photos
+- `RompCrm.JobPrint` report builder and HTML document for single-job PDFs (reuses the print-reports PDF adapter)
+
 ## [0.15.1] - 2026-07-17
 
 ### Changed

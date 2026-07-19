@@ -4,6 +4,7 @@ defmodule RompCrmWeb.JobsLive do
   import RompCrmWeb.JobExpandLists
   import RompCrmWeb.JobExpandedInlineFields
   import RompCrmWeb.JobDeleteBar, only: [job_delete_bar: 1]
+  import RompCrmWeb.JobPrintButton, only: [job_print_button: 1]
   import RompCrmWeb.JobPhotosSection, only: [job_photos_section: 1]
   import RompCrmWeb.JobAddPhotosModal, only: [job_add_photos_modal: 1]
   import RompCrmWeb.JobPhotoViewerModal, only: [job_photo_viewer_modal: 1]
