@@ -3,13 +3,17 @@ defmodule RompCrm.Employees.TimeEntryActions do
   Shared create/update/delete for employee workday time entries with audit logging.
   """
 
+  alias RompCrm.Accounts.User
   alias RompCrm.BusinessAuditLogs
   alias RompCrm.Employees
   alias RompCrm.Employees.{EmployeeTimeEntry, TimeAudit}
+  alias RompCrm.LocalWallClock
+  alias RompCrm.Reminders
+  alias RompCrm.Repo
 
   @doc "Live punch in from the workday timeclock UI."
   def clock_in_live(business_id, actor_user_id, employee, at \\ nil) do
-    at = at || NaiveDateTime.utc_now(:second)
+    at = at || default_live_punch_at(actor_user_id)
 
     attrs = %{
       business_id: business_id,
@@ -29,7 +33,7 @@ defmodule RompCrm.Employees.TimeEntryActions do
 
   @doc "Live punch out from the workday timeclock UI."
   def clock_out_live(business_id, actor_user_id, employee, %EmployeeTimeEntry{} = entry, at \\ nil) do
-    at = at || NaiveDateTime.utc_now(:second)
+    at = at || default_live_punch_at(actor_user_id)
     before = TimeAudit.snapshot(entry)
 
     attrs = %{clocked_out_at: at, clock_out_kind: :live_punch}
@@ -228,6 +232,23 @@ defmodule RompCrm.Employees.TimeEntryActions do
     end
   end
 
+  defp default_live_punch_at(actor_user_id) when is_integer(actor_user_id) do
+    tz =
+      case Repo.get(User, actor_user_id) do
+        %User{} = user ->
+          user.sms_reminder_prefs_json
+          |> Reminders.decode_prefs_json()
+          |> Map.get("timezone", LocalWallClock.default_timezone())
+
+        _ ->
+          LocalWallClock.default_timezone()
+      end
+
+    LocalWallClock.now(tz)
+  end
+
+  defp default_live_punch_at(_), do: LocalWallClock.now()
+
   defp record_audit(business_id, actor_user_id, source, action, entry, metadata, audit_extra \\ %{}) do
     metadata =
       metadata
@@ -245,3 +266,4 @@ defmodule RompCrm.Employees.TimeEntryActions do
     })
   end
 end
+

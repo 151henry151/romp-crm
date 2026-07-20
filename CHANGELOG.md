@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.16.2] - 2026-07-20
+
+### Fixed
+
+- Store live workday timeclock punches as local wall-clock times (user SMS reminder timezone) instead of UTC digits in naive columns
+- Prefill job-hours `datetime-local` defaults from local wall clock instead of UTC
+
+### Added
+
+- `RompCrm.LocalWallClock` helper for business-local naive datetimes
+
 ## [0.16.1] - 2026-07-20
 
 ### Fixed

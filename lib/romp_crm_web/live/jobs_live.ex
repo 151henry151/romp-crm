@@ -313,7 +313,13 @@ defmodule RompCrmWeb.JobsLive do
       job_id = String.to_integer(job_id)
       bid = socket.assigns.current_business_id
       job = Jobs.get_job!(job_id, bid)
-      {s, e} = JobTimeLogDefaults.default_datetime_local_pair()
+
+      tz =
+        socket.assigns.current_scope.user.sms_reminder_prefs_json
+        |> RompCrm.Reminders.decode_prefs_json()
+        |> Map.get("timezone", RompCrm.LocalWallClock.default_timezone())
+
+      {s, e} = JobTimeLogDefaults.default_datetime_local_pair(tz)
 
       {:noreply,
        socket
