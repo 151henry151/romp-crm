@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1] - 2026-07-20
+
+### Fixed
+
+- Keep job `notes` on the job row after expand-edit save instead of overlaying linked client notes via `merge_client_onto_job`
+- Stop copying client `notes` onto linked jobs during client contact sync
+
 ## [0.16.0] - 2026-07-18
 
 ### Added

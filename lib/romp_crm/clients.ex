@@ -134,6 +134,7 @@ defmodule RompCrm.Clients do
     job_attrs =
       client
       |> copy_client_contact_to_job_attrs()
+      |> Map.drop(["notes"])
       |> Map.put("client_id", client.id)
 
     client = Repo.preload(client, :jobs, force: true)
@@ -231,12 +232,19 @@ defmodule RompCrm.Clients do
 
   @doc """
   Overlays linked client contact fields onto a job for list/display (job-specific fields unchanged).
+
+  **`notes`** are intentionally not overlaid — job Notes / Availability stay on the job row;
+  client Notes stay on the client record.
   """
   def merge_client_onto_job(%Job{client: %Client{} = client} = job) do
     contact = ClientContact.from_struct(client)
 
-    Enum.reduce(ClientContact.contact_fields(), job, fn field, acc ->
-      Map.put(acc, field, Map.get(contact, field))
+    Enum.reduce(ClientContact.contact_fields(), job, fn
+      :notes, acc ->
+        acc
+
+      field, acc ->
+        Map.put(acc, field, Map.get(contact, field))
     end)
   end
 
