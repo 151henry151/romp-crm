@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.4] - 2026-07-20
+
+### Changed
+
+- Omit blank job fields and empty sections from Print job PDFs instead of rendering placeholder labels or dashes
+
 ## [0.16.3] - 2026-07-20
 
 ### Fixed

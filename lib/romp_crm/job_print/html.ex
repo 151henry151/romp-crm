@@ -8,29 +8,22 @@ defmodule RompCrm.JobPrint.Html do
     job = report.job
     title = headline(job)
 
-    body = """
-    <header class="masthead">
-      <p class="eyebrow">#{esc(report.business_name)}</p>
-      <h1>#{esc(title)}</h1>
-      <p class="sub">Job ##{job.id}</p>
-    </header>
-
-    <section class="summary">
-      <div class="stat"><span class="num">#{esc(status_label(job.status))}</span><span class="lbl">Status</span></div>
-      <div class="stat"><span class="num">#{esc(priority_label(job.priority))}</span><span class="lbl">Priority</span></div>
-      <div class="stat"><span class="num">#{esc(format_minutes(report.total_minutes))}</span><span class="lbl">Hours logged</span></div>
-    </section>
-
-    #{section("Contact & schedule", details_dl(job, report))}
-    #{section("Work description", prose(job.work_description))}
-    #{section("Customer comments", prose(job.customer_comments))}
-    #{section("Notes", prose(job.notes))}
-    #{section("Next action", prose(job.next_action))}
-    #{section("Work items", work_items_table(report.work_items))}
-    #{section("Materials", materials_table(report.materials))}
-    #{section("Hours logged", hours_table(report.time_entries))}
-    #{section("Photos", photos_block(report.photos))}
-    """
+    body =
+      [
+        masthead(report.business_name, title, job.id),
+        summary_block(job, report.total_minutes),
+        optional_section("Contact & schedule", details_dl(job, report)),
+        optional_section("Work description", prose(job.work_description)),
+        optional_section("Customer comments", prose(job.customer_comments)),
+        optional_section("Notes", prose(job.notes)),
+        optional_section("Next action", prose(job.next_action)),
+        optional_section("Work items", work_items_table(report.work_items)),
+        optional_section("Materials", materials_table(report.materials)),
+        optional_section("Hours logged", hours_table(report.time_entries)),
+        optional_section("Photos", photos_block(report.photos))
+      ]
+      |> Enum.reject(&(&1 in ["", nil]))
+      |> Enum.join("\n")
 
     wrap(title, body)
   end
@@ -38,44 +31,97 @@ defmodule RompCrm.JobPrint.Html do
   defp headline(%{client_name: name}) when is_binary(name) and name != "", do: name
   defp headline(_), do: "Job details"
 
-  defp details_dl(job, report) do
-    rows = [
-      {"Client", dash(job.client_name)},
-      {"Phone", dash(job.phone)},
-      {"Email", dash(job.client_email)},
-      {"Service address", dash(report.service_address)},
-      {"Billing address", billing_line(report.billing_address)},
-      {"Scheduled", format_schedule(job.scheduled_on, job.scheduled_time)},
-      {"Referred by", dash(job.referred_by)},
-      {"Created", format_dt(job.inserted_at)},
-      {"Updated", format_dt(job.updated_at)}
-    ]
-
-    body =
-      Enum.map_join(rows, "\n", fn {label, value} ->
-        "<div class=\"row\"><dt>#{esc(label)}</dt><dd>#{esc(value)}</dd></div>"
-      end)
-
+  defp masthead(business_name, title, job_id) do
     """
-    <dl class="details">
-    #{body}
-    </dl>
+    <header class="masthead">
+      <p class="eyebrow">#{esc(business_name)}</p>
+      <h1>#{esc(title)}</h1>
+      <p class="sub">Job ##{job_id}</p>
+    </header>
     """
   end
 
-  defp billing_line(nil), do: "Same as service"
-  defp billing_line(""), do: "Same as service"
-  defp billing_line(v), do: v
+  defp summary_block(job, total_minutes) do
+    stats =
+      [
+        {"Status", status_label(job.status)},
+        {"Priority", priority_label(job.priority)},
+        if(is_integer(total_minutes) and total_minutes > 0,
+          do: {"Hours logged", format_minutes(total_minutes)},
+          else: nil
+        )
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.filter(fn {_lbl, val} -> present?(val) end)
 
-  defp work_items_table([]), do: ~s(<p class="empty">No work items.</p>)
+    if stats == [] do
+      ""
+    else
+      inner =
+        Enum.map_join(stats, "\n", fn {lbl, val} ->
+          ~s(<div class="stat"><span class="num">#{esc(val)}</span><span class="lbl">#{esc(lbl)}</span></div>)
+        end)
+
+      """
+      <section class="summary">
+      #{inner}
+      </section>
+      """
+    end
+  end
+
+  defp details_dl(job, report) do
+    rows =
+      [
+        {"Client", job.client_name},
+        {"Phone", job.phone},
+        {"Email", job.client_email},
+        {"Service address", blankable_address(report.service_address)},
+        {"Billing address", report.billing_address},
+        {"Scheduled", schedule_value(job.scheduled_on, job.scheduled_time)},
+        {"Referred by", job.referred_by},
+        {"Created", format_dt(job.inserted_at)},
+        {"Updated", format_dt(job.updated_at)}
+      ]
+      |> Enum.filter(fn {_label, value} -> present?(value) end)
+
+    if rows == [] do
+      nil
+    else
+      body =
+        Enum.map_join(rows, "\n", fn {label, value} ->
+          "<div class=\"row\"><dt>#{esc(label)}</dt><dd>#{esc(value)}</dd></div>"
+        end)
+
+      """
+      <dl class="details">
+      #{body}
+      </dl>
+      """
+    end
+  end
+
+  defp blankable_address(nil), do: nil
+  defp blankable_address(""), do: nil
+  defp blankable_address("—"), do: nil
+  defp blankable_address(v), do: v
+
+  defp schedule_value(nil, _), do: nil
+  defp schedule_value(%Date{} = d, nil), do: format_date(d)
+
+  defp schedule_value(%Date{} = d, %Time{} = t) do
+    "#{format_date(d)} #{Calendar.strftime(t, "%H:%M")}"
+  end
+
+  defp work_items_table([]), do: nil
 
   defp work_items_table(items) do
     body =
       Enum.map_join(items, "\n", fn wi ->
         """
         <tr>
-          <td>#{esc(dash(wi.title))}</td>
-          <td>#{esc(format_schedule(wi.scheduled_on, wi.scheduled_time))}</td>
+          <td>#{esc(wi.title)}</td>
+          <td>#{esc(schedule_value(wi.scheduled_on, wi.scheduled_time) || "")}</td>
           <td>#{esc(if(wi.completed, do: "Done", else: "Open"))}</td>
         </tr>
         """
@@ -89,9 +135,19 @@ defmodule RompCrm.JobPrint.Html do
     """
   end
 
-  defp materials_table([]), do: ~s(<p class="empty">No materials listed.</p>)
+  defp materials_table([]), do: nil
 
   defp materials_table(rows) do
+    show_price? =
+      Enum.any?(rows, fn m -> present?(Map.get(m, :unit_price) || Map.get(m, "unit_price")) end)
+
+    headers =
+      if show_price? do
+        "<tr><th>Material</th><th>Qty</th><th>Unit price</th><th>On</th><th>Status</th></tr>"
+      else
+        "<tr><th>Material</th><th>Qty</th><th>On</th><th>Status</th></tr>"
+      end
+
     body =
       Enum.map_join(rows, "\n", fn m ->
         qty = format_qty(Map.get(m, :quantity) || Map.get(m, "quantity"))
@@ -99,12 +155,13 @@ defmodule RompCrm.JobPrint.Html do
         scope = Map.get(m, :scope_label) || Map.get(m, :scope) || "Job"
         done? = Map.get(m, :completed) || Map.get(m, "completed")
         price = format_money(Map.get(m, :unit_price) || Map.get(m, "unit_price"))
+        price_cell = if show_price?, do: "<td>#{esc(price || "")}</td>", else: ""
 
         """
         <tr>
-          <td>#{esc(dash(desc))}</td>
-          <td>#{esc(qty)}</td>
-          <td>#{esc(price)}</td>
+          <td>#{esc(desc)}</td>
+          <td>#{esc(qty || "")}</td>
+          #{price_cell}
           <td>#{esc(to_string(scope))}</td>
           <td>#{esc(if(done?, do: "Done", else: "Open"))}</td>
         </tr>
@@ -113,36 +170,47 @@ defmodule RompCrm.JobPrint.Html do
 
     """
     <table>
-      <thead><tr><th>Material</th><th>Qty</th><th>Unit price</th><th>On</th><th>Status</th></tr></thead>
+      <thead>#{headers}</thead>
       <tbody>#{body}</tbody>
     </table>
     """
   end
 
-  defp hours_table([]), do: ~s(<p class="empty">No hours logged.</p>)
+  defp hours_table([]), do: nil
 
   defp hours_table(entries) do
+    show_notes? = Enum.any?(entries, &present?(&1.notes))
+
+    headers =
+      if show_notes? do
+        "<tr><th>Started</th><th>Ended</th><th>Duration</th><th>Notes</th></tr>"
+      else
+        "<tr><th>Started</th><th>Ended</th><th>Duration</th></tr>"
+      end
+
     body =
       Enum.map_join(entries, "\n", fn te ->
+        notes_cell = if show_notes?, do: "<td>#{esc(te.notes || "")}</td>", else: ""
+
         """
         <tr>
           <td>#{esc(format_naive(te.started_at))}</td>
           <td>#{esc(format_naive(te.ended_at) || "Open")}</td>
-          <td>#{esc(format_minutes(TimeEntry.duration_minutes(te)) || "—")}</td>
-          <td>#{esc(dash(te.notes))}</td>
+          <td>#{esc(format_minutes(TimeEntry.duration_minutes(te)) || "")}</td>
+          #{notes_cell}
         </tr>
         """
       end)
 
     """
     <table>
-      <thead><tr><th>Started</th><th>Ended</th><th>Duration</th><th>Notes</th></tr></thead>
+      <thead>#{headers}</thead>
       <tbody>#{body}</tbody>
     </table>
     """
   end
 
-  defp photos_block([]), do: ~s(<p class="empty">No photos attached.</p>)
+  defp photos_block([]), do: nil
 
   defp photos_block(photos) do
     Enum.map_join(photos, "\n", fn photo ->
@@ -155,24 +223,33 @@ defmodule RompCrm.JobPrint.Html do
     end)
   end
 
-  defp prose(nil), do: ~s(<p class="empty">—</p>)
-  defp prose(""), do: ~s(<p class="empty">—</p>)
+  defp prose(value) do
+    if present?(value) do
+      paragraphs =
+        value
+        |> to_string()
+        |> String.trim()
+        |> String.split(~r/\n{2,}/, trim: true)
+        |> Enum.map_join("\n", fn para ->
+          lines =
+            para
+            |> String.split("\n")
+            |> Enum.map_join("<br />", &esc/1)
 
-  defp prose(text) when is_binary(text) do
-    paragraphs =
-      text
-      |> String.trim()
-      |> String.split(~r/\n{2,}/, trim: true)
-      |> Enum.map_join("\n", fn para ->
-        lines =
-          para
-          |> String.split("\n")
-          |> Enum.map_join("<br />", &esc/1)
+          "<p>#{lines}</p>"
+        end)
 
-        "<p>#{lines}</p>"
-      end)
+      if paragraphs == "", do: nil, else: paragraphs
+    else
+      nil
+    end
+  end
 
-    if paragraphs == "", do: ~s(<p class="empty">—</p>), else: paragraphs
+  defp optional_section(_title, nil), do: ""
+  defp optional_section(_title, ""), do: ""
+
+  defp optional_section(title, inner) when is_binary(inner) do
+    "<section><h2>#{esc(title)}</h2>#{inner}</section>"
   end
 
   defp wrap(title, body) do
@@ -301,11 +378,6 @@ defmodule RompCrm.JobPrint.Html do
       border-bottom: 1pt solid #94a3b8;
     }
     tr:nth-child(even) td { background: #f8fafc; }
-    .empty {
-      color: #64748b;
-      font-style: italic;
-      margin: 0.4rem 0 0.9rem;
-    }
     p { margin: 0.35rem 0 0.75rem; white-space: pre-wrap; }
     .photo {
       break-inside: avoid;
@@ -328,11 +400,20 @@ defmodule RompCrm.JobPrint.Html do
     """
   end
 
-  defp section(title, inner) do
-    "<section><h2>#{esc(title)}</h2>#{inner}</section>"
-  end
+  defp present?(nil), do: false
+  defp present?(""), do: false
+  defp present?("—"), do: false
 
-  defp format_minutes(nil), do: "—"
+  defp present?(s) when is_binary(s), do: String.trim(s) != ""
+
+  defp present?(n) when is_number(n), do: true
+  defp present?(%Date{}), do: true
+  defp present?(%DateTime{}), do: true
+  defp present?(%NaiveDateTime{}), do: true
+  defp present?(%Time{}), do: true
+  defp present?(_), do: false
+
+  defp format_minutes(nil), do: nil
 
   defp format_minutes(mins) when is_integer(mins) do
     h = div(mins, 60)
@@ -346,31 +427,27 @@ defmodule RompCrm.JobPrint.Html do
   end
 
   defp format_date(%Date{} = d), do: Calendar.strftime(d, "%b %d, %Y")
-  defp format_date(_), do: "—"
+  defp format_date(_), do: nil
 
   defp format_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%b %d, %Y %H:%M")
-  defp format_dt(_), do: "—"
+  defp format_dt(_), do: nil
 
   defp format_naive(nil), do: nil
   defp format_naive(%NaiveDateTime{} = ndt), do: Calendar.strftime(ndt, "%b %d, %Y %H:%M")
 
-  defp format_schedule(nil, _), do: "—"
-  defp format_schedule(%Date{} = d, nil), do: format_date(d)
+  defp format_qty(nil), do: nil
 
-  defp format_schedule(%Date{} = d, %Time{} = t) do
-    "#{format_date(d)} #{Calendar.strftime(t, "%H:%M")}"
-  end
+  defp format_qty(n) when is_float(n),
+    do: :erlang.float_to_binary(n, decimals: 2) |> String.trim_trailing("0") |> String.trim_trailing(".")
 
-  defp format_qty(nil), do: "—"
-  defp format_qty(n) when is_float(n), do: :erlang.float_to_binary(n, decimals: 2) |> String.trim_trailing("0") |> String.trim_trailing(".")
   defp format_qty(n) when is_integer(n), do: Integer.to_string(n)
   defp format_qty(n), do: to_string(n)
 
-  defp format_money(nil), do: "—"
+  defp format_money(nil), do: nil
   defp format_money(n) when is_number(n), do: "$#{:erlang.float_to_binary(n * 1.0, decimals: 2)}"
-  defp format_money(_), do: "—"
+  defp format_money(_), do: nil
 
-  defp status_label(nil), do: "—"
+  defp status_label(nil), do: nil
   defp status_label(:lead), do: "Lead"
   defp status_label(:pending), do: "Pending"
   defp status_label(:in_progress), do: "In progress"
@@ -379,12 +456,8 @@ defmodule RompCrm.JobPrint.Html do
 
   defp priority_label(:high), do: "High"
   defp priority_label(:normal), do: "Normal"
-  defp priority_label(nil), do: "—"
+  defp priority_label(nil), do: nil
   defp priority_label(other), do: to_string(other)
-
-  defp dash(nil), do: "—"
-  defp dash(""), do: "—"
-  defp dash(v), do: v
 
   defp esc(nil), do: ""
 
