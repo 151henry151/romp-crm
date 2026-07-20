@@ -1,7 +1,10 @@
 defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
   @moduledoc false
 
+  require Logger
+
   alias RompCrm.Ai.WorkItemsPrompt
+  alias RompCrm.LocalWallClock
 
   @api "https://api.anthropic.com/v1/messages"
   @finch RompCrm.Finch
@@ -28,21 +31,48 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
       scheduling_snapshot = Keyword.get(opts, :scheduling_snapshot, %{})
       pending_context = Keyword.get(opts, :pending_context, %{})
 
-      call_claude(
-        api_key,
-        model,
-        raw_message,
-        jobs_snapshot,
-        open_te_snapshot,
-        employees_snapshot,
-        prior_turns,
-        mms_image_blocks,
-        recent_deleted_jobs,
-        clients_snapshot,
-        bookings_snapshot,
-        scheduling_snapshot,
-        pending_context
-      )
+      wall_tz =
+        Keyword.get(opts, :reminder_wall_tz, LocalWallClock.default_timezone()) ||
+          LocalWallClock.default_timezone()
+
+      request = fn ->
+        call_claude(
+          api_key,
+          model,
+          raw_message,
+          jobs_snapshot,
+          open_te_snapshot,
+          employees_snapshot,
+          prior_turns,
+          mms_image_blocks,
+          recent_deleted_jobs,
+          clients_snapshot,
+          bookings_snapshot,
+          scheduling_snapshot,
+          pending_context,
+          wall_tz
+        )
+      end
+
+      case request.() do
+        {:error, :invalid_json_from_model} ->
+          Logger.warning(
+            "SMS unified extractor: invalid JSON from model; retrying once (tz=#{wall_tz})"
+          )
+
+          request.()
+
+        other ->
+          other
+      end
+    end
+  end
+
+  @doc false
+  def decode_model_text(text) when is_binary(text) do
+    case extract_json_object(text) do
+      {:ok, map} -> {:ok, map}
+      :error -> {:error, :invalid_json_from_model}
     end
   end
 
@@ -59,7 +89,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
          clients_snapshot,
          bookings_snapshot,
          scheduling_snapshot,
-         pending_context
+         pending_context,
+         wall_tz
        ) do
     user_blocks =
       build_user_content_blocks(
@@ -79,7 +110,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     body = %{
       model: model,
       max_tokens: 8192,
-      system: system_prompt(),
+      system: system_prompt(wall_tz),
       messages: [
         %{
           role: "user",
@@ -111,8 +142,15 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
   defp parse_claude_response(%{"content" => [%{"text" => text} | _]}) do
     case extract_json_object(text) do
-      {:ok, map} -> {:ok, map}
-      :error -> {:error, :invalid_json_from_model}
+      {:ok, map} ->
+        {:ok, map}
+
+      :error ->
+        Logger.warning(
+          "SMS unified extractor: could not parse model JSON (truncated): #{inspect(String.slice(text, 0, 400))}"
+        )
+
+        {:error, :invalid_json_from_model}
     end
   end
 
@@ -314,8 +352,9 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     end
   end
 
-  defp system_prompt do
-    today = Date.utc_today() |> Date.to_iso8601()
+  defp system_prompt(wall_tz) when is_binary(wall_tz) do
+    today = LocalWallClock.today(wall_tz) |> Date.to_iso8601()
+    now_local = LocalWallClock.now(wall_tz) |> NaiveDateTime.to_iso8601()
 
     """
     You extract structured operations for a plumbing/mechanical contractor from the **latest** inbound SMS.
@@ -473,6 +512,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     You must choose **`job_id`** by comparing the SMS to the jobs snapshot (and open time entries when clocking out). **Do not** use a separate `"match"` object — disambiguate using reasoning over the snapshot ids.
 
     Use today's date **`#{today}`** for times unless the message states otherwise ("8am" → `#{today}T08:00:00`, etc.).
+    The contractor's local wall-clock **now** is **`#{now_local}`** in timezone **`#{wall_tz}`**.
+    When they say "now", "clock in", "starting work", or "clock out" without a stated clock time, use **`#{now_local}`** (do **not** invent another time and do **not** use UTC).
 
     Return `[]` if the SMS has no job time-tracking intent.
 
@@ -482,8 +523,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
 
     Each element uses **`employee_id`** from the employees snapshot. Use **`open_entry`** on that employee for clock_out/lunch; use **`recent_entries`** (with `entry_id`) for corrections.
 
-    - **Clock in:** `{ "intent": "clock_in", "employee_id": <int>, "clocked_in_at": "<ISO 8601>" }` — e.g. "Bob arrived 8am"
-    - **Clock out:** `{ "intent": "clock_out", "employee_id": <int>, "clocked_out_at": "<ISO 8601>" }` — closes the open entry; e.g. "Bob left at 4pm"
+    - **Clock in:** `{ "intent": "clock_in", "employee_id": <int>, "clocked_in_at": "<ISO 8601>" }` — e.g. "Bob arrived 8am"; for "now" use **`#{now_local}`**
+    - **Clock out:** `{ "intent": "clock_out", "employee_id": <int>, "clocked_out_at": "<ISO 8601>" }` — closes the open entry; for "now" use **`#{now_local}`**
     - **Lunch:** `{ "intent": "lunch", "employee_id": <int>, "lunch_start_at": "...", "lunch_end_at": "..." }` — requires open entry
     - **Log shift:** `{ "intent": "log_shift", "employee_id": <int>, "clocked_in_at": "...", "clocked_out_at": "...", optional lunch fields }` — both times in one message, e.g. "Bob worked 8am-4pm today"
     - **Adjust entry:** `{ "intent": "adjust_entry", "entry_id": <int from recent_entries>, "employee_id": <int>, only changed time fields }`

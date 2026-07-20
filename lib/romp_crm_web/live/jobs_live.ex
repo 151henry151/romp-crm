@@ -697,15 +697,13 @@ defmodule RompCrmWeb.JobsLive do
              {:ok, ended_at} <- resolve_job_time_ended(ended_s, entry_for_resolve) do
           cond do
             is_nil(ended_at) ->
-              {:noreply,
-               save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, nil, notes)}
+              save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, nil, notes)
 
             NaiveDateTime.compare(ended_at, started_at) != :gt ->
               {:noreply, put_flash(socket, :error, "End time must be after start time.")}
 
             true ->
-              {:noreply,
-               save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, ended_at, notes)}
+              save_job_time_log_apply(socket, job_id, bid, user, te_id, started_at, ended_at, notes)
           end
         else
           {:error, :missing} ->

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.3] - 2026-07-20
+
+### Fixed
+
+- Pass contractor local wall-clock "now" into the unified SMS extractor prompt for job/employee clock in/out without a stated time
+- Retry the Anthropic SMS extractor once when model output is not parseable JSON, and log a truncated raw payload on parse failure
+- Return `save_job_time_log_apply/8` directly from JobsLive so saving job hours does not wrap `{:noreply, …}` twice
+
 ## [0.16.2] - 2026-07-20
 
 ### Fixed
