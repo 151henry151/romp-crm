@@ -714,6 +714,42 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  @doc """
+  Reorders all photos on a job by `inserted_at` ascending (oldest to newest), then `id`.
+  Rewrites contiguous `sort_order` values starting at 0.
+  """
+  def sort_job_photos_by_timestamp(%Job{} = job, business_id) when is_integer(business_id) do
+    if job.business_id != business_id do
+      {:error, :wrong_business}
+    else
+      photos =
+        Repo.all(
+          from p in JobPhoto,
+            where: p.job_id == ^job.id,
+            order_by: [asc: p.inserted_at, asc: p.id]
+        )
+
+      Repo.transaction(fn ->
+        photos
+        |> Enum.with_index()
+        |> Enum.each(fn {photo, i} ->
+          {:ok, _} = Repo.update(Ecto.Changeset.change(photo, sort_order: i))
+        end)
+
+        :ok
+      end)
+      |> case do
+        {:ok, :ok} ->
+          updated = get_job!(job.id, business_id)
+          broadcast(business_id, {:updated, updated})
+          {:ok, updated}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
   defp next_job_photo_sort_order(job_id) when is_integer(job_id) do
     case Repo.one(
            from p in JobPhoto,

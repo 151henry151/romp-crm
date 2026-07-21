@@ -520,6 +520,54 @@ defmodule RompCrm.JobsTest do
       assert ids == [b_row.id, a.id]
     end
 
+    test "sort_job_photos_by_timestamp orders oldest to newest" do
+      prev = Application.get_env(:romp_crm, :job_photo_static_dir)
+      dir = Path.join(System.tmp_dir!(), "romp-crm-photo-sort-ts-#{System.unique_integer()}")
+      File.mkdir_p!(dir)
+      Application.put_env(:romp_crm, :job_photo_static_dir, dir)
+
+      on_exit(fn ->
+        File.rm_rf(dir)
+
+        if prev do
+          Application.put_env(:romp_crm, :job_photo_static_dir, prev)
+        else
+          Application.delete_env(:romp_crm, :job_photo_static_dir)
+        end
+      end)
+
+      b = business_fixture()
+      job = job_fixture(%{business_id: b.id})
+
+      assert {:ok, newest} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(8), "image/jpeg")
+      assert {:ok, oldest} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(8), "image/jpeg")
+      assert {:ok, middle} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(8), "image/jpeg")
+
+      t0 = ~U[2024-01-01 10:00:00Z]
+      t1 = ~U[2024-01-02 10:00:00Z]
+      t2 = ~U[2024-01-03 10:00:00Z]
+
+      {:ok, _} =
+        newest
+        |> Ecto.Changeset.change(inserted_at: t2, updated_at: t2)
+        |> Repo.update()
+
+      {:ok, _} =
+        oldest
+        |> Ecto.Changeset.change(inserted_at: t0, updated_at: t0)
+        |> Repo.update()
+
+      {:ok, _} =
+        middle
+        |> Ecto.Changeset.change(inserted_at: t1, updated_at: t1)
+        |> Repo.update()
+
+      assert {:ok, updated} = Jobs.sort_job_photos_by_timestamp(job, b.id)
+      ids = Enum.map(updated.photos, & &1.id)
+      assert ids == [oldest.id, middle.id, newest.id]
+      assert Enum.map(updated.photos, & &1.sort_order) == [0, 1, 2]
+    end
+
     test "delete_all_job_photos removes all rows and files" do
       prev = Application.get_env(:romp_crm, :job_photo_static_dir)
       dir = Path.join(System.tmp_dir!(), "romp-crm-photo-delete-all-#{System.unique_integer()}")

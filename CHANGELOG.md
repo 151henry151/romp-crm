@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.8] - 2026-07-21
+
+### Added
+
+- Add a Sort by timestamp control in job photo edit mode that reorders photos oldest to newest by upload time
+
 ## [0.16.7] - 2026-07-21
 
 ### Added

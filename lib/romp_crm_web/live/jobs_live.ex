@@ -580,6 +580,27 @@ defmodule RompCrmWeb.JobsLive do
     end
   end
 
+  def handle_event("sort_job_photos_by_timestamp", %{"job_id" => jid}, socket) do
+    if not socket.assigns.can_edit_jobs do
+      {:noreply, put_flash(socket, :error, "You do not have permission to reorder photos.")}
+    else
+      jid = String.to_integer(jid)
+      bid = socket.assigns.current_business_id
+      job = Jobs.get_job!(jid, bid)
+
+      case Jobs.sort_job_photos_by_timestamp(job, bid) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Photos sorted oldest to newest.")
+           |> refresh_jobs()}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Could not sort photos by timestamp.")}
+      end
+    end
+  end
+
   def handle_event("request_delete_all_job_photos", %{"job_id" => jid}, socket) do
     if not socket.assigns.can_edit_jobs do
       {:noreply, put_flash(socket, :error, "You do not have permission to delete photos.")}

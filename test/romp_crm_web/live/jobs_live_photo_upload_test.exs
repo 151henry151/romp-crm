@@ -55,6 +55,58 @@ defmodule RompCrmWeb.JobsLivePhotoUploadTest do
     assert html =~ "data-role=\"camera-input\""
   end
 
+  test "photo edit mode shows Sort by timestamp and reorders oldest to newest", %{
+    conn: conn,
+    user: user
+  } do
+    [business] = Businesses.list_businesses_for_user(user)
+    job = job_fixture(%{business_id: business.id, client_name: "Sort Timestamp Client"})
+
+    assert {:ok, newer} =
+             Jobs.add_job_photo(job, business.id, :crypto.strong_rand_bytes(16), "image/jpeg")
+
+    assert {:ok, older} =
+             Jobs.add_job_photo(job, business.id, :crypto.strong_rand_bytes(16), "image/jpeg")
+
+    t_old = ~U[2024-06-01 12:00:00Z]
+    t_new = ~U[2024-06-02 12:00:00Z]
+
+    {:ok, _} =
+      newer
+      |> Ecto.Changeset.change(inserted_at: t_new, updated_at: t_new)
+      |> RompCrm.Repo.update()
+
+    {:ok, _} =
+      older
+      |> Ecto.Changeset.change(inserted_at: t_old, updated_at: t_old)
+      |> RompCrm.Repo.update()
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> element("#job-row-#{job.id}")
+    |> render_click()
+
+    view
+    |> element(
+      "#job-expand-md-#{job.id} button[phx-click=\"job_expand_edit_start\"][data-job-expand-edit-start*=\"photos:#{job.id}:edit\"]"
+    )
+    |> render_click()
+
+    html = render(view)
+    assert html =~ "Sort by timestamp"
+
+    view
+    |> element(
+      "#job-expand-md-#{job.id} button[phx-click=\"sort_job_photos_by_timestamp\"][phx-value-job_id=\"#{job.id}\"]"
+    )
+    |> render_click()
+
+    job = Jobs.get_job!(job.id, business.id)
+    assert Enum.map(job.photos, & &1.id) == [older.id, newer.id]
+    assert render(view) =~ "Photos sorted oldest to newest."
+  end
+
   test "job_photo_uploaded event refreshes job photos", %{conn: conn, user: user} do
     [business] = Businesses.list_businesses_for_user(user)
     job = job_fixture(%{business_id: business.id, client_name: "Refresh Client"})

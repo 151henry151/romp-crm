@@ -31,6 +31,15 @@ defmodule RompCrmWeb.JobPhotosSection do
           <p class="font-medium text-base-content/90 text-sm">Photos:</p>
           <%= if @can_edit_jobs && @photos != [] do %>
             <%= if @editing? do %>
+              <button
+                type="button"
+                phx-click="sort_job_photos_by_timestamp"
+                phx-value-job_id={@job.id}
+                class="rounded-lg border border-base-300 px-2 py-1 text-[11px] font-semibold text-base-content/80 hover:bg-base-200"
+                title="Sort photos oldest to newest by upload time"
+              >
+                Sort by timestamp
+              </button>
               <a
                 href={PathPrefix.request_path("/jobs/#{@job.id}/photos/download")}
                 class="rounded-lg border border-base-300 px-2 py-1 text-[11px] font-semibold text-base-content/80 hover:bg-base-200"
