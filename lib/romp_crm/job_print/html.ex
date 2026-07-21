@@ -163,7 +163,7 @@ defmodule RompCrm.JobPrint.Html do
           <td>#{esc(qty || "")}</td>
           #{price_cell}
           <td>#{esc(to_string(scope))}</td>
-          <td>#{esc(if(done?, do: "Done", else: "Open"))}</td>
+          <td>#{esc(if(done?, do: "Purchased", else: "Needed"))}</td>
         </tr>
         """
       end)

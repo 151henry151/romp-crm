@@ -95,4 +95,38 @@ defmodule RompCrm.JobPrint.HtmlTest do
     assert html =~ "1h 30m"
     refute html =~ "Billing address"
   end
+
+  test "materials status uses Needed and Purchased labels" do
+    job = %Job{
+      id: 9,
+      client_name: "Terra",
+      status: :pending,
+      priority: :normal,
+      inserted_at: ~U[2026-07-21 12:00:00Z],
+      updated_at: ~U[2026-07-21 12:00:00Z]
+    }
+
+    report = %{
+      job: job,
+      business_name: "Print Job Co",
+      service_address: "1 Main",
+      billing_address: nil,
+      work_items: [],
+      materials: [
+        %{description: "PVC adapter", quantity: 1, scope_label: "Job", completed: false, unit_price: nil},
+        %{description: "Glue", quantity: 1, scope_label: "Job", completed: true, unit_price: nil}
+      ],
+      time_entries: [],
+      total_minutes: 0,
+      photos: []
+    }
+
+    html = Html.job_document(report, DateTime.utc_now())
+
+    assert html =~ "Needed"
+    assert html =~ "Purchased"
+    refute html =~ "<td>Open</td>"
+    refute html =~ "<td>Done</td>"
+  end
 end
+

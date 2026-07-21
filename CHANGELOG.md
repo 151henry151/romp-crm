@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.6] - 2026-07-21
+
+### Changed
+
+- Label material status in Print job PDFs as Needed and Purchased instead of Open and Done
+
 ## [0.16.5] - 2026-07-21
 
 ### Fixed
