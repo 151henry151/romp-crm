@@ -46,7 +46,18 @@ defmodule RompCrm.Application do
       chrome =
         Application.get_env(:romp_crm, :chromic_pdf_chrome_path, "/usr/bin/chromium")
 
-      [{ChromicPDF, [chrome_executable: chrome]}]
+      [
+        {ChromicPDF,
+         [
+           chrome_executable: chrome,
+           # Job PDFs with many photos need more than the default 5s session timeout.
+           session_pool: [
+             timeout: 60_000,
+             checkout_timeout: 30_000,
+             init_timeout: 30_000
+           ]
+         ]}
+      ]
     else
       []
     end

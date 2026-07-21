@@ -3,6 +3,8 @@ defmodule RompCrm.JobPrint do
   Single-job printable PDF: full job details, hours, and embedded photos.
   """
 
+  require Logger
+
   alias RompCrm.Addresses
   alias RompCrm.Businesses.Business
   alias RompCrm.JobPrint.Html
@@ -11,6 +13,10 @@ defmodule RompCrm.JobPrint do
   alias RompCrm.Jobs.Job
   alias RompCrm.Repo
   alias RompCrm.TimeTracking
+
+  # Keep compact originals; larger files are resized for ChromicPDF.
+  @pdf_photo_max_bytes 180_000
+  @pdf_photo_max_edge 900
 
   @doc """
   Load a job for PDF printing in the given workspace.
@@ -58,6 +64,33 @@ defmodule RompCrm.JobPrint do
     end
   end
 
+  @doc false
+  def prepare_photo_for_pdf(abs_path, content_type)
+      when is_binary(abs_path) and is_binary(content_type) do
+    bytes = File.read!(abs_path)
+    ct = content_type || guess_content_type(abs_path)
+
+    cond do
+      not String.starts_with?(ct, "image/") ->
+        {ct, bytes}
+
+      byte_size(bytes) <= @pdf_photo_max_bytes and ct == "image/jpeg" ->
+        {ct, bytes}
+
+      true ->
+        case downscale_to_jpeg(abs_path) do
+          {:ok, jpeg} when byte_size(jpeg) < byte_size(bytes) or ct != "image/jpeg" ->
+            {"image/jpeg", jpeg}
+
+          {:ok, jpeg} ->
+            {"image/jpeg", jpeg}
+
+          :error ->
+            {ct, bytes}
+        end
+    end
+  end
+
   defp embed_photos(%Job{} = job) do
     (job.photos || [])
     |> Enum.with_index(1)
@@ -65,16 +98,17 @@ defmodule RompCrm.JobPrint do
       abs = JobUploads.absolute_path(photo.relative_path)
 
       if File.regular?(abs) do
-        bytes = File.read!(abs)
         ct = photo.content_type || guess_content_type(photo.relative_path)
 
         if String.starts_with?(ct, "image/") do
+          {out_ct, bytes} = prepare_photo_for_pdf(abs, ct)
+
           [
             %{
               id: photo.id,
               index: idx,
-              content_type: ct,
-              data_uri: "data:#{ct};base64,#{Base.encode64(bytes)}",
+              content_type: out_ct,
+              data_uri: "data:#{out_ct};base64,#{Base.encode64(bytes)}",
               work_item_id: photo.job_work_item_id
             }
           ]
@@ -85,6 +119,47 @@ defmodule RompCrm.JobPrint do
         []
       end
     end)
+  end
+
+  defp downscale_to_jpeg(abs_path) do
+    tmp =
+      Path.join(
+        System.tmp_dir!(),
+        "romp-job-print-#{System.unique_integer([:positive])}.jpg"
+      )
+
+    args = [
+      abs_path,
+      "-auto-orient",
+      "-resize",
+      "#{@pdf_photo_max_edge}x#{@pdf_photo_max_edge}>",
+      "-quality",
+      "72",
+      tmp
+    ]
+
+    try do
+      case System.cmd("convert", args, stderr_to_stdout: true) do
+        {_, 0} ->
+          if File.regular?(tmp) do
+            jpeg = File.read!(tmp)
+            File.rm(tmp)
+            {:ok, jpeg}
+          else
+            :error
+          end
+
+        {out, code} ->
+          Logger.warning("JobPrint ImageMagick convert failed (#{code}): #{String.slice(out, 0, 200)}")
+          File.rm(tmp)
+          :error
+      end
+    rescue
+      e ->
+        Logger.warning("JobPrint ImageMagick convert error: #{Exception.message(e)}")
+        File.rm(tmp)
+        :error
+    end
   end
 
   defp guess_content_type(path) when is_binary(path) do

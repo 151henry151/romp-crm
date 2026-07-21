@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.5] - 2026-07-21
+
+### Fixed
+
+- Downscale large job photos before embedding them in Print job PDFs so ChromicPDF can finish within a reasonable time
+- Raise ChromicPDF session timeouts for large job prints and return a soft error instead of crashing on print timeouts
+
 ## [0.16.4] - 2026-07-20
 
 ### Changed
