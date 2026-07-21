@@ -9,6 +9,7 @@ defmodule RompCrm.Jobs.JobPhoto do
     field :relative_path, :string
     field :content_type, :string
     field :byte_size, :integer
+    field :content_sha256, :string
     field :source_media_url, :string
     field :sort_order, :integer, default: 0
 
@@ -23,11 +24,13 @@ defmodule RompCrm.Jobs.JobPhoto do
       :relative_path,
       :content_type,
       :byte_size,
+      :content_sha256,
       :source_media_url,
       :sort_order
     ])
     |> validate_required([:job_id, :relative_path])
     |> validate_length(:relative_path, max: 500)
+    |> validate_length(:content_sha256, max: 64)
     |> validate_length(:source_media_url, max: 500)
   end
 end

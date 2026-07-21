@@ -474,6 +474,9 @@ defmodule RompCrm.Jobs do
   Options:
 
     * `:source_media_url` — Twilio MMS URL; skips insert when that URL is already stored on this job
+
+  Skips insert (returns `{:ok, :duplicate_skipped}`) when the same MMS URL or exact
+  image bytes (SHA-256) already exist on this job.
   """
   def add_job_photo(%Job{} = job, business_id, bytes, content_type, work_item_id \\ nil, opts \\ [])
       when is_integer(business_id) and is_binary(bytes) do
@@ -491,7 +494,10 @@ defmodule RompCrm.Jobs do
       if work_item_id == :invalid do
         {:error, :invalid_work_item}
       else
-        if duplicate_source_media_url?(job.id, source_media_url) do
+        content_sha256 = content_sha256_hex(bytes)
+
+        if duplicate_source_media_url?(job.id, source_media_url) or
+             duplicate_content_sha256?(job.id, content_sha256) do
           {:ok, :duplicate_skipped}
         else
           ext = ext_from_content_type(content_type)
@@ -508,6 +514,7 @@ defmodule RompCrm.Jobs do
             relative_path: rel,
             content_type: content_type,
             byte_size: byte_size(bytes),
+            content_sha256: content_sha256,
             source_media_url: source_media_url,
             sort_order: next_job_photo_sort_order(job.id)
           })
@@ -526,6 +533,10 @@ defmodule RompCrm.Jobs do
     end
   end
 
+  defp content_sha256_hex(bytes) when is_binary(bytes) do
+    :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+  end
+
   defp duplicate_source_media_url?(job_id, url) when is_integer(job_id) and is_binary(url) do
     url = String.trim(url)
 
@@ -537,6 +548,75 @@ defmodule RompCrm.Jobs do
   end
 
   defp duplicate_source_media_url?(_job_id, _url), do: false
+
+  defp duplicate_content_sha256?(job_id, hash)
+       when is_integer(job_id) and is_binary(hash) and hash != "" do
+    Repo.exists?(
+      from p in JobPhoto,
+        where: p.job_id == ^job_id and p.content_sha256 == ^hash
+    )
+  end
+
+  defp duplicate_content_sha256?(_job_id, _hash), do: false
+
+  @doc """
+  Backfills missing `content_sha256` from disk, then deletes extra photos on this job
+  that share the same content hash (keeps the earliest `id` per hash). Returns
+  `{:ok, removed_count}`.
+  """
+  def purge_duplicate_photos_for_job(%Job{} = job, business_id) when is_integer(business_id) do
+    if job.business_id != business_id do
+      {:error, :wrong_business}
+    else
+      photos =
+        Repo.all(
+          from p in JobPhoto,
+            where: p.job_id == ^job.id,
+            order_by: [asc: p.id]
+        )
+
+      photos = Enum.map(photos, &ensure_content_sha256/1)
+
+      to_remove =
+        photos
+        |> Enum.group_by(& &1.content_sha256)
+        |> Enum.flat_map(fn
+          {nil, _} -> []
+          {"", _} -> []
+          {_hash, [_keep | dups]} -> dups
+        end)
+
+      Enum.each(to_remove, fn photo ->
+        _ = delete_job_photo_file(photo)
+        Repo.delete!(photo)
+      end)
+
+      if to_remove != [] do
+        updated = get_job!(job.id, business_id)
+        broadcast(business_id, {:updated, updated})
+      end
+
+      {:ok, length(to_remove)}
+    end
+  end
+
+  defp ensure_content_sha256(%JobPhoto{} = photo) do
+    if is_binary(photo.content_sha256) and photo.content_sha256 != "" do
+      photo
+    else
+      abs = RompCrm.JobUploads.absolute_path(photo.relative_path)
+
+      if File.regular?(abs) do
+        hash = content_sha256_hex(File.read!(abs))
+
+        photo
+        |> Ecto.Changeset.change(content_sha256: hash)
+        |> Repo.update!()
+      else
+        photo
+      end
+    end
+  end
 
   @doc """
   Deletes all photos for a job (rows and files on disk).

@@ -509,10 +509,9 @@ defmodule RompCrm.JobsTest do
     test "move_job_photo swaps gallery order" do
       b = business_fixture()
       job = job_fixture(%{business_id: b.id})
-      bytes = :crypto.strong_rand_bytes(8)
 
-      assert {:ok, a} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
-      assert {:ok, b_row} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      assert {:ok, a} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(8), "image/jpeg")
+      assert {:ok, b_row} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(8), "image/jpeg")
 
       assert {:ok, _} = Jobs.move_job_photo(job, b.id, b_row.id, :up)
 
@@ -539,10 +538,10 @@ defmodule RompCrm.JobsTest do
 
       b = business_fixture()
       job = job_fixture(%{business_id: b.id})
-      bytes = :crypto.strong_rand_bytes(64)
 
-      assert {:ok, a} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
-      assert {:ok, b_row} = Jobs.add_job_photo(job, b.id, bytes, "image/jpeg")
+      assert {:ok, a} = Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(64), "image/jpeg")
+      assert {:ok, b_row} =
+               Jobs.add_job_photo(job, b.id, :crypto.strong_rand_bytes(64), "image/jpeg")
       abs_a = RompCrm.JobUploads.absolute_path(a.relative_path)
       abs_b = RompCrm.JobUploads.absolute_path(b_row.relative_path)
       assert File.exists?(abs_a)

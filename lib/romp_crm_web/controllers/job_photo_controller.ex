@@ -99,6 +99,9 @@ defmodule RompCrmWeb.JobPhotoController do
 
           job ->
             case Jobs.add_job_photo(job, business_id, bytes, ct || "image/jpeg", wi_id) do
+              {:ok, :duplicate_skipped} ->
+                respond_success(conn, "That photo is already on this job.")
+
               {:ok, _photo} ->
                 BusinessAuditLogs.record(%{
                   business_id: business_id,

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.7] - 2026-07-21
+
+### Added
+
+- Skip job photo uploads (web and MMS) when the image bytes already exist on the same job via SHA-256 content hash
+- Store `content_sha256` on job photos and add `Jobs.purge_duplicate_photos_for_job/2` to remove existing byte-identical duplicates per job
+
 ## [0.16.6] - 2026-07-21
 
 ### Changed
