@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.9] - 2026-07-23
+
+### Fixed
+
+- Default blank web-added work item titles to New work item so the add control does not hit a NOT NULL database error
+- Append SMS/AI work items with new titles onto existing rows instead of zip-merging equal-count lists that replace titles
+
 ## [0.16.8] - 2026-07-21
 
 ### Added

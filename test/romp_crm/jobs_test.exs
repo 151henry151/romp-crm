@@ -243,6 +243,52 @@ defmodule RompCrm.JobsTest do
       assert length(job2.work_items) == 2
     end
 
+    test "add_job_work_item/2 accepts blank title with a default label" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Pat",
+                 "priority" => "normal",
+                 "status" => "pending",
+                 "work_items" => [%{"title" => "First task"}]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+
+      assert {:ok, {job2, wi}} = Jobs.add_job_work_item(job, %{title: ""})
+      assert wi.title == "New work item"
+      assert length(job2.work_items) == 2
+      assert "First task" in Enum.map(job2.work_items, & &1.title)
+    end
+
+    test "update_job/2 appends a new work item when equal count titles differ (SMS add)" do
+      b = business_fixture()
+
+      assert {:ok, %Job{} = job} =
+               Jobs.create_job(%{
+                 "business_id" => b.id,
+                 "client_name" => "Terra",
+                 "priority" => "normal",
+                 "status" => "pending",
+                 "work_items" => [%{"title" => "Replace pressure tank"}]
+               })
+
+      job = Jobs.get_job!(job.id, b.id)
+
+      assert {:ok, %Job{} = job2} =
+               Jobs.update_job(job, %{
+                 "work_items" => [%{"title" => "Replace hose bib"}]
+               })
+
+      job2 = Jobs.get_job!(job2.id, b.id)
+      titles = Enum.map(job2.work_items, & &1.title)
+      assert length(job2.work_items) == 2
+      assert "Replace pressure tank" in titles
+      assert "Replace hose bib" in titles
+    end
+
     test "update_job/2 appends materials from partial list onto existing materials" do
       b = business_fixture()
 

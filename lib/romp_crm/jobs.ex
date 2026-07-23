@@ -335,10 +335,22 @@ defmodule RompCrm.Jobs do
         _ -> next_order
       end
 
+    title =
+      case Map.get(attrs, "title") || Map.get(attrs, :title) do
+        t when is_binary(t) ->
+          case String.trim(t) do
+            "" -> "New work item"
+            trimmed -> trimmed
+          end
+
+        _ ->
+          "New work item"
+      end
+
     attrs =
       attrs
       |> stringify_keys_shallow()
-      |> Map.put("title", Map.get(attrs, "title") || Map.get(attrs, :title) || "")
+      |> Map.put("title", title)
       |> Map.put("sort_order", sort_order)
       |> Map.put("job_id", job.id)
 
@@ -906,11 +918,11 @@ defmodule RompCrm.Jobs do
   defp maybe_add_work_item_sort_orders(attrs), do: attrs
 
   # When `cast_assoc(:work_items)` receives only new rows (no `id`), Ecto would replace the
-  # association and delete existing line items (`on_replace: :delete`). SMS updates often add a
-  # single new task; merge those onto the preloaded rows. If the model returns the same number
-  # of rows without ids (e.g. date-only edits), zip-merge onto existing ids instead of appending
-  # a full duplicate list. If any row carries a persisted `id`, the caller is responsible for
-  # supplying the full intended list — pass through unchanged.
+  # association and delete existing line items (`on_replace: :delete`). SMS/AI updates often add a
+  # single new task; append those onto the preloaded rows. If the model returns the same number
+  # of rows without ids **and matching titles** (e.g. date-only edits), zip-merge onto existing
+  # ids. Same count with **different** titles is treated as add(s), not rename-in-place. If any
+  # row carries a persisted `id`, the caller is responsible for the full intended list.
   defp merge_append_only_work_items(%Job{} = job, attrs) when is_map(attrs) do
     existing = job.work_items || []
 
@@ -941,11 +953,14 @@ defmodule RompCrm.Jobs do
 
     merged_maps =
       cond do
-        in_len == ex_len ->
+        in_len == ex_len and work_items_titles_align?(existing_sorted, incoming_sorted) ->
           Enum.zip(existing_sorted, incoming_sorted)
           |> Enum.map(fn {ex, inc} -> merge_incoming_onto_existing_wi_row(ex, inc) end)
 
-        in_len > ex_len ->
+        in_len > ex_len and work_items_titles_align?(
+              existing_sorted,
+              Enum.take(incoming_sorted, ex_len)
+            ) ->
           {inc_zip, inc_tail} = Enum.split(incoming_sorted, ex_len)
 
           front =
@@ -956,6 +971,8 @@ defmodule RompCrm.Jobs do
           front ++ tail
 
         true ->
+          # Different titles (or shorter/longer list that is not an extension of the same
+          # titles) means SMS/AI is adding new line items — preserve existing and append.
           preserved = Enum.map(existing_sorted, &work_item_to_nested_attrs/1)
           new_rows = Enum.map(incoming_sorted, &strip_work_item_id_for_append/1)
           preserved ++ new_rows
@@ -963,6 +980,31 @@ defmodule RompCrm.Jobs do
 
     renumber_work_item_sort_orders(merged_maps)
   end
+
+  defp work_items_titles_align?(existing, incoming)
+       when is_list(existing) and is_list(incoming) and length(existing) == length(incoming) do
+    Enum.zip(existing, incoming)
+    |> Enum.all?(fn {ex, inc} ->
+      inc_title =
+        inc
+        |> stringify_keys_shallow()
+        |> Map.get("title")
+        |> normalize_work_item_title()
+
+      ex_title = normalize_work_item_title(ex.title)
+      inc_title == "" or inc_title == ex_title
+    end)
+  end
+
+  defp work_items_titles_align?(_, _), do: false
+
+  defp normalize_work_item_title(nil), do: ""
+
+  defp normalize_work_item_title(t) when is_binary(t) do
+    t |> String.trim() |> String.downcase()
+  end
+
+  defp normalize_work_item_title(t), do: t |> to_string() |> normalize_work_item_title()
 
   defp incoming_work_item_sort_key(row) when is_map(row) do
     case Map.get(row, "sort_order") do
