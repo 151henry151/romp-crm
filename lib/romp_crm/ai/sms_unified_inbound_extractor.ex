@@ -15,6 +15,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
   alias RompCrm.Ai.SmsEmployeeTimeExtractor
   alias RompCrm.Ai.SmsJobExtractor
   alias RompCrm.Ai.SmsReminderExtractor
+  alias RompCrm.Ai.SmsStatedWallTime
   alias RompCrm.Ai.SmsTimeExtractor
 
   @doc """
@@ -56,13 +57,14 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
            prior_turns,
            opts
          ) do
-      {:ok, %{} = attrs} -> parse_combined_payload(attrs, opts)
+      {:ok, %{} = attrs} -> parse_combined_payload(raw_message, attrs, opts)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}
     end
   end
 
-  defp parse_combined_payload(map, opts) when is_map(map) and is_list(opts) do
+  defp parse_combined_payload(raw_message, map, opts)
+       when is_binary(raw_message) and is_map(map) and is_list(opts) do
     map = stringify_keys(map)
 
     assistant =
@@ -107,19 +109,22 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor do
           job_ops
         end
 
-      {:ok,
-       %{
-         assistant_sms: assistant,
-         turn_intent: parse_turn_intent(Map.get(map, "turn_intent")),
-         job_operations: job_ops,
-         time_operations: time_ops,
-         emp_operations: emp_ops,
-         reminder_operations: rem_ops,
-         booking_operations: booking_ops,
-         proposed_job_creates: proposed,
-         proposed_booking_initiates: proposed_booking_initiates,
-         image_kind: image_kind
-       }}
+      result =
+        %{
+          assistant_sms: assistant,
+          turn_intent: parse_turn_intent(Map.get(map, "turn_intent")),
+          job_operations: job_ops,
+          time_operations: time_ops,
+          emp_operations: emp_ops,
+          reminder_operations: rem_ops,
+          booking_operations: booking_ops,
+          proposed_job_creates: proposed,
+          proposed_booking_initiates: proposed_booking_initiates,
+          image_kind: image_kind
+        }
+        |> SmsStatedWallTime.apply_to_result(raw_message)
+
+      {:ok, result}
     end
   end
 

@@ -180,9 +180,11 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor.Anthropic do
     ## Time inference
     - "8am" → T08:00:00, "4pm" → T16:00:00, "noon" → T12:00:00, "3:30pm" → T15:30:00
     - Use today's date (#{today}) unless otherwise stated.
+    - For **new** clock_in / clock_out / lunch / log_shift, times MUST come from the **SMS text** (or "now"). **Never** copy times from snapshot `recent_entries` or prior days — those are only for `adjust_entry` `entry_id`. Example: "Clock me in for the day at 10:45 am" with a recent 08:30 entry → today T10:45:00, not 08:30.
 
     ## Examples
     SMS "picked Henry up at 8am" → clock_in for Henry, clocked_in_at = today T08:00:00
+    SMS "Clock me in for the day at 10:45 am" → clock_in for the matched employee, clocked_in_at = today T10:45:00 (ignore any recent_entries 08:30)
     SMS "Henry took lunch from noon to 1pm" → lunch for Henry, 12:00–13:00
     SMS "dropped Henry off at home at 4pm" → clock_out for Henry, clocked_out_at = today T16:00:00
     SMS "Bob worked from 8am to 4pm today" → log_shift for Bob, in/out today 08:00–16:00

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.10] - 2026-07-28
+
+### Fixed
+
+- Override SMS employee/job punch timestamps with the single stated am/pm clock time from the inbound text when the model copies a prior `recent_entries` time
+- Rewrite confirmation SMS punch times to match that stated clock time
+- Instruct the unified and employee SMS extractors not to copy punch times from `recent_entries` for new clock-in/out actions
+
 ## [0.16.9] - 2026-07-23
 
 ### Fixed

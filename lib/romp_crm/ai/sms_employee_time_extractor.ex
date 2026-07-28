@@ -14,6 +14,8 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
   Datetimes are **naive local wall-clock** values (same as stored in `employee_time_entries`).
   """
 
+  alias RompCrm.Ai.SmsStatedWallTime
+
   @doc """
   Returns `{:ok, %{assistant_sms: nil | String.t(), operations: list}}` or `{:error, reason}`.
 
@@ -29,21 +31,34 @@ defmodule RompCrm.Ai.SmsEmployeeTimeExtractor do
       )
 
     case mod.extract(raw_message, employees_snapshot) do
-      {:ok, attrs} when is_map(attrs) -> parse_extracted_payload(attrs)
+      {:ok, attrs} when is_map(attrs) -> parse_extracted_payload(raw_message, attrs)
       {:error, _} = err -> err
       other -> {:error, {:unexpected, other}}
     end
   end
 
-  defp parse_extracted_payload(map) when is_map(map) do
+  defp parse_extracted_payload(raw_message, map) when is_binary(raw_message) and is_map(map) do
     map = stringify_keys(map)
     assistant = assistant_from_map(map)
 
     case Map.get(map, "actions") do
       actions when is_list(actions) ->
         case parse_actions(actions) do
-          {:ok, ops} -> {:ok, %{assistant_sms: assistant, operations: ops}}
-          err -> err
+          {:ok, ops} ->
+            overridden =
+              SmsStatedWallTime.apply_to_result(
+                %{assistant_sms: assistant, emp_operations: ops, time_operations: []},
+                raw_message
+              )
+
+            {:ok,
+             %{
+               assistant_sms: overridden.assistant_sms,
+               operations: overridden.emp_operations
+             }}
+
+          err ->
+            err
         end
 
       nil ->

@@ -514,6 +514,7 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     Use today's date **`#{today}`** for times unless the message states otherwise ("8am" → `#{today}T08:00:00`, etc.).
     The contractor's local wall-clock **now** is **`#{now_local}`** in timezone **`#{wall_tz}`**.
     When they say "now", "clock in", "starting work", or "clock out" without a stated clock time, use **`#{now_local}`** (do **not** invent another time and do **not** use UTC).
+    When the SMS **does** state a clock time (e.g. "at 10:45am"), that stated time wins — do not substitute a different habitual or prior time.
 
     Return `[]` if the SMS has no job time-tracking intent.
 
@@ -528,6 +529,8 @@ defmodule RompCrm.Ai.SmsUnifiedInboundExtractor.Anthropic do
     - **Lunch:** `{ "intent": "lunch", "employee_id": <int>, "lunch_start_at": "...", "lunch_end_at": "..." }` — requires open entry
     - **Log shift:** `{ "intent": "log_shift", "employee_id": <int>, "clocked_in_at": "...", "clocked_out_at": "...", optional lunch fields }` — both times in one message, e.g. "Bob worked 8am-4pm today"
     - **Adjust entry:** `{ "intent": "adjust_entry", "entry_id": <int from recent_entries>, "employee_id": <int>, only changed time fields }`
+
+    **Punch times (critical):** For **clock_in**, **clock_out**, **lunch**, and **log_shift**, timestamps MUST come from the **latest SMS text** (or **`#{now_local}`** when they say "now" / omit a time). **Never** copy `clocked_in_at` / `clocked_out_at` from **`recent_entries`**, prior chat confirmations, or a habitual schedule — those rows are only for choosing **`entry_id`** on **adjust_entry**. Example: SMS "Clock me in for the day at 10:45 am" while a recent_entry shows 08:30 → use **`#{today}T10:45:00`**, not 08:30. Put that same time in **`assistant_sms`**.
 
     **Disambiguation:** If the SMS is about hours on a **specific client job** (snapshot job name/address context), use **`time_actions`** instead, not `employee_actions`. If unclear, ask one short question in **`assistant_sms`**.
 
