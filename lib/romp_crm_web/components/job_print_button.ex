@@ -18,7 +18,6 @@ defmodule RompCrmWeb.JobPrintButton do
         @class
       ]}
       title="Download a PDF of this job’s details"
-      onclick="event.stopPropagation()"
     >
       <.icon name="hero-printer" class="size-4 shrink-0 opacity-80" />
       Print job

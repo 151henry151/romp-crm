@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.12] - 2026-07-28
+
+### Fixed
+
+- Remove native `stopPropagation` from the Print job control so LiveView `phx-click` can open the print dialog
+
 ## [0.16.11] - 2026-07-28
 
 ### Added
