@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.11] - 2026-07-28
+
+### Added
+
+- Open a Print job dialog to choose With photos or Without photos before downloading the PDF
+- Accept `photos=0` (also `false` / `no` / `off`) on the job print endpoint to skip embedding photos
+
 ## [0.16.10] - 2026-07-28
 
 ### Fixed

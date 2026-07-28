@@ -89,6 +89,26 @@ defmodule RompCrm.JobPrintTest do
       assert length(report.photos) == 1
       assert hd(report.photos).data_uri =~ "data:image/jpeg;base64,"
     end
+
+    test "include_photos: false skips embedding even when job has photos", %{
+      business: business,
+      job: job
+    } do
+      {:ok, _photo} =
+        Jobs.add_job_photo(job, business.id, tiny_jpeg(), "image/jpeg", nil)
+
+      assert {:ok, with_photos} = JobPrint.build_job_report(job.id, business.id)
+      assert length(with_photos.photos) == 1
+
+      assert {:ok, without} =
+               JobPrint.build_job_report(job.id, business.id, include_photos: false)
+
+      assert without.photos == []
+
+      html = RompCrm.JobPrint.Html.job_document(without, DateTime.utc_now())
+      refute html =~ "Photos"
+      refute html =~ "data:image"
+    end
   end
 
   describe "render_pdf/1" do

@@ -21,10 +21,16 @@ defmodule RompCrm.JobPrint do
   @doc """
   Load a job for PDF printing in the given workspace.
 
+  Options:
+
+    * `:include_photos` — when `false`, skip embedding job photos (default `true`)
+
   Returns `{:ok, report}` or `{:error, :not_found}`.
   """
-  def build_job_report(job_id, business_id)
-      when is_integer(job_id) and is_integer(business_id) do
+  def build_job_report(job_id, business_id, opts \\ [])
+      when is_integer(job_id) and is_integer(business_id) and is_list(opts) do
+    include_photos? = Keyword.get(opts, :include_photos, true)
+
     case Jobs.get_job(job_id, business_id) do
       nil ->
         {:error, :not_found}
@@ -33,6 +39,13 @@ defmodule RompCrm.JobPrint do
         time_entries = TimeTracking.list_time_entries_for_job(job.id, business_id)
         total_minutes = TimeTracking.total_minutes_for_job(job.id, business_id)
         business = Repo.get(Business, business_id)
+
+        photos =
+          if include_photos? do
+            embed_photos(job)
+          else
+            []
+          end
 
         {:ok,
          %{
@@ -44,7 +57,7 @@ defmodule RompCrm.JobPrint do
            materials: Jobs.materials_combined(job),
            time_entries: time_entries,
            total_minutes: total_minutes,
-           photos: embed_photos(job)
+           photos: photos
          }}
     end
   end

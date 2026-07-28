@@ -4,12 +4,12 @@ defmodule RompCrmWeb.JobPrintController do
   alias RompCrm.Businesses
   alias RompCrm.JobPrint
 
-  def download(conn, %{"job_id" => job_id}) do
+  def download(conn, %{"job_id" => job_id} = params) do
     user = conn.assigns.current_scope.user
     bid = active_business_id(conn, user)
 
     with {:ok, jid} <- parse_id(job_id),
-         {:ok, report} <- JobPrint.build_job_report(jid, bid),
+         {:ok, report} <- JobPrint.build_job_report(jid, bid, include_photos: include_photos?(params)),
          {:ok, pdf, filename} <- JobPrint.render_pdf(report) do
       conn
       |> put_resp_content_type("application/pdf")
@@ -25,6 +25,13 @@ defmodule RompCrmWeb.JobPrintController do
         conn
         |> put_flash(:error, "Could not build the job PDF. (#{inspect(reason)})")
         |> redirect(to: ~p"/")
+    end
+  end
+
+  defp include_photos?(params) when is_map(params) do
+    case Map.get(params, "photos") do
+      v when v in ["0", "false", "no", "off"] -> false
+      _ -> true
     end
   end
 

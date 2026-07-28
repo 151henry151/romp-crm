@@ -45,6 +45,36 @@ defmodule RompCrmWeb.JobsLiveTest do
     refute has_element?(view, "#job-expand-sm-#{job.id}")
   end
 
+  test "print job opens dialog with with/without photos links", %{conn: conn, user: user} do
+    [business] = Businesses.list_businesses_for_user(user)
+
+    job =
+      job_fixture(%{
+        business_id: business.id,
+        client_name: "Print Dialog Client",
+        work_description: "Print me"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    refute has_element?(view, "#job-print-modal")
+
+    view
+    |> element("#job-row-#{job.id} button[phx-click=\"open_print_job\"]")
+    |> render_click()
+
+    assert has_element?(view, "#job-print-modal")
+    html = render(view)
+    assert html =~ "Print job"
+    assert html =~ "With photos"
+    assert html =~ "Without photos"
+    assert has_element?(view, "#job-print-modal a[href*=\"/jobs/#{job.id}/print\"]", "With photos")
+    assert has_element?(view, "#job-print-modal a[href*=\"photos=0\"]", "Without photos")
+
+    view |> element("#job-print-modal button", "Cancel") |> render_click()
+    refute has_element?(view, "#job-print-modal")
+  end
+
   test "add work item from expanded row", %{conn: conn, user: user} do
     [business] = Businesses.list_businesses_for_user(user)
 

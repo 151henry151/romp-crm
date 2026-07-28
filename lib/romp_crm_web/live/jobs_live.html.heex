@@ -592,6 +592,9 @@
     upload_url={~p"/jobs/#{@add_photos_job_id}/photos"}
   />
 <% end %>
+<%= if @print_job_id do %>
+  <.job_print_modal job_id={@print_job_id} client_name={@print_job_client_name} />
+<% end %>
 <%= if @photo_viewer_job_id && @photo_viewer_photo_id do %>
   <% viewer_job = photo_viewer_job_for_assigns(@jobs, @photo_viewer_job_id) %>
   <%= if viewer_job && viewer_job.photos != [] do %>

@@ -33,4 +33,21 @@ defmodule RompCrmWeb.JobPrintControllerTest do
     assert redirected_to(conn) == ~p"/"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not found"
   end
+
+  test "downloads a PDF without photos when photos=0", %{conn: conn, user: user} do
+    [business] = Businesses.list_businesses_for_user(user)
+
+    job =
+      job_fixture(%{
+        business_id: business.id,
+        client_name: "No Photos Print",
+        work_description: "Quick print"
+      })
+
+    conn = get(conn, ~p"/jobs/#{job.id}/print?photos=0")
+
+    assert response(conn, 200)
+    assert get_resp_header(conn, "content-type") |> hd() =~ "application/pdf"
+    assert byte_size(response(conn, 200)) > 0
+  end
 end

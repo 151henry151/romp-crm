@@ -7,6 +7,7 @@ defmodule RompCrmWeb.JobsLive do
   import RompCrmWeb.JobPrintButton, only: [job_print_button: 1]
   import RompCrmWeb.JobPhotosSection, only: [job_photos_section: 1]
   import RompCrmWeb.JobAddPhotosModal, only: [job_add_photos_modal: 1]
+  import RompCrmWeb.JobPrintModal, only: [job_print_modal: 1]
   import RompCrmWeb.JobPhotoViewerModal, only: [job_photo_viewer_modal: 1]
 
   alias RompCrm.BusinessAuditLogs
@@ -63,6 +64,8 @@ defmodule RompCrmWeb.JobsLive do
      |> assign(:add_photos_job_id, nil)
      |> assign(:add_photos_client_name, "")
      |> assign(:add_photos_saved_count, 0)
+     |> assign(:print_job_id, nil)
+     |> assign(:print_job_client_name, "")
      |> assign(:photo_viewer_job_id, nil)
      |> assign(:photo_viewer_photo_id, nil)
      |> assign(:photo_delete_all_pending_job_id, nil)
@@ -215,6 +218,12 @@ defmodule RompCrmWeb.JobsLive do
     |> assign(:add_photos_job_id, nil)
     |> assign(:add_photos_client_name, "")
     |> assign(:add_photos_saved_count, 0)
+  end
+
+  defp close_print_job_modal(socket) do
+    socket
+    |> assign(:print_job_id, nil)
+    |> assign(:print_job_client_name, "")
   end
 
   defp refresh_time_entries(socket) do
@@ -436,6 +445,26 @@ defmodule RompCrmWeb.JobsLive do
 
   def handle_event("close_add_photos", _params, socket) do
     {:noreply, close_add_photos_modal(socket)}
+  end
+
+  def handle_event("open_print_job", %{"job_id" => job_id}, socket) do
+    job_id = String.to_integer(job_id)
+    bid = socket.assigns.current_business_id
+
+    case Enum.find(socket.assigns.jobs, &(&1.id == job_id)) || Jobs.get_job(job_id, bid) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "Job not found.")}
+
+      job ->
+        {:noreply,
+         socket
+         |> assign(:print_job_id, job_id)
+         |> assign(:print_job_client_name, job.client_name || "Job")}
+    end
+  end
+
+  def handle_event("close_print_job", _params, socket) do
+    {:noreply, close_print_job_modal(socket)}
   end
 
   def handle_event("job_photo_uploaded", %{"count" => count}, socket) do
