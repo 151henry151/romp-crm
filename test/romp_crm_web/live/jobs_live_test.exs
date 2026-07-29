@@ -75,6 +75,31 @@ defmodule RompCrmWeb.JobsLiveTest do
     refute has_element?(view, "#job-print-modal")
   end
 
+  test "choosing a print option closes the dialog", %{conn: conn, user: user} do
+    [business] = Businesses.list_businesses_for_user(user)
+
+    job =
+      job_fixture(%{
+        business_id: business.id,
+        client_name: "Print Close Client",
+        work_description: "Print me"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> element("#job-row-#{job.id} button[phx-click=\"open_print_job\"]")
+    |> render_click()
+
+    assert has_element?(view, "#job-print-modal")
+
+    view
+    |> element("#job-print-modal a[phx-click=\"close_print_job\"]", "Without photos")
+    |> render_click()
+
+    refute has_element?(view, "#job-print-modal")
+  end
+
   test "add work item from expanded row", %{conn: conn, user: user} do
     [business] = Businesses.list_businesses_for_user(user)
 

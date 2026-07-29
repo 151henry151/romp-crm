@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.13] - 2026-07-28
+
+### Fixed
+
+- Close the Print job dialog when choosing With photos or Without photos so LiveView does not unload on the PDF download link
+
 ## [0.16.12] - 2026-07-28
 
 ### Fixed

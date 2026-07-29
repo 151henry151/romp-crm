@@ -27,12 +27,14 @@ defmodule RompCrmWeb.JobPrintModal do
           <a
             href={PathPrefix.request_path("/jobs/#{@job_id}/print")}
             class="btn btn-brand btn-sm"
+            phx-click="close_print_job"
           >
             With photos
           </a>
           <a
             href={PathPrefix.request_path("/jobs/#{@job_id}/print?photos=0")}
             class="btn btn-outline btn-sm"
+            phx-click="close_print_job"
           >
             Without photos
           </a>
